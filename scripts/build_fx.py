@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1] / "max"
 VERSION = dict(major=9, minor=2, revision=0, architecture="arm64", modernui=1)
 
 # Turn-on defaults match the parameters in the native controls. Gen handles

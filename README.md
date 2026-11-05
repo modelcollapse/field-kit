@@ -39,9 +39,11 @@ With audio enabled, click **Record…** and choose where to save the take. Captu
 
 ## Build and test
 
-From a source checkout, open **Field Kit.maxpat** directly in Max 9. To package the editable download, run `python3 package_max_download.py build/field-kit-max.zip`.
+From a source checkout, open [Field Kit.maxpat](max/Field%20Kit.maxpat) in Max 9. The patch, its support files, and the demo live together in [`max/`](max/). Build and packaging tools are in [`scripts/`](scripts/).
 
-Run `python3 build.py` to regenerate the patch, subpatchers, and original demo. Run `python3 prepare_max_project.py . build/standalone` to stage a Max project. Open the generated **Field Kit.maxproj** in Max and choose **File → Build Collective / Application… → Application**. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
+Run `python3 scripts/build.py` to regenerate the patch, subpatchers, and demo. Run `python3 scripts/package_max_download.py build/field-kit-max.zip` to package the editable download.
+
+To build the standalone app, run `python3 scripts/prepare_max_project.py max build/standalone`. Open the generated **Field Kit.maxproj** in Max and choose **File → Build Collective / Application… → Application**. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
 
 Run the playback startup and pattern bank controller tests with Node.js.
 

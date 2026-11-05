@@ -8,4 +8,4 @@ __pycache__/
 *.mxf
 *.zip
 *.wav
-!/fk_demo.wav
+!/max/fk_demo.wav

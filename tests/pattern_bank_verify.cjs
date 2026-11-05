@@ -105,7 +105,7 @@ function File(path, mode) {
 }
 
 const host = vm.createContext({ patcher: { getnamed: named }, File });
-vm.runInContext(readFileSync(join(__dirname, '..', 'fk_patterns.js'), 'utf8'), host);
+vm.runInContext(readFileSync(join(__dirname, '..', 'max', 'fk_patterns.js'), 'utf8'), host);
 
 host.loadbang();
 host.slot(2);

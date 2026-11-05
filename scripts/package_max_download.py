@@ -58,4 +58,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive", type=Path, help="Path of the output ZIP")
     args = parser.parse_args()
-    make_download(Path(__file__).resolve().parent, args.archive)
+    make_download(Path(__file__).resolve().parents[1] / "max", args.archive)

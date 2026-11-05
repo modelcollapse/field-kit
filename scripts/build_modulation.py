@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent
+OUT = Path(__file__).resolve().parents[1] / "max"
 BOXES = []
 LINES = []
 DESTINATIONS = ("Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan")

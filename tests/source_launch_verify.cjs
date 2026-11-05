@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const home = path.join(__dirname, '..');
+const home = path.join(__dirname, '..', 'max');
 const trace = [];
 const regions = [];
 const tasks = new Map();

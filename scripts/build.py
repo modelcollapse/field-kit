@@ -8,7 +8,8 @@ import struct
 import wave
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT = SCRIPT_DIR.parent / "max"
 VERSION = dict(major=9, minor=2, revision=0, architecture="arm64", modernui=1)
 CELLS = (
     # name, min, max, initial, offset at full LFO depth, conversion
@@ -446,8 +447,8 @@ def demo():
 
 
 if __name__ == "__main__":
-    runpy.run_path(str(ROOT / "build_modulation.py"))
+    runpy.run_path(str(SCRIPT_DIR / "build_modulation.py"))
     for generator in ("build_fx.py", "build_recorder.py"):
-        runpy.run_path(str(ROOT / generator), run_name="__main__")
+        runpy.run_path(str(SCRIPT_DIR / generator), run_name="__main__")
     build()
     demo()
