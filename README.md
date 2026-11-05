@@ -2,6 +2,8 @@
 
 FIELD KIT is a Max instrument that turns one audio file into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, filter, level, and pan. Three LFOs can modulate the controls, and a built-in recorder captures the stereo mix.
 
+![FIELD KIT playing the bundled demo through four loop windows, with window controls, pattern slots, effects, and the recorder visible](docs/screenshots/field-kit-overview.png)
+
 ## Start playing
 
 - **macOS app.** Download the standalone ZIP from the repository's Releases tab, unzip it, and open **Field Kit.app**.
@@ -26,6 +28,8 @@ Click **Store pattern**, then pick one of the eight squares. Click a filled squa
 Select **LFO 1–3** and set its rate and shape. Choose a window and destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the playback control receives.
 
 Click **Use curve** to use a custom breakpoint shape. The graph runs from the start to the end of one cycle. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO has its own curve.
+
+![Close-up of LFO 1 modulating Window 2 speed at 25 percent, with its breakpoint curve and live feedback](docs/screenshots/field-kit-modulation.png)
 
 ## Process and capture
 
