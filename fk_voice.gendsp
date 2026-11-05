@@ -1,0 +1,1060 @@
+{
+  "patcher": {
+    "fileversion": 1,
+    "appversion": {
+      "major": 9,
+      "minor": 0,
+      "revision": 0,
+      "architecture": "x64",
+      "modernui": 1
+    },
+    "classnamespace": "dsp.gen",
+    "rect": [
+      55.0,
+      80.0,
+      934.0,
+      712.0
+    ],
+    "default_fontname": "Arial",
+    "default_fontsize": 12.0,
+    "gridonopen": 1,
+    "gridsize": [
+      15.0,
+      15.0
+    ],
+    "gridsnaponopen": 0,
+    "description": "Stereo, variable-speed playback of one crossfaded section of a shared source buffer.",
+    "boxes": [
+      {
+        "box": {
+          "id": "input-1",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            20.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 1",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-1",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            20.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Start"
+        }
+      },
+      {
+        "box": {
+          "id": "input-2",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            103.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 2",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-2",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            103.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "End"
+        }
+      },
+      {
+        "box": {
+          "id": "input-3",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            186.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 3",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-3",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            186.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Speed"
+        }
+      },
+      {
+        "box": {
+          "id": "input-4",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            269.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 4",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-4",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            269.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Direction"
+        }
+      },
+      {
+        "box": {
+          "id": "input-5",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            352.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 5",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-5",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            352.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Fade ms"
+        }
+      },
+      {
+        "box": {
+          "id": "input-6",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            435.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 6",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-6",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            435.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Drive"
+        }
+      },
+      {
+        "box": {
+          "id": "input-7",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            518.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 7",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-7",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            518.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Filter"
+        }
+      },
+      {
+        "box": {
+          "id": "input-8",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            601.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 8",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-8",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            601.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Level"
+        }
+      },
+      {
+        "box": {
+          "id": "input-9",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            684.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 9",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-9",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            684.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Pan"
+        }
+      },
+      {
+        "box": {
+          "id": "input-10",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            767.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 10",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-10",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            767.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Play"
+        }
+      },
+      {
+        "box": {
+          "id": "input-11",
+          "maxclass": "newobj",
+          "numinlets": 0,
+          "numoutlets": 1,
+          "patching_rect": [
+            850.0,
+            51.0,
+            40.0,
+            22.0
+          ],
+          "text": "in 11",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "input-label-11",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            850.0,
+            25.0,
+            76.0,
+            20.0
+          ],
+          "text": "Source Hz"
+        }
+      },
+      {
+        "box": {
+          "id": "player",
+          "maxclass": "codebox",
+          "numinlets": 11,
+          "numoutlets": 12,
+          "patching_rect": [
+            20.0,
+            111.0,
+            878.0,
+            495.0
+          ],
+          "outlettype": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "code": "Buffer source;\n\nHistory legPhase(0);\nHistory legReverse(0);\nHistory wasPlaying(0);\nHistory gateMemory(0);\n\nHistory startMemory(0);\nHistory endMemory(1);\nHistory rateMemory(1);\nHistory fadeMemory(12);\nHistory driveMemory(0);\nHistory filterMemory(0);\nHistory levelMemory(0);\nHistory panMemory(0);\n\nHistory modeMemory(0);\nHistory correctionLeft(0);\nHistory correctionRight(0);\nHistory mixedLeftMemory(0);\nHistory mixedRightMemory(0);\nHistory poleLeft(0);\nHistory poleRight(0);\n\nframeCount = dim(source);\nsourceRate = in11 > 0 ? in11 : samplerate;\nplaying = (in10 >= 0.5) && (frameCount >= 2);\nonset = playing && !wasPlaying;\ngate = clamp(gateMemory + (playing ? 1 : -1) * 200 / samplerate, 0, 1);\nrolling = playing || (gate > 0);\n\ncontrolSlew = 1 - exp(-100 / samplerate);\nedgeSlew = 1 - exp(-50 / samplerate);\nsmoothControls = rolling && !onset;\ncontrolMix = smoothControls ? controlSlew : 1;\nedgeMix = smoothControls ? edgeSlew : 1;\n\nstartNorm = mix(startMemory, clamp(in1, 0, 1), edgeMix);\nendNorm = mix(endMemory, clamp(in2, 0, 1), edgeMix);\nrateScale = mix(rateMemory, clamp(in3, 0.01, 8), controlMix);\nfadeMs = mix(fadeMemory, clamp(in5, 0, 500), controlMix);\ndriveAmt = mix(driveMemory, clamp(in6, 0, 1), controlMix);\nfilterAmt = mix(filterMemory, clamp(in7, -1, 1), controlMix);\nlevelAmt = mix(levelMemory, clamp(in8, 0, 1), controlMix);\npanAmt = mix(panMemory, clamp(in9, -1, 1), controlMix);\n\nstartMemory = startNorm;\nendMemory = endNorm;\nrateMemory = rateScale;\nfadeMemory = fadeMs;\ndriveMemory = driveAmt;\nfilterMemory = filterAmt;\nlevelMemory = levelAmt;\npanMemory = panAmt;\n\n// Start inclusive, end exclusive. The last readable index is one frame before end.\nusableFrames = max(frameCount, 2);\nminSpan = min(usableFrames, max(2, sourceRate * 0.001));\nregionStart = clamp(min(startNorm, endNorm) * usableFrames, 0, usableFrames - minSpan);\nregionEnd = clamp(max(startNorm, endNorm) * usableFrames, regionStart + minSpan, usableFrames);\nspan = regionEnd - regionStart;\nlastReadable = regionEnd - 1;\nlastPhase = (span - 1) / span;\n\nplayMode = clamp(floor(in4 + 0.5), 0, 2);\npingPong = playMode == 2;\nreverseNow = pingPong ? legReverse : (playMode == 1);\nposition = legPhase;\n\nif (onset || !rolling) {\n    position = 0;\n    reverseNow = playMode == 1;\n} else if (reverseNow != legReverse) {\n    // A manual reversal keeps the read index at the point already playing.\n    position = clamp(lastPhase - position, 0, lastPhase);\n}\n\n// At a seam, overlap the end of this leg with the beginning of the next leg.\n// The next leg resumes beyond the part already heard during the overlap.\nstepFrames = rateScale * sourceRate / samplerate;\nfadeFrames = min(span * 0.45, fadeMs * rateScale * sourceRate * 0.001);\nfadePhase = fadeFrames / span;\ncycleSpan = 1 - fadePhase;\noffset = position * span;\nincomingOffset = max(0, position - cycleSpan) * span;\nreverseNextLeg = pingPong ? (1 - reverseNow) : reverseNow;\n\nprimaryIndex = clamp(reverseNow ? lastReadable - offset : regionStart + offset, regionStart, lastReadable);\nincomingIndex = clamp(reverseNextLeg ? lastReadable - incomingOffset : regionStart + incomingOffset, regionStart, lastReadable);\nfadePos = clamp(incomingOffset / max(fadeFrames, 0.000001), 0, 1);\nfadeWeight = fadePos * fadePos * (3 - 2 * fadePos);\n\nnextPosition = position + stepFrames / span;\nif (nextPosition >= 1) {\n    crossedLegs = 1 + floor((nextPosition - 1) / cycleSpan);\n    nextPosition = nextPosition - crossedLegs * cycleSpan;\n    if (pingPong && ((crossedLegs % 2) == 1)) {\n        reverseNow = 1 - reverseNow;\n    }\n}\n\nlegPhase = rolling ? nextPosition : 0;\nlegReverse = rolling ? reverseNow : (playMode == 1);\nwasPlaying = playing;\ngateMemory = gate;\n\n// Clamp the right read to the first channel for a mono source.\nreadChannel = clamp(channels(source) - 1, 0, 1);\nprimaryLeft = peek(source, primaryIndex, 0, interp=\"linear\", boundmode=\"clamp\");\nprimaryRight = peek(source, primaryIndex, readChannel, interp=\"linear\", boundmode=\"clamp\");\nincomingLeft = peek(source, incomingIndex, 0, interp=\"linear\", boundmode=\"clamp\");\nincomingRight = peek(source, incomingIndex, readChannel, interp=\"linear\", boundmode=\"clamp\");\nmixedLeft = mix(primaryLeft, incomingLeft, fadeWeight);\nmixedRight = mix(primaryRight, incomingRight, fadeWeight);\n\n// A mode change can interrupt an overlap. Decay the difference from the last sample.\nchangeMode = playMode != modeMemory;\noffsetLeft = changeMode ? mixedLeftMemory - mixedLeft : correctionLeft;\noffsetRight = changeMode ? mixedRightMemory - mixedRight : correctionRight;\noffsetLeft = smoothControls ? offsetLeft : 0;\noffsetRight = smoothControls ? offsetRight : 0;\nmixedLeft = mixedLeft + offsetLeft;\nmixedRight = mixedRight + offsetRight;\n\ncorrectionDecay = exp(-400 / samplerate);\ncorrectionLeft = offsetLeft * correctionDecay;\ncorrectionRight = offsetRight * correctionDecay;\nmixedLeftMemory = mixedLeft;\nmixedRightMemory = mixedRight;\nmodeMemory = playMode;\n\ndriveGain = 1 + 11 * driveAmt;\ndriveWet = min(1, driveAmt * 3);\ndriveNorm = 1 / tanh(driveGain);\ndrivenLeft = mix(mixedLeft, tanh(mixedLeft * driveGain) * driveNorm, driveWet);\ndrivenRight = mix(mixedRight, tanh(mixedRight * driveGain) * driveNorm, driveWet);\n\n// Low-pass on the negative side, high-pass on the positive side, flat at center.\nlowPass = filterAmt < 0;\nlowCut = min(18000, samplerate * 0.45) * pow(0.01, -filterAmt);\nhighCut = min(7500, samplerate * 0.45) * pow(0.003333333333, 1 - filterAmt);\ncutoff = lowPass ? lowCut : highCut;\npoleMix = 1 - exp(-twopi * cutoff / samplerate);\nlowLeft = mix(poleLeft, drivenLeft, poleMix);\nlowRight = mix(poleRight, drivenRight, poleMix);\npoleLeft = rolling ? lowLeft : 0;\npoleRight = rolling ? lowRight : 0;\nfilterWet = min(1, abs(filterAmt) * 10);\nfilteredLeft = mix(drivenLeft, lowPass ? lowLeft : drivenLeft - lowLeft, filterWet);\nfilteredRight = mix(drivenRight, lowPass ? lowRight : drivenRight - lowRight, filterWet);\n\n// Center preserves stereo. Toward either edge, crossfeed the far channel.\npanAngle = abs(panAmt) * pi * 0.5;\npanCross = sin(panAngle);\npanFar = cos(panAngle);\npanNorm = 1 / sqrt(1 + panCross);\npannedLeft = panAmt < 0 ? filteredLeft + filteredRight * panCross : filteredLeft * panFar;\npannedRight = panAmt > 0 ? filteredRight + filteredLeft * panCross : filteredRight * panFar;\n\nout1 = pannedLeft * panNorm * levelAmt * gate;\nout2 = pannedRight * panNorm * levelAmt * gate;\nout3 = primaryIndex / max(1, frameCount - 1);\n\n// Publish applied controls in the same units as the signal inlets.\nout4 = frameCount >= 2 ? regionStart / usableFrames : startNorm;\nout5 = frameCount >= 2 ? regionEnd / usableFrames : endNorm;\nout6 = rateScale;\nout7 = playMode;\nout8 = frameCount >= 2 ? 1000 * fadeFrames / (rateScale * sourceRate) : fadeMs;\nout9 = driveAmt;\nout10 = filterAmt;\nout11 = levelAmt;\nout12 = panAmt;\n"
+        }
+      },
+      {
+        "box": {
+          "id": "output-1",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            20.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 1"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-1",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            20.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Left"
+        }
+      },
+      {
+        "box": {
+          "id": "output-2",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            93.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 2"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-2",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            93.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Right"
+        }
+      },
+      {
+        "box": {
+          "id": "output-3",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            166.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 3"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-3",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            166.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Playhead"
+        }
+      },
+      {
+        "box": {
+          "id": "output-4",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            239.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 4"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-4",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            239.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Start"
+        }
+      },
+      {
+        "box": {
+          "id": "output-5",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            312.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 5"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-5",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            312.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "End"
+        }
+      },
+      {
+        "box": {
+          "id": "output-6",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            385.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 6"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-6",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            385.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Speed"
+        }
+      },
+      {
+        "box": {
+          "id": "output-7",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            458.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 7"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-7",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            458.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Direction"
+        }
+      },
+      {
+        "box": {
+          "id": "output-8",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            531.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 8"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-8",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            531.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Fade ms"
+        }
+      },
+      {
+        "box": {
+          "id": "output-9",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            604.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 9"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-9",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            604.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Drive"
+        }
+      },
+      {
+        "box": {
+          "id": "output-10",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            677.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 10"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-10",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            677.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Filter"
+        }
+      },
+      {
+        "box": {
+          "id": "output-11",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            750.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 11"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-11",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            750.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Level"
+        }
+      },
+      {
+        "box": {
+          "id": "output-12",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            823.0,
+            642.0,
+            60.0,
+            22.0
+          ],
+          "text": "out 12"
+        }
+      },
+      {
+        "box": {
+          "id": "output-label-12",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            823.0,
+            670.0,
+            73.0,
+            20.0
+          ],
+          "text": "Pan"
+        }
+      }
+    ],
+    "lines": [
+      {
+        "patchline": {
+          "source": [
+            "input-1",
+            0
+          ],
+          "destination": [
+            "player",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-2",
+            0
+          ],
+          "destination": [
+            "player",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-3",
+            0
+          ],
+          "destination": [
+            "player",
+            2
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-4",
+            0
+          ],
+          "destination": [
+            "player",
+            3
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-5",
+            0
+          ],
+          "destination": [
+            "player",
+            4
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-6",
+            0
+          ],
+          "destination": [
+            "player",
+            5
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-7",
+            0
+          ],
+          "destination": [
+            "player",
+            6
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-8",
+            0
+          ],
+          "destination": [
+            "player",
+            7
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-9",
+            0
+          ],
+          "destination": [
+            "player",
+            8
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-10",
+            0
+          ],
+          "destination": [
+            "player",
+            9
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "input-11",
+            0
+          ],
+          "destination": [
+            "player",
+            10
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            0
+          ],
+          "destination": [
+            "output-1",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            1
+          ],
+          "destination": [
+            "output-2",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            2
+          ],
+          "destination": [
+            "output-3",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            3
+          ],
+          "destination": [
+            "output-4",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            4
+          ],
+          "destination": [
+            "output-5",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            5
+          ],
+          "destination": [
+            "output-6",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            6
+          ],
+          "destination": [
+            "output-7",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            7
+          ],
+          "destination": [
+            "output-8",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            8
+          ],
+          "destination": [
+            "output-9",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            9
+          ],
+          "destination": [
+            "output-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            10
+          ],
+          "destination": [
+            "output-11",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "player",
+            11
+          ],
+          "destination": [
+            "output-12",
+            0
+          ]
+        }
+      }
+    ]
+  }
+}

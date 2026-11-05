@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/
+*.pyc
+
+/build/
+/dist/
+*.app/
+*.mxf
+*.zip
+*.wav
+!/fk_demo.wav
