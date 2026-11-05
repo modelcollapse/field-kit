@@ -57,6 +57,9 @@
           "numinlets": 1,
           "numoutlets": 0,
           "text": "00:00.0",
+          "fontsize": 16,
+          "fontface": 1,
+          "textjustification": 2,
           "presentation": 1,
           "presentation_rect": [
             240,
@@ -80,6 +83,8 @@
           "numinlets": 1,
           "numoutlets": 0,
           "text": "Enable audio to record",
+          "fontsize": 14,
+          "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
             0,
@@ -169,6 +174,7 @@
           "parameter_enable": 0,
           "text": "Record…",
           "texton": "Record…",
+          "hint": "Choose where to save a WAV of the final mix.",
           "outlettype": [
             "",
             ""
@@ -217,8 +223,9 @@
           "mode": 0,
           "active": 0,
           "parameter_enable": 0,
-          "text": "Stop",
-          "texton": "Stop",
+          "text": "■ Stop",
+          "texton": "■ Stop",
+          "hint": "Finish and save this recording.",
           "outlettype": [
             "",
             ""

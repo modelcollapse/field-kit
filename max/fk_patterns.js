@@ -8,11 +8,17 @@ var VOICE_COUNT = 4;
 var LFO_COUNT = 8;
 var LEGACY_LFO_COUNT = 3;
 var TARGET_COUNT = 9;
+var PITCH_SCALE_COUNT = 7;
 var BANK_FORMAT = "field-kit-patterns";
 var BANK_VERSION = 2;
 var LEGACY_BANK_VERSION = 1;
 // Allow all eight slots to hold eight full curves with unrounded values.
 var MAX_BANK_BYTES = 8 * 1024 * 1024;
+var EMPTY_BUTTON = [0.25, 0.25, 0.25, 1];
+var STORED_BUTTON = [0.40, 0.29, 0.09, 1];
+var SELECTED_BUTTON = [0.92, 0.62, 0.08, 1];
+var LIGHT_TEXT = [0.92, 0.92, 0.92, 1];
+var DARK_TEXT = [0.07, 0.07, 0.07, 1];
 var DEFAULT_PANS = [-45, -15, 15, 45];
 var VOICE_CONTROLS = [
     ["rate", 0.125, 4, 1],
@@ -36,11 +42,13 @@ var FX_CONTROLS = [
 var host = this;
 var slots = [];
 var armed = false;
+var lastSlot = -1;
 for (var index = 0; index < SLOT_COUNT; index++) {
     slots.push(null);
 }
 
 function loadbang() {
+    set_armed(false);
     render_slots();
 }
 
@@ -51,19 +59,39 @@ status.local = 1;
 
 function render_slots() {
     for (var i = 0; i < SLOT_COUNT; i++) {
-        host.patcher.getnamed("pattern_" + (i + 1)).message("set", slots[i] ? 1 : 0);
+        var filled = slots[i] !== null;
+        var selected = i === lastSlot;
+        paint_button("pattern_" + (i + 1), String(i + 1) + (filled ? " •" : ""),
+                     selected ? SELECTED_BUTTON : filled ? STORED_BUTTON : EMPTY_BUTTON,
+                     selected ? DARK_TEXT : LIGHT_TEXT);
     }
 }
 render_slots.local = 1;
 
+function paint_button(name, text, background, foreground) {
+    var button = host.patcher.getnamed(name);
+    button.message("text", text);
+    button.message("texton", text);
+    button.message.apply(button, ["activebgcolor"].concat(background));
+    button.message.apply(button, ["activetextcolor"].concat(foreground));
+    button.message.apply(button, ["activebgoncolor"].concat(background));
+    button.message.apply(button, ["activetextoncolor"].concat(foreground));
+}
+paint_button.local = 1;
+
+function toggle_store() {
+    arm(!armed);
+}
+
 function arm(value) {
     set_armed(!!value);
-    status(armed ? "Click a slot to store this setup." : "Click a filled slot to recall.");
+    status(armed ? "Choose a square. Filled squares will be replaced." : "Store cancelled. Click a filled square to recall.");
 }
 
 function set_armed(value) {
     armed = value;
-    host.patcher.getnamed("pattern_store").message("set", armed ? 1 : 0);
+    paint_button("pattern_store", armed ? "Cancel store" : "Store pattern",
+                 armed ? SELECTED_BUTTON : EMPTY_BUTTON, armed ? DARK_TEXT : LIGHT_TEXT);
 }
 set_armed.local = 1;
 
@@ -75,18 +103,21 @@ function slot(number) {
     if (armed) {
         var snapshot = capture_pattern();
         if (!valid_pattern(snapshot, LFO_COUNT)) {
-            render_slots();
             status("Pattern not ready. Try again.");
             return;
         }
+        var replacing = slots[index] !== null;
         slots[index] = snapshot;
+        lastSlot = index;
         set_armed(false);
-        status("Pattern " + number + " stored.");
+        status("Pattern " + number + (replacing ? " replaced." : " stored."));
     } else if (slots[index]) {
         apply_pattern(slots[index]);
+        lastSlot = index;
         status("Pattern " + number + " recalled.");
     } else {
-        status("Slot " + number + " is empty. Click Store first.");
+        status("Square " + number + " is empty. Click Store pattern first.");
+        return;
     }
     render_slots();
 }
@@ -122,6 +153,7 @@ function capture_pattern() {
         curves: router.curves.map(function (curve) { return curve.slice(); }),
         selection: { window: router.selected, lfo: router.currentLfo, target: router.targetIndex },
         effects: effects,
+        pitchScale: value_of(patch.getnamed("pitch_scale")),
         master: value_of(patch.getnamed("master"))
     };
 }
@@ -133,6 +165,8 @@ function apply_pattern(pattern) {
     var router = patch.getnamed("patchbay").subpatcher().getnamed("fk_router");
     var fx = patch.getnamed("mix_fx").subpatcher();
     source.message("exit_normal");
+    // Banks written before Pitch Snap was added omit this field.
+    patch.getnamed("pitch_scale").message(pattern.pitchScale === undefined ? 0 : pattern.pitchScale);
     pattern.windows.forEach(function (window, i) {
         var voice = i + 1;
         source.message("set_region", voice, window.region[0], window.region[1]);
@@ -196,10 +230,12 @@ function reset() {
     var defaults = modulation_defaults();
     apply_pattern({
         windows: windows, gains: gains, rates: defaults.rates, shapes: defaults.shapes, curves: defaults.curves,
-        selection: { window: 0, lfo: 0, target: 0 }, effects: effects, master: -12
+        selection: { window: 0, lfo: 0, target: 0 }, effects: effects, pitchScale: 0, master: -12
     });
     patch.getnamed("source_control").message("inspect_window", 0);
+    lastSlot = -1;
     set_armed(false);
+    render_slots();
     status("Reset · Play all to hear the loops");
 }
 
@@ -266,9 +302,10 @@ function read_bank(path) {
             throw new Error("Invalid bank patterns");
         }
         slots = legacy ? bank.slots.map(upgrade_pattern) : bank.slots;
+        lastSlot = -1;
         set_armed(false);
         render_slots();
-        status("Bank loaded. Click a filled slot.");
+        status("Bank loaded. Click a filled square to recall.");
     } catch (error) {
         status("Couldn’t open that pattern bank.");
     } finally {
@@ -374,6 +411,7 @@ function valid_pattern(pattern, lfoCount) {
         pattern.curves.every(valid_curve) && pattern.selection &&
         index_valid(pattern.selection.window, VOICE_COUNT) && index_valid(pattern.selection.lfo, lfoCount) &&
         index_valid(pattern.selection.target, TARGET_COUNT) && controls_valid(pattern.effects, FX_CONTROLS) &&
-        pattern.effects.fx_enabled % 1 === 0 && in_range(pattern.master, -70, 0);
+        pattern.effects.fx_enabled % 1 === 0 && in_range(pattern.master, -70, 0) &&
+        (pattern.pitchScale === undefined || index_valid(pattern.pitchScale, PITCH_SCALE_COUNT));
 }
 valid_pattern.local = 1;

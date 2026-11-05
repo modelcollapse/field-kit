@@ -10,6 +10,7 @@ var LFOS = DEFAULT_RATES.length;
 var TARGETS = ["Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan"];
 var DIRECTIONS = ["Forward", "Reverse", "Ping-pong"];
 var TABLE_SIZE = 1025;
+var CURVE_FADE_MS = 24;
 var DEFAULT_CURVE = [0, 0, 0.25, 1, 0.5, 0, 0.75, -1, 1, 0];
 var bufferIds = new Global("field_kit_curve_ids");
 var selected = 0;
@@ -23,6 +24,7 @@ var shapes = DEFAULT_SHAPES.slice();
 var activeRoutes = [];
 var enabled = false;
 var painting = false;
+var dumpReceived = false;
 var initialized = false;
 
 for (var i = 0; i < WINDOWS * LFOS * TARGETS.length; i++) {
@@ -131,12 +133,17 @@ watch.local = 1;
 function bang() {
     if (!initialized) {
         for (var i = 0; i < LFOS; i++) {
-            bufferIds.last = (bufferIds.last || 0) + 1;
-            var name = "field-kit-curve-" + bufferIds.last;
-            send("fk_curve_buffer_" + (i + 1), "name", name);
-            send("fk_curve_wave_" + (i + 1), "set", name);
-            tables.push(new Buffer(name));
-            writeCurve(i);
+            var buffers = [];
+            for (var slot = 0; slot < 2; slot++) {
+                bufferIds.last = (bufferIds.last || 0) + 1;
+                var name = "field-kit-curve-" + bufferIds.last;
+                var suffix = (i + 1) + "_" + slot;
+                send("fk_curve_buffer_" + suffix, "name", name);
+                send("fk_curve_wave_" + suffix, "set", name);
+                buffers.push(new Buffer(name));
+            }
+            tables.push({ buffers: buffers, active: 0, fading: false, dirty: false });
+            writeCurveTable(i, 0);
         }
         initialized = true;
     }
@@ -254,11 +261,10 @@ function use_curve() {
 function curve_edited() {
     if (!painting) {
         // listdump outputs nothing when all points have been removed.
-        var previous = curves[currentLfo];
-        curves[currentLfo] = [];
+        dumpReceived = false;
         send("fk_curve", "listdump");
-        if (curves[currentLfo].length === 0 && previous.length > 0) {
-            writeCurve(currentLfo);
+        if (!dumpReceived) {
+            setCurve(currentLfo, []);
         }
     }
 }
@@ -267,6 +273,7 @@ function curve_points() {
     if (painting) {
         return;
     }
+    dumpReceived = true;
     var values = arrayfromargs(arguments);
     var points = [];
     for (var i = 0; i + 1 < values.length; i += 2) {
@@ -286,13 +293,28 @@ function curve_points() {
             result.push(point[0], point[1]);
         }
     }
-    curves[currentLfo] = result;
-    writeCurve(currentLfo);
+    setCurve(currentLfo, result);
 }
 
-function writeCurve(index) {
-    if (!tables[index] || tables[index].framecount() !== TABLE_SIZE) {
+function setCurve(index, points) {
+    var previous = curves[index];
+    if (previous.length === points.length && points.every(function (value, i) {
+        return value === previous[i];
+    })) {
         return;
+    }
+    curves[index] = points;
+    if (tables[index]) {
+        tables[index].dirty = true;
+        fadeCurve(index);
+    }
+}
+setCurve.local = 1;
+
+function writeCurveTable(index, slot) {
+    var buffer = tables[index].buffers[slot];
+    if (buffer.framecount() !== TABLE_SIZE) {
+        return false;
     }
     var points = curves[index];
     var values = [];
@@ -309,16 +331,52 @@ function writeCurve(index) {
         }
         values.push(value);
     }
-    tables[index].poke(1, 0, values);
+    buffer.poke(1, 0, values);
+    return true;
 }
-writeCurve.local = 1;
+writeCurveTable.local = 1;
+
+function rampCurve(index) {
+    send("fk_curve_fade_" + (index + 1), 1 - tables[index].active, CURVE_FADE_MS);
+}
+rampCurve.local = 1;
+
+function fadeCurve(index) {
+    var table = tables[index];
+    // Only write to the silent table. Edits received during the ramp replace
+    // the pending curve so the next ramp uses the latest set of points.
+    if (enabled && table.dirty && !table.fading && writeCurveTable(index, 1 - table.active)) {
+        table.dirty = false;
+        table.fading = true;
+        rampCurve(index);
+    }
+}
+fadeCurve.local = 1;
+
+function curve_ready(index) {
+    if (indexIn(index, tables.length) && tables[index].fading) {
+        var table = tables[index];
+        table.active = 1 - table.active;
+        table.fading = false;
+        fadeCurve(index);
+    }
+}
 
 function running(value) {
+    var wasEnabled = enabled;
     enabled = !!value;
     if (!enabled) {
         label("fk_lfo_value", "LFO signal  ·  Audio off");
         label("fk_applied_value", "Applied value  ·  Audio off");
         send("fk_curve", "cursor", -1);
+    } else if (!wasEnabled) {
+        for (var i = 0; i < tables.length; i++) {
+            if (tables[i].fading) {
+                rampCurve(i);
+            } else {
+                fadeCurve(i);
+            }
+        }
     }
 }
 

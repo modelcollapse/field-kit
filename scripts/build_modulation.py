@@ -81,12 +81,12 @@ def action(text, selector, col, row, width, router):
     connect(node, router)
 
 
-def build_lfo(row):
+def build_lfo(row, curve_done):
     number = row + 1
     freq = RATES[row]
     x = 350 * row
     phase = msp(f"phasor~ {freq}", x, 458, numinlets=2, varname=f"fk_lfo_phase_{number}")
-    selected_shape = msp(f"selector~ {len(SHAPES)} {DEFAULT_SHAPES[row] + 1}", x, 660, 150,
+    selected_shape = msp(f"selector~ {len(SHAPES)} {DEFAULT_SHAPES[row] + 1}", x, 820, 150,
                          len(SHAPES) + 1, varname=f"fk_lfo_shape_signal_{number}")
 
     shifted = msp("+~ 0.75", x, 502, 64, 2)
@@ -99,12 +99,35 @@ def build_lfo(row):
     square = msp("-~ 1.", x + 162, 574, 54, 2)
     random = msp("noise~", x, 574, 54, numinlets=0)
     hold = msp("sah~ 0.000001", x, 610, 100, 2)
-    obj("buffer~ fk-unbound-curve @samps 1025", x + 120, 610, 222, 1,
-        ["float", "bang"], varname=f"fk_curve_buffer_{number}")
-    custom = msp("wave~ fk-unbound-curve @interp 1", x + 120, 642, 215, 3,
-                 varname=f"fk_curve_wave_{number}")
+    waves = []
+    for slot in range(2):
+        y = 610 + 55 * slot
+        suffix = f"{number}_{slot}"
+        obj("buffer~ fk-unbound-curve @samps 1025", x + 120, y, 222, 1,
+            ["float", "bang"], varname=f"fk_curve_buffer_{suffix}")
+        wave = msp("wave~ fk-unbound-curve @interp 1", x + 120, y + 27, 215, 3,
+                   varname=f"fk_curve_wave_{suffix}")
+        connect(phase, wave)
+        waves.append(wave)
 
-    for node in (shifted, triangle, saw_scale, comparator, custom):
+    # Start at the first table and use the same phasor for both readers.
+    # A + (B - A) * ramp preserves the waveform phase during edits.
+    fade = obj("line~ 0.", x + 220, 720, 100, 2, ["signal", "bang"],
+               varname=f"fk_curve_fade_{number}")
+    complete = box("message", [x + 220, 755, 100, 22], 2, 1, text=f"curve_ready {row}")
+    connect(fade, complete, 1)
+    connect(complete, curve_done)
+    difference = msp("-~", x + 120, 720, 44, 2)
+    scaled = msp("*~", x + 120, 755, 44, 2)
+    custom = msp("+~", x + 120, 788, 44, 2)
+    connect(waves[1], difference)
+    connect(waves[0], difference, inlet=1)
+    connect(difference, scaled)
+    connect(fade, scaled, inlet=1)
+    connect(waves[0], custom)
+    connect(scaled, custom, inlet=1)
+
+    for node in (shifted, triangle, saw_scale, comparator):
         connect(phase, node)
     connect(shifted, sine)
     connect(saw_scale, saw)
@@ -179,26 +202,28 @@ def build():
     wire_message(curve, "curve_points", router, 675, 318, 2)
     action("Use curve", "use_curve", 11, 4, 3, router)
 
-    lfo_watch = msp(f"selector~ {LFO_COUNT} 1", 0, 718, 140, LFO_COUNT + 1, varname="fk_lfo_watch")
-    phase_watch = msp(f"selector~ {LFO_COUNT} 1", 220, 718, 140, LFO_COUNT + 1, varname="fk_phase_watch")
+    lfo_watch = msp(f"selector~ {LFO_COUNT} 1", 0, 864, 140, LFO_COUNT + 1, varname="fk_lfo_watch")
+    phase_watch = msp(f"selector~ {LFO_COUNT} 1", 220, 864, 140, LFO_COUNT + 1, varname="fk_phase_watch")
     connect(lfo_watch, scope)
     for node, selector, x in ((lfo_watch, "lfo_sample", 0), (phase_watch, "lfo_phase", 220)):
-        snap = obj("snapshot~ 50", x, 756, 120, 2, ["float"])
+        snap = obj("snapshot~ 50", x, 900, 120, 2, ["float"])
         connect(node, snap)
-        wire_message(snap, selector, router, x, 788)
-    matrix = obj(f"matrix~ {LFO_COUNT} {MOD_CHANNELS} 1. @ramp 20", 0, 844, 1052, LFO_COUNT,
+        wire_message(snap, selector, router, x, 934)
+    matrix = obj(f"matrix~ {LFO_COUNT} {MOD_CHANNELS} 1. @ramp 20", 0, 980, 1052, LFO_COUNT,
                  ["signal"] * MOD_CHANNELS + [""])
     connect(router, matrix)
+    curve_done = obj("deferlow", 920, 318, 65)
+    connect(curve_done, router)
     for row in range(LFO_COUNT):
-        phase, signal = build_lfo(row)
+        phase, signal = build_lfo(row, curve_done)
         connect(signal, matrix, inlet=row)
         connect(signal, lfo_watch, inlet=row + 1)
         connect(phase, phase_watch, inlet=row + 1)
 
-    packed = obj(f"mc.pack~ {MOD_CHANNELS}", 0, 890, 1052, MOD_CHANNELS, ["multichannelsignal"])
-    signal_out = box("outlet", [0, 932, 30, 30], 1, 0, index=1,
+    packed = obj(f"mc.pack~ {MOD_CHANNELS}", 0, 1028, 1052, MOD_CHANNELS, ["multichannelsignal"])
+    signal_out = box("outlet", [0, 1070, 30, 30], 1, 0, index=1,
                      comment=f"{MOD_CHANNELS} signed modulation channels")
-    target_out = box("outlet", [190, 932, 30, 30], 1, 0, index=2, comment="Selected feedback signal index")
+    target_out = box("outlet", [190, 1070, 30, 30], 1, 0, index=2, comment="Selected feedback signal index")
     for index in range(MOD_CHANNELS):
         connect(matrix, packed, index, index)
     connect(packed, signal_out)

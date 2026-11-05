@@ -70,6 +70,8 @@ function addControl(name, initial) {
             messages.push([name, ...args]);
             if (args[0] === 'set') this.value = args[1];
             if (typeof args[0] === 'number') this.value = args[0];
+            if (args[0] === 'text') this.text = args[1];
+            if (args[0] === 'activebgcolor') this.background = args.slice(1);
         },
         getvalueof() { return [this.value]; },
     };
@@ -80,7 +82,8 @@ for (let voice = 1; voice <= 4; voice++) {
     }
 }
 for (const [name, value] of Object.entries({
-    fx_enabled: 1, fx_tone: -8, fx_echo: 60, fx_time_ms: 500, fx_repeats: 77, fx_space: 12, fx_decay: 3.2, master: -5,
+    fx_enabled: 1, fx_tone: -8, fx_echo: 60, fx_time_ms: 500, fx_repeats: 77, fx_space: 12, fx_decay: 3.2,
+    pitch_scale: 5, master: -5,
 })) addControl(name, value);
 for (let i = 1; i <= 8; i++) addControl('pattern_' + i, 0);
 for (const name of ['pattern_store', 'pattern_status', 'pattern_save_dialog', 'pattern_load_dialog']) addControl(name, 0);
@@ -117,12 +120,23 @@ const host = vm.createContext({ patcher: { getnamed: named }, File });
 vm.runInContext(readFileSync(join(__dirname, '..', 'max', 'fk_patterns.js'), 'utf8'), host);
 
 host.loadbang();
+assert.equal(controls.pattern_2.text, '2');
+assert.equal(controls.pattern_store.text, 'Store pattern');
 host.slot(2);
 assert.match(controls.pattern_status.value, /empty/);
-host.arm(1);
+host.toggle_store();
+assert.equal(controls.pattern_store.text, 'Cancel store');
+host.toggle_store();
+assert.equal(controls.pattern_store.text, 'Store pattern');
 host.slot(2);
-assert.equal(controls.pattern_2.value, 1);
-assert.equal(controls.pattern_store.value, 0);
+assert.equal(controls.pattern_2.text, '2');
+host.toggle_store();
+host.slot(2);
+assert.equal(controls.pattern_2.text, '2 •');
+assert.equal(controls.pattern_store.text, 'Store pattern');
+assert.match(controls.pattern_status.value, /Pattern 2 stored/);
+const selectedBackground = controls.pattern_2.background;
+assert.notDeepEqual(selectedBackground, controls.pattern_1.background);
 host.save_bank();
 assert.deepEqual(messages.at(-1), ['pattern_save_dialog', 'bang']);
 host.write_bank('/test/bank.json');
@@ -131,6 +145,7 @@ assert.equal(bank.format, 'field-kit-patterns');
 assert.equal(bank.version, 2);
 assert.equal(bank.slots.length, 8);
 assert.equal(bank.slots[1].windows[1].rate, 0.5);
+assert.equal(bank.slots[1].pitchScale, 5);
 assert.deepEqual(bank.slots[1].curves, initialCurves);
 assert.deepEqual(bank.slots[1].selection, { window: 3, lfo: 7, target: 7 });
 
@@ -147,6 +162,7 @@ modState.targetIndex = 0;
 controls.rate_2.value = 2;
 controls.master.value = -40;
 controls.fx_echo.value = 1;
+controls.pitch_scale.value = 0;
 sourceState.normalPlaying = true;
 host.slot(2);
 assert.deepEqual(sourceState.positions[1], [19, 37]);
@@ -165,6 +181,10 @@ assert.equal(modState.targetIndex, 7);
 assert.equal(controls.rate_2.value, 0.5);
 assert.equal(controls.master.value, -5);
 assert.equal(controls.fx_echo.value, 60);
+assert.equal(controls.pitch_scale.value, 5);
+host.slot(2);
+assert.equal(controls.pattern_2.text, '2 •');
+assert.deepEqual(controls.pattern_2.background, selectedBackground);
 
 host.reset();
 assert.deepEqual(sourceState.positions, [[0, 25], [25, 50], [50, 75], [75, 100]]);
@@ -174,37 +194,65 @@ assert.equal(controls.rate_2.value, 1);
 assert.equal(controls.fx_enabled.value, 0);
 assert.equal(controls.fx_echo.value, 20);
 assert.equal(controls.master.value, -12);
+assert.equal(controls.pitch_scale.value, 0);
 assert.equal(controls.pan_4.value, 45);
-assert.equal(controls.pattern_2.value, 1);
+assert.equal(controls.pattern_2.text, '2 •');
+assert.notDeepEqual(controls.pattern_2.background, selectedBackground);
+assert.notDeepEqual(controls.pattern_2.background, controls.pattern_1.background);
 assert.equal(modState.targetIndex, 0);
 assert(modState.gains.every(value => value === 0));
 assert.deepEqual(modState.rates, defaultRates);
 assert.deepEqual(modState.shapes, defaultShapes);
 assert.deepEqual(modState.curves, Array(8).fill(defaultCurve));
 
-host.arm(1);
+host.toggle_store();
 host.slot(4);
-assert.equal(controls.pattern_4.value, 1);
+assert.equal(controls.pattern_4.text, '4 •');
+controls.rate_2.value = 0.75;
+host.toggle_store();
+host.slot(4);
+assert.match(controls.pattern_status.value, /Pattern 4 replaced/);
+controls.rate_2.value = 1;
+host.slot(4);
+assert.equal(controls.rate_2.value, 0.75);
+controls.rate_2.value = 1;
 files.set('/test/invalid.json', JSON.stringify({ ...bank, version: 100 }));
 host.read_bank('/test/invalid.json');
 assert.match(controls.pattern_status.value, /Couldn’t open/);
-assert.equal(controls.pattern_4.value, 1);
+assert.equal(controls.pattern_4.text, '4 •');
 files.set('/test/wrong-width.json', JSON.stringify({ ...bank, version: 1 }));
 host.read_bank('/test/wrong-width.json');
 assert.match(controls.pattern_status.value, /Couldn’t open/);
-assert.equal(controls.pattern_4.value, 1);
+assert.equal(controls.pattern_4.text, '4 •');
+const invalidPitchSlots = bank.slots.slice();
+invalidPitchSlots[1] = { ...bank.slots[1], pitchScale: 7 };
+files.set('/test/invalid-pitch.json', JSON.stringify({ ...bank, slots: invalidPitchSlots }));
+host.read_bank('/test/invalid-pitch.json');
+assert.match(controls.pattern_status.value, /Couldn’t open/);
+assert.equal(controls.pattern_4.text, '4 •');
 host.load_bank();
 assert.deepEqual(messages.at(-1), ['pattern_load_dialog', 'bang']);
 failTextRead = true;
 host.read_bank('/test/bank.json');
-assert.equal(controls.pattern_4.value, 0);
-assert.equal(controls.pattern_2.value, 1);
+assert.equal(controls.pattern_4.text, '4');
+assert.equal(controls.pattern_2.text, '2 •');
 assert.equal(controls.rate_2.value, 1);
 host.slot(2);
 assert.equal(controls.rate_2.value, 0.5);
 assert.equal(modState.gains[241], -100);
 assert.equal(modState.gains[287], 42);
 assert.deepEqual(modState.curves, initialCurves);
+assert.equal(controls.pitch_scale.value, 5);
+
+const oldV2Pattern = { ...bank.slots[1] };
+delete oldV2Pattern.pitchScale;
+const oldV2Slots = bank.slots.slice();
+oldV2Slots[1] = oldV2Pattern;
+files.set('/test/old-v2.json', JSON.stringify({ ...bank, slots: oldV2Slots }));
+host.read_bank('/test/old-v2.json');
+assert.match(controls.pattern_status.value, /Bank loaded/);
+host.slot(2);
+assert.equal(controls.pitch_scale.value, 0);
 
 // These are version 1 indices for W1 LFO 2 Start, W2 LFO 1 Speed,
 // W3 LFO 2 Level, and W4 LFO 3 Level.
@@ -214,7 +262,7 @@ legacyGains[29] = 31;
 legacyGains[70] = -18;
 legacyGains[106] = -100;
 const legacyPattern = {
-    ...bank.slots[1],
+    ...oldV2Pattern,
     gains: legacyGains,
     rates: [0.1, 0.5, 15],
     shapes: [5, 0, 5],
@@ -226,9 +274,11 @@ legacySlots[7] = legacyPattern;
 files.set('/test/legacy.json', JSON.stringify({ format: bank.format, version: 1, slots: legacySlots }));
 host.read_bank('/test/legacy.json');
 assert.match(controls.pattern_status.value, /Bank loaded/);
-assert.equal(controls.pattern_2.value, 0);
-assert.equal(controls.pattern_8.value, 1);
+assert.equal(controls.pattern_2.text, '2');
+assert.equal(controls.pattern_8.text, '8 •');
+controls.pitch_scale.value = 6;
 host.slot(8);
+assert.equal(controls.pitch_scale.value, 0);
 assert.equal(modState.currentLfo, 2);
 assert.equal(modState.selected, 3);
 assert.equal(modState.targetIndex, 7);
@@ -261,4 +311,4 @@ assert.match(controls.pattern_status.value, /Bank loaded/);
 host.slot(8);
 assert.deepEqual(modState.curves[7], denseCurve);
 
-console.log('PASS eight-LFO recall, reset, and bank round-trip, with version 1 migration and invalid bank protection');
+console.log('PASS pattern store, cancel, overwrite, visible slots, pitch snap, and v1/v2 bank round-trip');

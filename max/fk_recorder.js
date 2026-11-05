@@ -9,7 +9,8 @@ var dspOn = false;
 var path = "";
 var lastSavedPath = "";
 var elapsedMs = 0;
-var nativeElapsedMs = 0;
+var nativeElapsedMs = null;
+var normalStatusColor = null;
 var lastProgressAt = 0;
 var endReason = "";
 var verifyAttempts = 0;
@@ -39,12 +40,22 @@ function renderTime() {
 renderTime.local = 1;
 
 function render() {
+    var recording = state === "recording";
     send("record_button", "active", dspOn && state === "idle" ? 1 : 0);
-    send("stop_button", "active", state === "starting" || state === "recording" ? 1 : 0);
+    send("stop_button", "active", state === "starting" || recording ? 1 : 0);
+    if (recording && normalStatusColor === null) {
+        normalStatusColor = host.patcher.getnamed("record_status").getattr("textcolor");
+        send("record_status", "bgcolor", 0.64, 0.10, 0.16, 1);
+        send("record_status", "textcolor", 1, 1, 1, 1);
+    } else if (!recording && normalStatusColor !== null) {
+        send("record_status", "bgcolor", 0, 0, 0, 0);
+        send.apply(null, ["record_status", "textcolor"].concat(normalStatusColor));
+        normalStatusColor = null;
+    }
     send("record_status", "set", status);
     var currentPath = path || lastSavedPath;
     if (currentPath) {
-        var name = currentPath.replace(/^.*[\\/]/, "");
+        var name = (path ? "" : "Last saved: ") + currentPath.replace(/^.*[\\/]/, "");
         send("record_file", "set", name.length > 56 ? name.slice(0, 48) + "…" + name.slice(-7) : name);
         send("record_file", "hint", currentPath);
     } else {
@@ -118,6 +129,7 @@ function start_path(filePath) {
     }
     path = filePath;
     elapsedMs = 0;
+    nativeElapsedMs = null;
     lastProgressAt = Date.now();
     state = "starting";
     status = "Starting…";
@@ -129,16 +141,22 @@ function start_path(filePath) {
 }
 
 function elapsed(value) {
-    var advancing = value !== nativeElapsedMs && value > 0;
+    if (typeof value !== "number" || !isFinite(value) || value < 0 ||
+        (state !== "starting" && state !== "recording")) {
+        return;
+    }
+    // sfrecord~ holds its last elapsed value when stopped. Require two
+    // observations from this take before showing the recording indicator.
+    var previous = nativeElapsedMs;
     nativeElapsedMs = value;
-    if (!advancing || (state !== "starting" && state !== "recording")) {
+    if (previous === null || value <= previous || value <= elapsedMs) {
         return;
     }
     elapsedMs = value;
     lastProgressAt = Date.now();
     if (state === "starting") {
         state = "recording";
-        status = "●  Recording final mix";
+        status = "● RECORDING";
         render();
     } else {
         renderTime();
@@ -171,16 +189,46 @@ function stopTake(reason) {
 stopTake.local = 1;
 
 function hasAudio(filePath) {
+    var file;
     try {
-        var file = new File(filePath, "read");
+        file = new File(filePath, "read");
         if (!file.isopen) {
             return false;
         }
-        var present = file.eof > 44;
-        file.close();
-        return present;
+        // Empty Max WAVs can include a padded header larger than 44 bytes.
+        var container = file.readstring(4);
+        file.position = 8;
+        if ((container !== "RIFF" && container !== "RF64") || file.readstring(4) !== "WAVE") {
+            return false;
+        }
+        file.byteorder = "little";
+        var extendedSize = 0;
+        var fileSize = file.eof;
+        while (file.position + 8 <= fileSize) {
+            var chunk = file.readstring(4);
+            var size = file.readint32(1)[0] >>> 0;
+            var start = file.position;
+            if (chunk === "data") {
+                var bytes = container === "RF64" && size === 0xffffffff ? extendedSize : size;
+                return bytes >= 6 && start + bytes <= fileSize;
+            }
+            if (start + size + size % 2 > fileSize) {
+                return false;
+            }
+            if (chunk === "ds64" && container === "RF64" && size >= 28) {
+                file.position = start + 8;
+                var words = file.readint32(2);
+                extendedSize = (words[0] >>> 0) + (words[1] >>> 0) * 4294967296;
+            }
+            file.position = start + size + size % 2;
+        }
+        return false;
     } catch (error) {
         return false;
+    } finally {
+        if (file && file.isopen) {
+            file.close();
+        }
     }
 }
 hasAudio.local = 1;
@@ -193,9 +241,9 @@ function finish() {
     }
     if (saved) {
         lastSavedPath = path;
-        status = endReason ? "Saved WAV · " + endReason : "Saved stereo WAV";
+        status = endReason ? "Saved partial WAV · " + endReason : "Saved stereo WAV";
     } else {
-        status = "Couldn’t save audio · Check the save folder";
+        status = endReason ? "No WAV saved · " + endReason : "No WAV saved · Check the save folder";
     }
     path = "";
     state = "idle";

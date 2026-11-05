@@ -24,6 +24,8 @@ CELLS = (
     ("pan", -100, 100, 0, 100, 0.01),
 )
 DIRECTIONS = ["Forward", "Reverse", "Ping-pong"]
+PITCH_SCALES = ("Off", "Chromatic", "Major", "Natural Minor", "Dorian",
+                "Major Pentatonic", "Minor Pentatonic")
 DIALS = ("rate", "fade", "drive", "filter", "level", "pan")
 DIAL_LABELS = ("Speed ×", "Fade ms", "Drive %", "LP / HP", "Level %", "Pan %")
 
@@ -132,8 +134,8 @@ def pattern_controls(p):
     for slot in range(1, 9):
         name = f"pattern_{slot}"
         p.ui(name, "live.text", slot + 1, row, 1, 2, y_offset=y_offset, outs=2,
-             types=["", ""], mode=1, text=str(slot), texton=str(slot), parameter_enable=0,
-             hint=f"Recall pattern {slot}. Enable Store first to save into this square.")
+             types=["", ""], mode=1, outputmode=1, text=str(slot), texton=str(slot), parameter_enable=0,
+             hint=f"Recall pattern {slot} if this square has a dot. Click Store pattern first to save here.")
         x = 1540 + (slot - 1) * 112
         p.obj(f"pattern_click_{slot}", "t b", x, 1920, types=["bang"])
         p.add(f"pattern_slot_{slot}", "message", [x, 1960, 70, 22], ins=2, text=f"slot {slot}")
@@ -141,11 +143,13 @@ def pattern_controls(p):
         p.connect(f"pattern_click_{slot}", 0, f"pattern_slot_{slot}")
         p.connect(f"pattern_slot_{slot}", 0, "pattern_control")
     p.ui("pattern_store", "live.text", 10, row, 4, 2, y_offset=y_offset, outs=2, types=["", ""],
-         mode=1, text="Store pattern", texton="Choose a square", parameter_enable=0)
-    p.obj("pattern_arm", "prepend arm", 1675, 1960, ins=2)
-    p.connect("pattern_store", 0, "pattern_arm")
-    p.connect("pattern_arm", 0, "pattern_control")
-    p.label("pattern_status", "Store a setup, then click a filled square to recall it.",
+         mode=0, text="Store pattern", texton="Store pattern", parameter_enable=0)
+    p.obj("pattern_store_click", "sel bang", 1675, 2000, outs=2, types=["bang", ""])
+    p.add("pattern_toggle_store", "message", [1675, 2035, 100, 22], ins=2, text="toggle_store")
+    p.connect("pattern_store", 0, "pattern_store_click")
+    p.connect("pattern_store_click", 0, "pattern_toggle_store")
+    p.connect("pattern_toggle_store", 0, "pattern_control")
+    p.label("pattern_status", "Click Store pattern, then choose a square.",
             SPLIT, row + 1, RIGHT_TRACKS, y_offset=y_offset)
     for name, label, col, command, result, dialog, outputs in (
         ("pattern_load", "Load bank…", SPLIT, "load_bank", "read_bank", "opendialog JSON", ["", "bang"]),
@@ -200,8 +204,18 @@ def window_controls(p):
         p.obj(message, f"prepend inspector_edit {key}", 1600, 510 + index * 29, ins=2)
         p.connect(name, 0, message)
         p.connect(message, 0, "source_control")
-    p.label("filter_help", "Filter at 0 is flat · left LP / right HP", SPLIT, 10, RIGHT_TRACKS,
+    p.label("filter_help", "Filter: LP ← 0 → HP", SPLIT, 10, 3,
             y_offset=PLAYBACK_OFFSET)
+    p.label("pitch_scale_label", "Pitch snap · All", SPLIT + 3, 10, 2,
+            y_offset=PLAYBACK_OFFSET)
+    scale_items = [atom for scale in PITCH_SCALES for atom in (scale, ",")][:-1]
+    p.ui("pitch_scale", "umenu", SPLIT + 5, 10, 3, y_offset=PLAYBACK_OFFSET,
+         outs=3, types=["int", "", ""], items=scale_items, pattrmode=0,
+         hint="Snap the speed of all four windows to a scale. The original sample at 1× is the tonic.")
+    p.obj("pitch_scale_default", "loadmess 0", 2280, 805, types=["int"])
+    p.obj("pitch_scale_signal", "sig~ 0.", 2280, 845, types=["signal"])
+    p.connect("pitch_scale_default", 0, "pitch_scale")
+    p.connect("pitch_scale", 0, "pitch_scale_signal")
 
 
 def build():
@@ -343,11 +357,12 @@ def build():
         p.connect("source_control", voice - 1, f"wave_{voice}", 2)
 
         y = 950 + 210 * (voice - 1)
-        p.obj(f"voice_{voice}", "gen~ fk_voice", 28, y + 132, ins=11, outs=12,
+        p.obj(f"voice_{voice}", "gen~ fk_voice", 28, y + 132, ins=12, outs=12,
               types=["signal"] * 12, width=500)
         p.obj(f"run_{voice}", "sig~ 0.", 925, y, types=["signal"])
         p.connect(f"run_{voice}", 0, f"voice_{voice}", 9)
         p.connect("source_rate", 0, f"voice_{voice}", 10)
+        p.connect("pitch_scale_signal", 0, f"voice_{voice}", 11)
 
         for i, (key, low, high, default, depth, unit) in enumerate(CELLS):
             control = f"{key}_{voice}"
