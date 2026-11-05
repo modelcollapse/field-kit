@@ -8,7 +8,11 @@ BOXES = []
 LINES = []
 DESTINATIONS = ("Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan")
 SHAPES = ("Sine", "Triangle", "Saw", "Square", "S&H", "Breakpoint")
-RATES = (0.12, 0.31, 0.73)
+# Match the defaults used by the router when resetting or loading patterns.
+RATES = (0.12, 0.31, 0.73, 0.18, 0.43, 0.67, 1.1, 1.7)
+DEFAULT_SHAPES = (0, 1, 2, 0, 1, 0, 1, 0)
+LFO_COUNT = len(RATES)
+MOD_CHANNELS = 4 * len(DESTINATIONS)
 
 
 def box(maxclass, rect, numinlets=1, numoutlets=0, **attrs):
@@ -55,15 +59,10 @@ def param(name, typ, low, high, initial, items=None, units=None):
     return dict(parameter_enable=1, saved_attribute_attributes=dict(valueof=settings))
 
 
-def menu(name, items, col, width, tab=False):
-    if tab:
-        return control("live.tab", col, 2, width, numoutlets=3,
-                       outlettype=["int", "", "float"], varname=name,
-                       num_lines_presentation=1, num_lines_patching=1,
-                       **param(name, 2, 0, len(items) - 1, 0, items))
+def menu(name, items, col, width, **attrs):
     menu_items = [atom for item in items for atom in (item, ",")][:-1]
     return control("umenu", col, 2, width, numoutlets=3,
-                   outlettype=["int", "", ""], varname=name, items=menu_items)
+                   outlettype=["int", "", ""], varname=name, items=menu_items, **attrs)
 
 
 def wire_message(source, selector, router, x, y, outlet=0):
@@ -87,7 +86,7 @@ def build_lfo(row):
     freq = RATES[row]
     x = 350 * row
     phase = msp(f"phasor~ {freq}", x, 458, numinlets=2, varname=f"fk_lfo_phase_{number}")
-    selected_shape = msp(f"selector~ {len(SHAPES)} {row + 1}", x, 660, 150,
+    selected_shape = msp(f"selector~ {len(SHAPES)} {DEFAULT_SHAPES[row] + 1}", x, 660, 150,
                          len(SHAPES) + 1, varname=f"fk_lfo_shape_signal_{number}")
 
     shifted = msp("+~ 0.75", x, 502, 64, 2)
@@ -137,7 +136,8 @@ def build():
         ("Window", 7, 2), ("Destination", 9, 3), ("Depth (%)", 12, 2),
     ):
         label(text, col, 1, width)
-    lfo = menu("fk_mod_lfo", ("LFO 1", "LFO 2", "LFO 3"), 0, 3, tab=True)
+    lfo = menu("fk_mod_lfo", (f"LFO {i + 1}" for i in range(LFO_COUNT)), 0, 3,
+               hint="Choose which LFO to edit. All eight run independently.")
     window = menu("fk_mod_window", [f"Window {i}" for i in range(1, 5)], 7, 2)
     target = menu("fk_mod_target", DESTINATIONS, 9, 3)
     depth = control("live.dial", 12, 2, 2, 2, numoutlets=2, outlettype=["float", "float"],
@@ -179,25 +179,27 @@ def build():
     wire_message(curve, "curve_points", router, 675, 318, 2)
     action("Use curve", "use_curve", 11, 4, 3, router)
 
-    lfo_watch = msp("selector~ 3 1", 0, 718, 140, 4, varname="fk_lfo_watch")
-    phase_watch = msp("selector~ 3 1", 220, 718, 140, 4, varname="fk_phase_watch")
+    lfo_watch = msp(f"selector~ {LFO_COUNT} 1", 0, 718, 140, LFO_COUNT + 1, varname="fk_lfo_watch")
+    phase_watch = msp(f"selector~ {LFO_COUNT} 1", 220, 718, 140, LFO_COUNT + 1, varname="fk_phase_watch")
     connect(lfo_watch, scope)
     for node, selector, x in ((lfo_watch, "lfo_sample", 0), (phase_watch, "lfo_phase", 220)):
         snap = obj("snapshot~ 50", x, 756, 120, 2, ["float"])
         connect(node, snap)
         wire_message(snap, selector, router, x, 788)
-    matrix = obj("matrix~ 3 36 1. @ramp 20", 0, 844, 1052, 3, ["signal"] * 36 + [""])
+    matrix = obj(f"matrix~ {LFO_COUNT} {MOD_CHANNELS} 1. @ramp 20", 0, 844, 1052, LFO_COUNT,
+                 ["signal"] * MOD_CHANNELS + [""])
     connect(router, matrix)
-    for row in range(3):
+    for row in range(LFO_COUNT):
         phase, signal = build_lfo(row)
         connect(signal, matrix, inlet=row)
         connect(signal, lfo_watch, inlet=row + 1)
         connect(phase, phase_watch, inlet=row + 1)
 
-    packed = obj("mc.pack~ 36", 0, 890, 1052, 36, ["multichannelsignal"])
-    signal_out = box("outlet", [0, 932, 30, 30], 1, 0, index=1, comment="36 signed modulation channels")
+    packed = obj(f"mc.pack~ {MOD_CHANNELS}", 0, 890, 1052, MOD_CHANNELS, ["multichannelsignal"])
+    signal_out = box("outlet", [0, 932, 30, 30], 1, 0, index=1,
+                     comment=f"{MOD_CHANNELS} signed modulation channels")
     target_out = box("outlet", [190, 932, 30, 30], 1, 0, index=2, comment="Selected feedback signal index")
-    for index in range(36):
+    for index in range(MOD_CHANNELS):
         connect(matrix, packed, index, index)
     connect(packed, signal_out)
     connect(router, target_out, 1)

@@ -5,12 +5,14 @@ outlets = 0;
 
 var SLOT_COUNT = 8;
 var VOICE_COUNT = 4;
-var LFO_COUNT = 3;
+var LFO_COUNT = 8;
+var LEGACY_LFO_COUNT = 3;
 var TARGET_COUNT = 9;
 var BANK_FORMAT = "field-kit-patterns";
-var BANK_VERSION = 1;
-var MAX_BANK_BYTES = 2 * 1024 * 1024;
-var DEFAULT_CURVE = [0, 0, 0.25, 1, 0.5, 0, 0.75, -1, 1, 0];
+var BANK_VERSION = 2;
+var LEGACY_BANK_VERSION = 1;
+// Allow all eight slots to hold eight full curves with unrounded values.
+var MAX_BANK_BYTES = 8 * 1024 * 1024;
 var DEFAULT_PANS = [-45, -15, 15, 45];
 var VOICE_CONTROLS = [
     ["rate", 0.125, 4, 1],
@@ -72,7 +74,7 @@ function slot(number) {
     var index = number - 1;
     if (armed) {
         var snapshot = capture_pattern();
-        if (!valid_pattern(snapshot)) {
+        if (!valid_pattern(snapshot, LFO_COUNT)) {
             render_slots();
             status("Pattern not ready. Try again.");
             return;
@@ -164,6 +166,16 @@ function apply_pattern(pattern) {
 }
 apply_pattern.local = 1;
 
+function modulation_defaults() {
+    var router = host.patcher.getnamed("patchbay").subpatcher().getnamed("fk_router").js;
+    return {
+        rates: router.DEFAULT_RATES.slice(),
+        shapes: router.DEFAULT_SHAPES.slice(),
+        curves: router.DEFAULT_RATES.map(function () { return router.DEFAULT_CURVE.slice(); })
+    };
+}
+modulation_defaults.local = 1;
+
 function reset() {
     var patch = host.patcher;
     patch.getnamed("source_control").message("stop_all");
@@ -181,9 +193,9 @@ function reset() {
     for (var j = 0; j < VOICE_COUNT * LFO_COUNT * TARGET_COUNT; j++) {
         gains.push(0);
     }
+    var defaults = modulation_defaults();
     apply_pattern({
-        windows: windows, gains: gains, rates: [0.12, 0.31, 0.73], shapes: [0, 1, 2],
-        curves: [DEFAULT_CURVE, DEFAULT_CURVE, DEFAULT_CURVE],
+        windows: windows, gains: gains, rates: defaults.rates, shapes: defaults.shapes, curves: defaults.curves,
         selection: { window: 0, lfo: 0, target: 0 }, effects: effects, master: -12
     });
     patch.getnamed("source_control").message("inspect_window", 0);
@@ -243,12 +255,17 @@ function read_bank(path) {
             throw new Error("Invalid bank file");
         }
         var bank = JSON.parse(read_bank_text(file));
-        if (!bank || bank.format !== BANK_FORMAT || bank.version !== BANK_VERSION ||
-            !Array.isArray(bank.slots) || bank.slots.length !== SLOT_COUNT ||
-            !bank.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern); })) {
+        if (!bank || bank.format !== BANK_FORMAT ||
+            (bank.version !== BANK_VERSION && bank.version !== LEGACY_BANK_VERSION) ||
+            !Array.isArray(bank.slots) || bank.slots.length !== SLOT_COUNT) {
             throw new Error("Invalid bank contents");
         }
-        slots = bank.slots;
+        var legacy = bank.version === LEGACY_BANK_VERSION;
+        var count = legacy ? LEGACY_LFO_COUNT : LFO_COUNT;
+        if (!bank.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, count); })) {
+            throw new Error("Invalid bank patterns");
+        }
+        slots = legacy ? bank.slots.map(upgrade_pattern) : bank.slots;
         set_armed(false);
         render_slots();
         status("Bank loaded. Click a filled slot.");
@@ -260,6 +277,31 @@ function read_bank(path) {
         }
     }
 }
+
+function upgrade_pattern(pattern) {
+    if (pattern === null) {
+        return null;
+    }
+    var defaults = modulation_defaults();
+    var gains = [];
+    var legacyBlock = LEGACY_LFO_COUNT * TARGET_COUNT;
+    var newRoutes = (LFO_COUNT - LEGACY_LFO_COUNT) * TARGET_COUNT;
+    // Routes are grouped by window. Extend each window's block so its old
+    // LFO and destination indices still point to the same controls.
+    for (var window = 0; window < VOICE_COUNT; window++) {
+        var firstRoute = window * legacyBlock;
+        gains = gains.concat(pattern.gains.slice(firstRoute, firstRoute + legacyBlock));
+        for (var route = 0; route < newRoutes; route++) {
+            gains.push(0);
+        }
+    }
+    pattern.gains = gains;
+    pattern.rates = pattern.rates.concat(defaults.rates.slice(LEGACY_LFO_COUNT));
+    pattern.shapes = pattern.shapes.concat(defaults.shapes.slice(LEGACY_LFO_COUNT));
+    pattern.curves = pattern.curves.concat(defaults.curves.slice(LEGACY_LFO_COUNT));
+    return pattern;
+}
+upgrade_pattern.local = 1;
 
 function read_bank_text(file) {
     var size = file.eof;
@@ -318,19 +360,19 @@ function valid_curve(curve) {
 }
 valid_curve.local = 1;
 
-function valid_pattern(pattern) {
+function valid_pattern(pattern, lfoCount) {
     return !!pattern && Array.isArray(pattern.windows) && pattern.windows.length === VOICE_COUNT &&
         pattern.windows.every(function (window) {
             return controls_valid(window, VOICE_CONTROLS) && window.direction % 1 === 0 &&
                 numbers_valid(window.region, 2, 0, 100) && window.region[0] < window.region[1];
-        }) && numbers_valid(pattern.gains, VOICE_COUNT * LFO_COUNT * TARGET_COUNT, -100, 100) &&
+        }) && numbers_valid(pattern.gains, VOICE_COUNT * lfoCount * TARGET_COUNT, -100, 100) &&
         pattern.gains.every(function (gain) { return gain % 1 === 0; }) &&
-        numbers_valid(pattern.rates, LFO_COUNT, 0.01, 20) &&
-        numbers_valid(pattern.shapes, LFO_COUNT, 0, 5) &&
+        numbers_valid(pattern.rates, lfoCount, 0.01, 20) &&
+        numbers_valid(pattern.shapes, lfoCount, 0, 5) &&
         pattern.shapes.every(function (shape) { return shape % 1 === 0; }) &&
-        Array.isArray(pattern.curves) && pattern.curves.length === LFO_COUNT &&
+        Array.isArray(pattern.curves) && pattern.curves.length === lfoCount &&
         pattern.curves.every(valid_curve) && pattern.selection &&
-        index_valid(pattern.selection.window, VOICE_COUNT) && index_valid(pattern.selection.lfo, LFO_COUNT) &&
+        index_valid(pattern.selection.window, VOICE_COUNT) && index_valid(pattern.selection.lfo, lfoCount) &&
         index_valid(pattern.selection.target, TARGET_COUNT) && controls_valid(pattern.effects, FX_CONTROLS) &&
         pattern.effects.fx_enabled % 1 === 0 && in_range(pattern.master, -70, 0);
 }

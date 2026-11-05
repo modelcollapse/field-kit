@@ -1,6 +1,6 @@
 # FIELD KIT
 
-FIELD KIT is a Max instrument that turns one audio file into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, filter, level, and pan. Three LFOs can modulate the controls, and a built-in recorder captures the stereo mix.
+FIELD KIT is a Max instrument that turns one audio file into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, filter, level, and pan. Eight LFOs can modulate the controls, and a built-in recorder captures the stereo mix.
 
 ## Start here
 
@@ -23,17 +23,19 @@ The eight-second demo loads on startup. Click **Play all** to turn on audio and 
 
 Click **Store pattern**, then pick one of the eight squares. Click a filled square to recall its loop settings, LFO routes and curves, and effects on the current sample. **Save bank…** writes all eight slots to a file you can reopen with **Load bank…**.
 
+Banks from the three-LFO version still open. Their settings are restored on LFOs 1–3. LFOs 4–8 start at their defaults with no routes.
+
 ## Patch modulation
 
-Select **LFO 1–3** and set its rate and shape. Choose a window and destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the playback control receives.
+Choose **LFO 1–8** from the dropdown and set its rate and shape. Choose a window and destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the playback control receives.
 
 Click **Use curve** to use a custom breakpoint shape. The graph runs from the start to the end of one cycle. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO has its own curve.
 
-![Close-up of LFO 1 modulating Window 2 speed at 25 percent, with its breakpoint curve and live feedback](docs/screenshots/field-kit-modulation.png)
+![Close-up of LFO 8 modulating Window 4 pan at 55 percent, with its breakpoint curve and live feedback](docs/screenshots/field-kit-modulation.png)
 
 ## Process and capture
 
-Click **FX Off** to turn on tone, stereo echo, and room reverb. Set an effect's **Mix %** to zero to remove it from the mix. Tone is neutral at zero.
+Click **Enable FX** to turn on tone, stereo echo, and room reverb. Set an effect's **Mix %** to zero to remove it from the mix. Tone is neutral at zero.
 
 With audio enabled, click **Record…** and choose where to save the take. Capture writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click **Stop** in Capture when the take is finished.
 

@@ -198,7 +198,7 @@ def build():
 
     switch = [528, 0, 140, 20]
     enabled = p.add("live.text", switch, view=switch, outs=2, types=["", ""],
-                    mode=1, text="FX Off", texton="FX On", varname="fx_enabled",
+                    mode=1, text="Enable FX", texton="FX on", varname="fx_enabled",
                     hint="Switch the entire mix effects chain in or out.",
                     **parameter("FX enabled", "FX", 0, 0, 1, options=("Off", "On")))
     prefix = p.obj("prepend enabled", 0, 265, 108, ins=2)

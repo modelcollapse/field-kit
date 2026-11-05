@@ -13,18 +13,27 @@ const sourceState = {
     normalPlaying: false,
     path: '/test/audio.wav',
 };
-const initialCurves = [[0, 1, 0.6, -0.8, 1, 1], [], [0, -0.5, 1, 0.5]];
+const defaultCurve = [0, 0, 0.25, 1, 0.5, 0, 0.75, -1, 1, 0];
+const defaultRates = [0.12, 0.31, 0.73, 0.18, 0.43, 0.67, 1.1, 1.7];
+const defaultShapes = [0, 1, 2, 0, 1, 0, 1, 0];
+const legacyCurves = [[0, 1, 0.6, -0.8, 1, 1], [], [0, -0.5, 1, 0.5]];
+const lastCurve = [0, -0.25, 0.7, 0.75, 1, -0.25];
+const initialCurves = [...legacyCurves, ...Array(4).fill(defaultCurve), lastCurve];
 const modState = {
-    gains: Array(108).fill(0),
+    DEFAULT_RATES: defaultRates,
+    DEFAULT_SHAPES: defaultShapes,
+    DEFAULT_CURVE: defaultCurve,
+    gains: Array(288).fill(0),
     curves: structuredClone(initialCurves),
-    rates: [0.1, 0.5, 15],
-    shapes: [5, 0, 5],
-    currentLfo: 2,
+    rates: [0.1, 0.5, 15, 0.2, 0.3, 0.4, 0.5, 19],
+    shapes: [5, 0, 5, 0, 0, 0, 0, 5],
+    currentLfo: 7,
     selected: 3,
     targetIndex: 7,
 };
 modState.gains[9] = 25;
-modState.gains[106] = -100;
+modState.gains[241] = -100;
+modState.gains[287] = 42;
 
 const router = {
     js: modState,
@@ -36,7 +45,7 @@ const router = {
         case 'curve_points': modState.curves[modState.currentLfo] = args; break;
         case 'view': modState.selected = args[0] - 1; break;
         case 'select_destination': modState.targetIndex = args[0]; break;
-        case 'depth': modState.gains[((args[0] - 1) * 3 + args[1] - 1) * 9 + args[2] - 1] = args[3]; break;
+        case 'depth': modState.gains[((args[0] - 1) * 8 + args[1] - 1) * 9 + args[2] - 1] = args[3]; break;
         case 'bang': break;
         default: throw new Error('Unexpected route selector ' + selector);
         }
@@ -119,16 +128,19 @@ assert.deepEqual(messages.at(-1), ['pattern_save_dialog', 'bang']);
 host.write_bank('/test/bank.json');
 const bank = JSON.parse(files.get('/test/bank.json'));
 assert.equal(bank.format, 'field-kit-patterns');
-assert.equal(bank.version, 1);
+assert.equal(bank.version, 2);
 assert.equal(bank.slots.length, 8);
 assert.equal(bank.slots[1].windows[1].rate, 0.5);
 assert.deepEqual(bank.slots[1].curves, initialCurves);
-assert.deepEqual(bank.slots[1].selection, { window: 3, lfo: 2, target: 7 });
+assert.deepEqual(bank.slots[1].selection, { window: 3, lfo: 7, target: 7 });
 
 sourceState.positions[1][0] = 26;
 modState.curves[0][1] = 0;
 modState.gains[0] = 100;
-modState.gains[106] = 25;
+modState.gains[241] = 25;
+modState.gains[287] = 0;
+modState.rates[7] = 5;
+modState.shapes[7] = 1;
 modState.currentLfo = 0;
 modState.selected = 0;
 modState.targetIndex = 0;
@@ -143,8 +155,11 @@ assert.equal(sourceState.normalPlaying, false);
 assert.equal(sourceState.path, '/test/audio.wav');
 assert.deepEqual(modState.curves, initialCurves);
 assert.equal(modState.gains[0], 0);
-assert.equal(modState.gains[106], -100);
-assert.equal(modState.currentLfo, 2);
+assert.equal(modState.gains[241], -100);
+assert.equal(modState.gains[287], 42);
+assert.equal(modState.rates[7], 19);
+assert.equal(modState.shapes[7], 5);
+assert.equal(modState.currentLfo, 7);
 assert.equal(modState.selected, 3);
 assert.equal(modState.targetIndex, 7);
 assert.equal(controls.rate_2.value, 0.5);
@@ -163,12 +178,19 @@ assert.equal(controls.pan_4.value, 45);
 assert.equal(controls.pattern_2.value, 1);
 assert.equal(modState.targetIndex, 0);
 assert(modState.gains.every(value => value === 0));
+assert.deepEqual(modState.rates, defaultRates);
+assert.deepEqual(modState.shapes, defaultShapes);
+assert.deepEqual(modState.curves, Array(8).fill(defaultCurve));
 
 host.arm(1);
 host.slot(4);
 assert.equal(controls.pattern_4.value, 1);
 files.set('/test/invalid.json', JSON.stringify({ ...bank, version: 100 }));
 host.read_bank('/test/invalid.json');
+assert.match(controls.pattern_status.value, /Couldn’t open/);
+assert.equal(controls.pattern_4.value, 1);
+files.set('/test/wrong-width.json', JSON.stringify({ ...bank, version: 1 }));
+host.read_bank('/test/wrong-width.json');
 assert.match(controls.pattern_status.value, /Couldn’t open/);
 assert.equal(controls.pattern_4.value, 1);
 host.load_bank();
@@ -180,6 +202,63 @@ assert.equal(controls.pattern_2.value, 1);
 assert.equal(controls.rate_2.value, 1);
 host.slot(2);
 assert.equal(controls.rate_2.value, 0.5);
-assert.equal(modState.gains[106], -100);
+assert.equal(modState.gains[241], -100);
+assert.equal(modState.gains[287], 42);
 assert.deepEqual(modState.curves, initialCurves);
-console.log('PASS eight pattern slots, recall, selected route and curves, reset, bank round-trip, and invalid bank protection');
+
+// These are version 1 indices for W1 LFO 2 Start, W2 LFO 1 Speed,
+// W3 LFO 2 Level, and W4 LFO 3 Level.
+const legacyGains = Array(108).fill(0);
+legacyGains[9] = 25;
+legacyGains[29] = 31;
+legacyGains[70] = -18;
+legacyGains[106] = -100;
+const legacyPattern = {
+    ...bank.slots[1],
+    gains: legacyGains,
+    rates: [0.1, 0.5, 15],
+    shapes: [5, 0, 5],
+    curves: legacyCurves,
+    selection: { window: 3, lfo: 2, target: 7 },
+};
+const legacySlots = Array(8).fill(null);
+legacySlots[7] = legacyPattern;
+files.set('/test/legacy.json', JSON.stringify({ format: bank.format, version: 1, slots: legacySlots }));
+host.read_bank('/test/legacy.json');
+assert.match(controls.pattern_status.value, /Bank loaded/);
+assert.equal(controls.pattern_2.value, 0);
+assert.equal(controls.pattern_8.value, 1);
+host.slot(8);
+assert.equal(modState.currentLfo, 2);
+assert.equal(modState.selected, 3);
+assert.equal(modState.targetIndex, 7);
+assert.deepEqual(modState.rates, [0.1, 0.5, 15, ...defaultRates.slice(3)]);
+assert.deepEqual(modState.shapes, [5, 0, 5, ...defaultShapes.slice(3)]);
+assert.deepEqual(modState.curves, [...legacyCurves, ...Array(5).fill(defaultCurve)]);
+const migratedGains = Array(288).fill(0);
+migratedGains[9] = 25;
+migratedGains[74] = 31;
+migratedGains[160] = -18;
+migratedGains[241] = -100;
+assert.deepEqual(modState.gains, migratedGains);
+host.write_bank('/test/migrated.json');
+const migratedBank = JSON.parse(files.get('/test/migrated.json'));
+assert.equal(migratedBank.version, 2);
+assert.deepEqual(migratedBank.slots[7].gains, migratedGains);
+
+const denseCurve = [];
+for (let point = 0; point <= 1024; point++) {
+    denseCurve.push(point / 1024, Math.sin(point));
+}
+const densePattern = { ...bank.slots[1], curves: Array(8).fill(denseCurve) };
+const denseBank = { ...bank, slots: Array(8).fill(densePattern) };
+const denseBankText = JSON.stringify(denseBank, null, 2);
+assert(denseBankText.length > 2 * 1024 * 1024);
+failTextRead = false;
+files.set('/test/dense-bank.json', denseBankText);
+host.read_bank('/test/dense-bank.json');
+assert.match(controls.pattern_status.value, /Bank loaded/);
+host.slot(8);
+assert.deepEqual(modState.curves[7], denseCurve);
+
+console.log('PASS eight-LFO recall, reset, and bank round-trip, with version 1 migration and invalid bank protection');
