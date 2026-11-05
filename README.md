@@ -2,14 +2,14 @@
 
 FIELD KIT is a Max instrument that turns one audio file into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, filter, level, and pan. Three LFOs can modulate the controls, and a built-in recorder captures the stereo mix.
 
-![FIELD KIT playing the bundled demo through four loop windows, with window controls, pattern slots, effects, and the recorder visible](docs/screenshots/field-kit-overview.png)
+## Start here
 
-## Start playing
-
-- **macOS app.** Download the standalone ZIP from the repository's Releases tab, unzip it, and open **Field Kit.app**.
-- **Max patch.** Download or clone this repository and open **Field Kit.maxpat** in Max 9. Keep the supporting files beside the patch.
+- **[Download the macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. The app includes everything it needs to run.
+- **[Download the editable Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it, open **FIELD KIT for Max**, and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** beside the launcher so Max can load its files automatically.
 
 The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select an output device, and **Enable audio** starts the engine without starting playback.
+
+![FIELD KIT playing the bundled demo through four loop windows, with window controls, pattern slots, effects, and the recorder visible](docs/screenshots/field-kit-overview.png)
 
 ## Play and shape the loops
 
@@ -38,6 +38,8 @@ Click **FX Off** to turn on tone, stereo echo, and room reverb. Set an effect's 
 With audio enabled, click **Record…** and choose where to save the take. Capture writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click **Stop** in Capture when the take is finished.
 
 ## Build and test
+
+From a source checkout, open **Field Kit.maxpat** directly in Max 9. To package the editable download, run `python3 package_max_download.py build/field-kit-max.zip`.
 
 Run `python3 build.py` to regenerate the patch, subpatchers, and original demo. Run `python3 prepare_max_project.py . build/standalone` to stage a Max project. Open the generated **Field Kit.maxproj** in Max and choose **File → Build Collective / Application… → Application**. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
 

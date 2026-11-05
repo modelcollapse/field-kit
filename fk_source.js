@@ -104,14 +104,18 @@ function choose() {
 function load_demo() {
     var file = host.patcher.filepath;
     var folder = file.slice(0, file.lastIndexOf("/") + 1);
-    // Standalones resolve bundled media by name inside their collective.
     var demo = folder + "fk_demo.wav";
     if (typeof File === "function") {
-        var fileOnDisk = new File(demo, "read");
-        if (fileOnDisk.isopen) {
-            fileOnDisk.close();
-        } else {
-            demo = "fk_demo.wav";
+        var candidates = [demo, folder + "Support/fk_demo.wav"];
+        // Standalones resolve bundled media by name inside their collective.
+        demo = "fk_demo.wav";
+        for (var index = 0; index < candidates.length; index++) {
+            var fileOnDisk = new File(candidates[index], "read");
+            if (fileOnDisk.isopen) {
+                fileOnDisk.close();
+                demo = candidates[index];
+                break;
+            }
         }
     }
     open_source(demo, true);
