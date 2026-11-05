@@ -321,7 +321,7 @@ def build():
         p.connect("output_peak_" + suffix, 0, "mix_peak", channel)
 
     p.label("row_heading", "Playback windows", 0, 2, 7, heading=True, y_offset=PLAYBACK_OFFSET)
-    p.label("wave_heading", "Drag to set a loop", 7, 2, SPLIT - 7, y_offset=PLAYBACK_OFFSET + 4)
+    p.label("wave_heading", "Drag a range, release to set the loop", 7, 2, SPLIT - 7, y_offset=PLAYBACK_OFFSET + 4)
     window_controls(p)
 
     mod_rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
@@ -357,12 +357,14 @@ def build():
         p.connect("source_control", voice - 1, f"wave_{voice}", 2)
 
         y = 950 + 210 * (voice - 1)
-        p.obj(f"voice_{voice}", "gen~ fk_voice", 28, y + 132, ins=12, outs=12,
+        p.obj(f"voice_{voice}", "gen~ fk_voice", 28, y + 132, ins=13, outs=12,
               types=["signal"] * 12, width=500)
         p.obj(f"run_{voice}", "sig~ 0.", 925, y, types=["signal"])
+        p.obj(f"wave_edit_revision_{voice}", "sig~ 0.", 1030, y + 108, types=["signal"])
         p.connect(f"run_{voice}", 0, f"voice_{voice}", 9)
         p.connect("source_rate", 0, f"voice_{voice}", 10)
         p.connect("pitch_scale_signal", 0, f"voice_{voice}", 11)
+        p.connect(f"wave_edit_revision_{voice}", 0, f"voice_{voice}", 12)
 
         for i, (key, low, high, default, depth, unit) in enumerate(CELLS):
             control = f"{key}_{voice}"
@@ -417,9 +419,12 @@ def build():
             p.connect(f"voice_{voice}", outlet, f"abs_{suffix}_{voice}")
             p.connect(f"abs_{suffix}_{voice}", 0, f"peak_{voice}", outlet)
 
-        p.obj(f"edit_wave_{voice}", f"prepend edit_wave {voice}", 1110, y + 34, ins=2)
-        p.connect(f"wave_{voice}", 5, f"edit_wave_{voice}")
-        p.connect(f"edit_wave_{voice}", 0, "source_control")
+        p.obj(f"track_wave_{voice}", f"prepend track_wave {voice}", 1110, y + 34, ins=2)
+        p.connect(f"wave_{voice}", 5, f"track_wave_{voice}")
+        p.connect(f"track_wave_{voice}", 0, "source_control")
+        p.obj(f"wave_mouse_{voice}", f"prepend wave_mouse {voice}", 1110, y + 102, ins=2)
+        p.connect(f"wave_{voice}", 4, f"wave_mouse_{voice}")
+        p.connect(f"wave_mouse_{voice}", 0, "source_control")
         p.obj(f"edit_play_{voice}", f"prepend edit_play {voice}", 1290, y + 34, ins=2)
         p.connect(f"play_{voice}", 0, f"edit_play_{voice}")
         p.connect(f"edit_play_{voice}", 0, "source_control")

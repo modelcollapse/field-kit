@@ -13,7 +13,7 @@ The eight-second demo loads on startup. Click **Play all** to turn on audio and 
 
 ## Play and shape the loops
 
-1. Drag across a waveform to set its loop. The shaded region marks the bounds, and the moving line shows playback position.
+1. Drag across a waveform to preview a loop range, then release to apply it. If the window is playing, it fades briefly as it switches to the new range. The moving line shows playback position.
 2. Use **Window 1–4** to pick the window you want to edit. **In %** and **Out %** let you enter the bounds precisely.
 3. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials. **Fade ms** blends each pass into the next. **LP / HP** is flat at zero. Turn left for a low-pass filter or right for a high-pass filter.
 

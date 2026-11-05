@@ -24,12 +24,16 @@ var normalPlaying = false;
 var drawing = false;
 var inspectedWindow = 1;
 var positions = DEFAULT_POSITIONS.map(function (range) { return range.slice(); });
+var waveRanges = DEFAULT_POSITIONS.map(function (range) { return range.slice(); });
+var waveRevisions = [0, 0, 0, 0];
+var pendingWaveEdits = 0;
 var playing = [false, false, false, false];
 var boot = new Task(boot_source, host);
 var read = new Task(read_source, host);
 var waitForRead = new Task(read_timeout, host);
 var waitForAudio = new Task(audio_timeout, host);
 var settleAudio = new Task(audio_settled, host);
+var commitWave = new Task(commit_wave_edits, host);
 
 function send(name, selector) {
     var object = host.patcher.getnamed(name);
@@ -126,6 +130,8 @@ function open_source(path, isDemo) {
         return;
     }
     stop_all();
+    commitWave.cancel();
+    pendingWaveEdits = 0;
     ready = false;
     duration = 0;
     pendingPath = path;
@@ -421,7 +427,10 @@ function min_width() {
 min_width.local = 1;
 
 function draw_region(voice) {
-    var range = positions[voice - 1];
+    var index = voice - 1;
+    var range = positions[index];
+    waveRanges[index] = range.slice();
+    pendingWaveEdits &= ~(1 << index);
     send("base_start_" + voice, range[0]);
     send("base_end_" + voice, range[1]);
     send("start_" + voice, "set", range[0]);
@@ -469,23 +478,47 @@ function set_region(voice, start, end) {
     draw_region(voice);
 }
 
-function edit_wave(voice, displayStart, displayLength, start, end) {
+function track_wave(voice, displayStart, displayLength, start, end) {
     if (drawing || !ready || voice < 1 || voice > WINDOWS || !isFinite(start) || !isFinite(end)) {
         return;
     }
-    var low = clip(Math.min(start, end) / duration * 100, 0, 100);
-    var high = clip(Math.max(start, end) / duration * 100, 0, 100);
-    if (high - low < min_width()) {
-        high = Math.min(100, low + min_width());
-        low = Math.max(0, high - min_width());
-    }
-    var range = positions[voice - 1];
-    if (Math.abs(range[0] - low) < 0.00001 && Math.abs(range[1] - high) < 0.00001) {
+    waveRanges[voice - 1] = [Math.min(start, end) / duration * 100,
+                            Math.max(start, end) / duration * 100];
+}
+
+function wave_mouse(voice, x, y, phase) {
+    if (!ready || voice < 1 || voice > WINDOWS) {
         return;
     }
-    positions[voice - 1] = [low, high];
-    draw_region(voice);
-    if (voice !== inspectedWindow) {
-        inspect_window(voice - 1);
+    var bit = 1 << (voice - 1);
+    if (phase === 1) {
+        pendingWaveEdits &= ~bit;
+    } else if (phase === 0) {
+        pendingWaveEdits |= bit;
+        // Let waveform~ finish emitting its selection for this mouse event.
+        commitWave.schedule(0);
     }
 }
+
+function commit_wave_edits() {
+    var edits = pendingWaveEdits;
+    pendingWaveEdits = 0;
+    for (var index = 0; ready && index < WINDOWS; index++) {
+        if (!(edits & (1 << index))) {
+            continue;
+        }
+        var range = positions[index];
+        var next = waveRanges[index];
+        if (Math.abs(range[0] - next[0]) < 0.00001 && Math.abs(range[1] - next[1]) < 0.00001) {
+            continue;
+        }
+        var voice = index + 1;
+        waveRevisions[index] = (waveRevisions[index] + 1) % 1048576;
+        send("wave_edit_revision_" + voice, waveRevisions[index]);
+        set_region(voice, next[0], next[1]);
+        if (voice !== inspectedWindow) {
+            inspect_window(index);
+        }
+    }
+}
+commit_wave_edits.local = 1;

@@ -84,16 +84,36 @@ host.edit_play(3, 0);
 assert(sent('run_3', 0));
 assert(sent('status', 'set', '3 of 4 windows playing'));
 
-host.edit_wave(2, 0, 8000, 3200, 4800);
+trace.length = 0;
+host.wave_mouse(2, 0.2, 0, 1);
+host.track_wave(2, 0, 8000, 2000, 2000);
+host.wave_mouse(2, 0.5, 0, 2);
+host.track_wave(2, 0, 8000, 2000, 4000);
+assert(!tasks.has('commit_wave_edits'));
+assert(!trace.some(([name]) => /^(base_start_2|base_end_2|wave_edit_revision_2)$/.test(name)));
+host.wave_mouse(2, 0.6, 0, 0);
+host.track_wave(2, 0, 8000, 3200, 4800);
+runTask('commit_wave_edits');
+assert(sent('wave_edit_revision_2', 1));
 assert(sent('start_2', 'set', 40));
 assert(sent('end_2', 'set', 60));
+assert.deepEqual(trace.filter(([name]) => /^(base_start_2|base_end_2|wave_edit_revision_2)$/.test(name)), [
+    ['wave_edit_revision_2', 1], ['base_start_2', 40], ['base_end_2', 60],
+]);
+trace.length = 0;
+host.wave_mouse(2, 0.6, 0, 0);
+runTask('commit_wave_edits');
+assert(!trace.some(([name]) => name === 'wave_edit_revision_2'));
 host.edit_start(2, 10);
 assert.deepEqual(regions.at(-1), [1, 800, 4800]);
 host.edit_end(2, -10);
 assert(Math.abs(regions.at(-1)[2] - 801) < 1e-10);
 
 trace.length = 0;
+host.wave_mouse(2, 0.6, 0, 0);
+assert(tasks.has('commit_wave_edits'));
 host.open_source('/fixture/Stereo Test.wav');
+assert(!tasks.has('commit_wave_edits'));
 assert(sent('run_1', 0));
 assert(sent('run_2', 0));
 assert(sent('run_4', 0));
