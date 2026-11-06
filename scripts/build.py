@@ -36,6 +36,7 @@ GUTTER = 4
 SECTION_GAP = 16
 TRACKS = 22
 SPLIT = 14
+MIXER_TRACKS = 5
 RIGHT_TRACKS = TRACKS - SPLIT
 PATTERNS_TOP = 88
 PLAYBACK_TOP = PATTERNS_TOP + 2 * ROW - GUTTER + SECTION_GAP
@@ -218,6 +219,57 @@ def window_controls(p):
     p.connect("pitch_scale", 0, "pitch_scale_signal")
 
 
+def performance_mixer(p):
+    p.label("mixer_heading", "Performance mixer", 0, 2, 4, heading=True,
+            y_offset=PLAYBACK_OFFSET)
+    p.obj("mixer_control", "js fk_mixer.js", 1560, 1880, outs=0)
+    p.connect("dsp_enabled", 0, "mixer_control")
+    p.ui("mixer_clear_solo", "live.text", 4, 2, y_offset=PLAYBACK_OFFSET, outs=2,
+         types=["bang", ""], mode=0, active=0, text="Unsolo", texton="Unsolo",
+         parameter_enable=0, hint="Clear all solo buttons and return to the current mute mix.")
+    p.add("mixer_unsolo", "message", [1560, 1910, 100, 22], ins=2, text="clear_solos")
+    p.connect("mixer_clear_solo", 0, "mixer_unsolo")
+    p.connect("mixer_unsolo", 0, "mixer_control")
+
+
+def mixer_strip(p, voice, row, y):
+    for column, key in ((2, "mute"), (3, "solo")):
+        name = f"mixer_{key}_{voice}"
+        hint = ("Mute this window without stopping the loop." if key == "mute" else
+                "Listen to soloed windows. Mute still silences a window.")
+        p.ui(name, "live.text", column, row, y_offset=PLAYBACK_OFFSET, outs=2,
+             types=["int", ""], mode=1, text=key.capitalize(), texton=key.capitalize(),
+             parameter_enable=0, hint=hint)
+        p.obj(name + "_msg", f"prepend {key} {voice}", 2680, y + (column - 2) * 30, ins=2)
+        p.connect(name, 0, name + "_msg")
+        p.connect(name + "_msg", 0, "mixer_control")
+
+    p.ui(f"mixer_pan_{voice}", "live.numbox", 4, row, y_offset=PLAYBACK_OFFSET,
+         outs=2, types=["float", "float"], hint=f"Window {voice} pan",
+         **parameter(f"Mixer pan {voice}", [-45, -15, 15, 45][voice - 1], -100, 100, unit_style=6))
+    p.ui(f"mixer_level_{voice}", "live.slider", 0, row + 1, 2, y_offset=PLAYBACK_OFFSET + 4,
+         outs=2, types=["float", "float"], orientation=1, showname=0, shownumber=0, relative=1,
+         hint=f"Window {voice} level. This is the base value before level modulation.",
+         **parameter(f"Mixer level {voice}", 70, 0, 100, unit_style=5))
+    level_value = f"mixer_level_value_{voice}"
+    p.ui(level_value, "live.numbox", 2, row + 1, y_offset=PLAYBACK_OFFSET + 2,
+         outs=2, types=["float", "float"], hint=f"Window {voice} level in percent",
+         parameter_mappable=0, **parameter(f"Mixer level value {voice}", 70, 0, 100, unit_style=5))
+    p.connect(level_value, 0, f"level_{voice}")
+    p.ui(f"meter_{voice}", "live.meter~", 3, row + 1, 2, y_offset=PLAYBACK_OFFSET, outs=2,
+         types=["float", "int"], orientation=1, hint=f"Window {voice} peak after mute and solo.")
+
+    for index, key in enumerate(("level", "pan")):
+        name = f"mixer_{key}_{voice}"
+        base = f"{key}_{voice}"
+        sync = f"{name}_sync"
+        p.obj(sync, "prepend set", 2680 + 116 * index, y + 62, ins=2)
+        p.connect(name, 0, base)
+        p.connect(base, 0, sync)
+        p.connect(sync, 0, name)
+    p.connect(f"mixer_level_{voice}_sync", 0, level_value)
+
+
 def build():
     p = Patch()
     p.label("title", "FIELD KIT", 0, 0, 3, heading=True)
@@ -320,8 +372,9 @@ def build():
         p.connect("output_" + suffix, 0, "output_peak_" + suffix)
         p.connect("output_peak_" + suffix, 0, "mix_peak", channel)
 
-    p.label("row_heading", "Playback windows", 0, 2, 7, heading=True, y_offset=PLAYBACK_OFFSET)
-    p.label("wave_heading", "Drag a range, release to set the loop", 7, 2, SPLIT - 7, y_offset=PLAYBACK_OFFSET + 4)
+    performance_mixer(p)
+    p.label("row_heading", "Playback windows", MIXER_TRACKS, 2, 4, heading=True, y_offset=PLAYBACK_OFFSET)
+    p.label("wave_heading", "Drag a range, release to set the loop", 9, 2, SPLIT - 9, y_offset=PLAYBACK_OFFSET + 4)
     window_controls(p)
 
     mod_rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
@@ -350,9 +403,8 @@ def build():
         p.ui(f"play_{voice}", "live.text", 0, row, 2, y_offset=PLAYBACK_OFFSET, outs=2, types=["", ""],
              text=f"{voice:02} Stopped", texton=f"{voice:02} Playing", mode=1,
              **parameter(f"Window {voice} Play", 0, 0, 1, options=["Off", "On"]))
-        p.ui(f"meter_{voice}", "live.meter~", 0, row + 1, 2, y_offset=PLAYBACK_OFFSET, outs=2,
-             types=["float", "int"], orientation=1)
-        p.ui(f"wave_{voice}", "waveform~", 2, row, SPLIT - 2, 2, y_offset=PLAYBACK_OFFSET, ins=5, outs=6,
+        p.ui(f"wave_{voice}", "waveform~", MIXER_TRACKS, row, SPLIT - MIXER_TRACKS, 2,
+             y_offset=PLAYBACK_OFFSET, ins=5, outs=6,
              types=["float", "float", "float", "float", "list", "list"], setmode=1)
         p.connect("source_control", voice - 1, f"wave_{voice}", 2)
 
@@ -410,13 +462,19 @@ def build():
                 p.obj(sync, f"prepend inspector_sync {voice} {key}", 1690 + i * 96, y + 40, ins=2)
                 p.connect(control, 0, sync)
                 p.connect(sync, 0, "source_control")
+        mixer_strip(p, voice, row, y)
+        p.obj(f"mixer_gain_{voice}", "line~ 1.", 2680, y + 94, ins=2, outs=2, types=["signal", "bang"])
         p.obj(f"peak_{voice}", "maximum~", 920, y + 170, ins=2, types=["signal"])
         p.connect(f"peak_{voice}", 0, f"meter_{voice}")
         for suffix, outlet in (("left", 0), ("right", 1)):
-            p.connect(f"voice_{voice}", outlet, "mix_fx", outlet)
+            mix_channel = f"mixer_{suffix}_{voice}"
+            p.obj(mix_channel, "*~", 2680 + 116 * outlet, y + 124, ins=2, types=["signal"])
+            p.connect(f"voice_{voice}", outlet, mix_channel)
+            p.connect(f"mixer_gain_{voice}", 0, mix_channel, 1)
+            p.connect(mix_channel, 0, "mix_fx", outlet)
             rect_x = 780 + outlet * 100
             p.obj(f"abs_{suffix}_{voice}", "abs~", rect_x, y + 132, types=["signal"])
-            p.connect(f"voice_{voice}", outlet, f"abs_{suffix}_{voice}")
+            p.connect(mix_channel, 0, f"abs_{suffix}_{voice}")
             p.connect(f"abs_{suffix}_{voice}", 0, f"peak_{voice}", outlet)
 
         p.obj(f"track_wave_{voice}", f"prepend track_wave {voice}", 1110, y + 34, ins=2)

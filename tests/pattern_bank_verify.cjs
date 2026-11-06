@@ -63,6 +63,15 @@ const source = {
         if (selector === 'inspect_window') sourceState.inspector = args[0];
     },
 };
+const mixerState = { mutes: [0, 1, 0, 1], solos: [0, 0, 1, 0] };
+const mixer = {
+    js: mixerState,
+    message(selector, ...mutes) {
+        assert.equal(selector, 'recall_mutes');
+        mixerState.mutes = mutes;
+        mixerState.solos.fill(0);
+    },
+};
 function addControl(name, initial) {
     controls[name] = {
         value: initial,
@@ -91,6 +100,7 @@ const named = name => {
     if (name === 'source_control') return source;
     if (name === 'patchbay') return { subpatcher: () => ({ getnamed: () => router }) };
     if (name === 'mix_fx') return { subpatcher: () => ({ getnamed: key => controls[key] }) };
+    if (name === 'mixer_control') return mixer;
     if (controls[name]) return controls[name];
     throw new Error('Unexpected control ' + name);
 };
@@ -137,6 +147,7 @@ assert.equal(controls.pattern_store.text, 'Store pattern');
 assert.match(controls.pattern_status.value, /Pattern 2 stored/);
 const selectedBackground = controls.pattern_2.background;
 assert.notDeepEqual(selectedBackground, controls.pattern_1.background);
+mixerState.mutes.fill(1);
 host.save_bank();
 assert.deepEqual(messages.at(-1), ['pattern_save_dialog', 'bang']);
 host.write_bank('/test/bank.json');
@@ -146,6 +157,8 @@ assert.equal(bank.version, 2);
 assert.equal(bank.slots.length, 8);
 assert.equal(bank.slots[1].windows[1].rate, 0.5);
 assert.equal(bank.slots[1].pitchScale, 5);
+assert.deepEqual(bank.slots[1].mixerMutes, [0, 1, 0, 1]);
+assert.equal(bank.slots[1].mixerSolos, undefined);
 assert.deepEqual(bank.slots[1].curves, initialCurves);
 assert.deepEqual(bank.slots[1].selection, { window: 3, lfo: 7, target: 7 });
 
@@ -182,10 +195,13 @@ assert.equal(controls.rate_2.value, 0.5);
 assert.equal(controls.master.value, -5);
 assert.equal(controls.fx_echo.value, 60);
 assert.equal(controls.pitch_scale.value, 5);
+assert.deepEqual(mixerState.mutes, [0, 1, 0, 1]);
+assert.deepEqual(mixerState.solos, [0, 0, 0, 0]);
 host.slot(2);
 assert.equal(controls.pattern_2.text, '2 •');
 assert.deepEqual(controls.pattern_2.background, selectedBackground);
 
+mixerState.solos[0] = 1;
 host.reset();
 assert.deepEqual(sourceState.positions, [[0, 25], [25, 50], [50, 75], [75, 100]]);
 assert.deepEqual(sourceState.playing, [false, false, false, false]);
@@ -195,6 +211,8 @@ assert.equal(controls.fx_enabled.value, 0);
 assert.equal(controls.fx_echo.value, 20);
 assert.equal(controls.master.value, -12);
 assert.equal(controls.pitch_scale.value, 0);
+assert.deepEqual(mixerState.mutes, [0, 0, 0, 0]);
+assert.deepEqual(mixerState.solos, [0, 0, 0, 0]);
 assert.equal(controls.pan_4.value, 45);
 assert.equal(controls.pattern_2.text, '2 •');
 assert.notDeepEqual(controls.pattern_2.background, selectedBackground);
@@ -230,6 +248,14 @@ files.set('/test/invalid-pitch.json', JSON.stringify({ ...bank, slots: invalidPi
 host.read_bank('/test/invalid-pitch.json');
 assert.match(controls.pattern_status.value, /Couldn’t open/);
 assert.equal(controls.pattern_4.text, '4 •');
+for (const mixerMutes of [null, [0, 1, 0], [0, 0.5, 0, 1], [0, 2, 0, 1], [0, '1', 0, 1]]) {
+    const invalidMuteSlots = bank.slots.slice();
+    invalidMuteSlots[1] = { ...bank.slots[1], mixerMutes };
+    files.set('/test/invalid-mutes.json', JSON.stringify({ ...bank, slots: invalidMuteSlots }));
+    host.read_bank('/test/invalid-mutes.json');
+    assert.match(controls.pattern_status.value, /Couldn’t open/);
+    assert.equal(controls.pattern_4.text, '4 •');
+}
 host.load_bank();
 assert.deepEqual(messages.at(-1), ['pattern_load_dialog', 'bang']);
 failTextRead = true;
@@ -237,15 +263,18 @@ host.read_bank('/test/bank.json');
 assert.equal(controls.pattern_4.text, '4');
 assert.equal(controls.pattern_2.text, '2 •');
 assert.equal(controls.rate_2.value, 1);
+assert.deepEqual(mixerState.mutes, [0, 0, 0, 0]);
 host.slot(2);
 assert.equal(controls.rate_2.value, 0.5);
 assert.equal(modState.gains[241], -100);
 assert.equal(modState.gains[287], 42);
 assert.deepEqual(modState.curves, initialCurves);
 assert.equal(controls.pitch_scale.value, 5);
+assert.deepEqual(mixerState.mutes, [0, 1, 0, 1]);
 
 const oldV2Pattern = { ...bank.slots[1] };
 delete oldV2Pattern.pitchScale;
+delete oldV2Pattern.mixerMutes;
 const oldV2Slots = bank.slots.slice();
 oldV2Slots[1] = oldV2Pattern;
 files.set('/test/old-v2.json', JSON.stringify({ ...bank, slots: oldV2Slots }));
@@ -253,6 +282,7 @@ host.read_bank('/test/old-v2.json');
 assert.match(controls.pattern_status.value, /Bank loaded/);
 host.slot(2);
 assert.equal(controls.pitch_scale.value, 0);
+assert.deepEqual(mixerState.mutes, [0, 0, 0, 0]);
 
 // These are version 1 indices for W1 LFO 2 Start, W2 LFO 1 Speed,
 // W3 LFO 2 Level, and W4 LFO 3 Level.
@@ -277,8 +307,12 @@ assert.match(controls.pattern_status.value, /Bank loaded/);
 assert.equal(controls.pattern_2.text, '2');
 assert.equal(controls.pattern_8.text, '8 •');
 controls.pitch_scale.value = 6;
+mixerState.mutes[0] = 1;
+mixerState.solos[1] = 1;
 host.slot(8);
 assert.equal(controls.pitch_scale.value, 0);
+assert.deepEqual(mixerState.mutes, [0, 0, 0, 0]);
+assert.deepEqual(mixerState.solos, [0, 0, 0, 0]);
 assert.equal(modState.currentLfo, 2);
 assert.equal(modState.selected, 3);
 assert.equal(modState.targetIndex, 7);
@@ -311,4 +345,4 @@ assert.match(controls.pattern_status.value, /Bank loaded/);
 host.slot(8);
 assert.deepEqual(modState.curves[7], denseCurve);
 
-console.log('PASS pattern store, cancel, overwrite, visible slots, pitch snap, and v1/v2 bank round-trip');
+console.log('PASS pattern store, cancel, overwrite, visible slots, pitch snap, mixer mutes, and v1/v2 bank round-trip');

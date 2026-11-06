@@ -20,6 +20,7 @@ var SELECTED_BUTTON = [0.92, 0.62, 0.08, 1];
 var LIGHT_TEXT = [0.92, 0.92, 0.92, 1];
 var DARK_TEXT = [0.07, 0.07, 0.07, 1];
 var DEFAULT_PANS = [-45, -15, 15, 45];
+var DEFAULT_MIXER_MUTES = [0, 0, 0, 0];
 var VOICE_CONTROLS = [
     ["rate", 0.125, 4, 1],
     ["direction", 0, 2, 0],
@@ -133,6 +134,7 @@ function capture_pattern() {
     var source = patch.getnamed("source_control").js;
     var router = patch.getnamed("patchbay").subpatcher().getnamed("fk_router").js;
     var fx = patch.getnamed("mix_fx").subpatcher();
+    var mixer = patch.getnamed("mixer_control").js;
     var windows = [];
     for (var i = 0; i < VOICE_COUNT; i++) {
         var window = { region: source.positions[i].slice() };
@@ -153,6 +155,7 @@ function capture_pattern() {
         curves: router.curves.map(function (curve) { return curve.slice(); }),
         selection: { window: router.selected, lfo: router.currentLfo, target: router.targetIndex },
         effects: effects,
+        mixerMutes: mixer.mutes.slice(),
         pitchScale: value_of(patch.getnamed("pitch_scale")),
         master: value_of(patch.getnamed("master"))
     };
@@ -197,6 +200,9 @@ function apply_pattern(pattern) {
     router.message("view", pattern.selection.window + 1);
     router.message("select_destination", pattern.selection.target);
     router.message("bang");
+
+    var mixer = patch.getnamed("mixer_control");
+    mixer.message.apply(mixer, ["recall_mutes"].concat(pattern.mixerMutes || DEFAULT_MIXER_MUTES));
 }
 apply_pattern.local = 1;
 
@@ -230,7 +236,8 @@ function reset() {
     var defaults = modulation_defaults();
     apply_pattern({
         windows: windows, gains: gains, rates: defaults.rates, shapes: defaults.shapes, curves: defaults.curves,
-        selection: { window: 0, lfo: 0, target: 0 }, effects: effects, pitchScale: 0, master: -12
+        selection: { window: 0, lfo: 0, target: 0 }, effects: effects, mixerMutes: DEFAULT_MIXER_MUTES,
+        pitchScale: 0, master: -12
     });
     patch.getnamed("source_control").message("inspect_window", 0);
     lastSlot = -1;
@@ -412,6 +419,9 @@ function valid_pattern(pattern, lfoCount) {
         index_valid(pattern.selection.window, VOICE_COUNT) && index_valid(pattern.selection.lfo, lfoCount) &&
         index_valid(pattern.selection.target, TARGET_COUNT) && controls_valid(pattern.effects, FX_CONTROLS) &&
         pattern.effects.fx_enabled % 1 === 0 && in_range(pattern.master, -70, 0) &&
-        (pattern.pitchScale === undefined || index_valid(pattern.pitchScale, PITCH_SCALE_COUNT));
+        (pattern.pitchScale === undefined || index_valid(pattern.pitchScale, PITCH_SCALE_COUNT)) &&
+        (pattern.mixerMutes === undefined ||
+            (Array.isArray(pattern.mixerMutes) && pattern.mixerMutes.length === VOICE_COUNT &&
+                pattern.mixerMutes.every(function (mute) { return index_valid(mute, 2); })));
 }
 valid_pattern.local = 1;

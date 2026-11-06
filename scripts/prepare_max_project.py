@@ -16,6 +16,7 @@ RUNTIME_ASSETS = {
         "fk_record.maxpat": "patcher",
     },
     "code": {
+        "fk_mixer.js": "javascript",
         "fk_mod_routes.js": "javascript",
         "fk_source.js": "javascript",
         "fk_recorder.js": "javascript",

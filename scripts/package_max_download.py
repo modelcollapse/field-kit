@@ -34,6 +34,7 @@ def make_download(source, archive):
 
     document = json.loads((source / TOP_LEVEL).read_text(encoding="utf-8"))
     replacements = {
+        "js fk_mixer.js": f"js {SUPPORT_PATH}fk_mixer.js",
         "js fk_source.js": f"js {SUPPORT_PATH}fk_source.js",
         "js fk_patterns.js": f"js {SUPPORT_PATH}fk_patterns.js",
         "gen~ fk_voice": f"gen~ @gen {SUPPORT_PATH}fk_voice.gendsp",

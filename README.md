@@ -1,6 +1,6 @@
 # FIELD KIT
 
-FIELD KIT is a Max instrument that turns one audio file into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, filter, level, and pan. Eight LFOs can modulate the controls, and a built-in recorder captures the stereo mix.
+FIELD KIT is a Max instrument that turns one audio file into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, and filter. Blend the loops in the performance mixer, move them with eight LFOs, and capture the stereo mix with the built-in recorder.
 
 ## Start here
 
@@ -9,7 +9,7 @@ FIELD KIT is a Max instrument that turns one audio file into four independent st
 
 The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select an output device, and **Enable audio** starts the engine without starting playback.
 
-![FIELD KIT playing the bundled demo through four loop windows, with Pitch Snap set to Natural Minor, one filled pattern square, and the red recording indicator](docs/screenshots/field-kit-overview.png)
+![FIELD KIT playing four loops with two mixer channels soloed, one muted, and one filled pattern square](docs/screenshots/field-kit-overview.png)
 
 ## Play and shape the loops
 
@@ -19,11 +19,15 @@ The eight-second demo loads on startup. Click **Play all** to turn on audio and 
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 
-**Play normal** plays the original sample once at its original speed, with effects bypassed. **Stop all** stops playback. **Reset** also restores the default loop, modulation, and effects settings. It keeps the current sample and stored patterns.
+**Play normal** plays the original sample once at its original speed, with the window mixer and effects bypassed. **Stop all** stops playback. **Reset** also restores the default loop, mixer, modulation, and effects settings. It keeps the current sample and stored patterns.
+
+## Mix the four windows
+
+Each waveform has a mixer strip with playback, level, pan, mute, solo, and a peak meter. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. The meters show what each window sends into the shared effects, and **Capture** records the resulting master mix.
 
 ## Store patterns
 
-Click **Store pattern**, then pick one of the eight squares. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, pitch scale, LFO routes and curves, and effects on the current sample. Click **Cancel store** to leave the bank alone.
+Click **Store pattern**, then pick one of the eight squares. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. Recall clears active solos. Click **Cancel store** to leave the bank alone.
 
 Use **Save bank…** to keep your patterns between sessions. **Load bank…** opens a saved bank.
 
