@@ -27,7 +27,7 @@ DIRECTIONS = ["Forward", "Reverse", "Ping-pong"]
 PITCH_SCALES = ("Off", "Chromatic", "Major", "Natural Minor", "Dorian",
                 "Major Pentatonic", "Minor Pentatonic")
 DIALS = ("rate", "fade", "drive", "filter", "level", "pan")
-DIAL_LABELS = ("Speed ×", "Fade ms", "Drive %", "LP / HP", "Level %", "Pan %")
+DIAL_LABELS = ("Speed ×", "Fade ms", "Drive %", "Filter", "Level %", "Pan %")
 
 MARGIN = 16
 TRACK = 48
@@ -247,16 +247,17 @@ def mixer_strip(p, voice, row, y):
     p.ui(f"mixer_pan_{voice}", "live.numbox", 4, row, y_offset=PLAYBACK_OFFSET,
          outs=2, types=["float", "float"], hint=f"Window {voice} pan",
          **parameter(f"Mixer pan {voice}", [-45, -15, 15, 45][voice - 1], -100, 100, unit_style=6))
-    p.ui(f"mixer_level_{voice}", "live.slider", 0, row + 1, 2, y_offset=PLAYBACK_OFFSET + 4,
-         outs=2, types=["float", "float"], orientation=1, showname=0, shownumber=0, relative=1,
-         hint=f"Window {voice} level. This is the base value before level modulation.",
+    p.ui(f"mixer_level_{voice}", "live.slider", 0, row + 1, 3, y_offset=PLAYBACK_OFFSET,
+         outs=2, types=["float", "float"], orientation=1, showname=0, shownumber=0, relative=0,
+         tricolor=[0.56, 0.71, 0.96, 1.0], trioncolor=[0.68, 0.80, 0.99, 1.0],
+         hint=f"Window {voice} volume. Click or drag to set it directly.",
          **parameter(f"Mixer level {voice}", 70, 0, 100, unit_style=5))
     level_value = f"mixer_level_value_{voice}"
-    p.ui(level_value, "live.numbox", 2, row + 1, y_offset=PLAYBACK_OFFSET + 2,
+    p.ui(level_value, "live.numbox", 3, row + 1, y_offset=PLAYBACK_OFFSET + 2,
          outs=2, types=["float", "float"], hint=f"Window {voice} level in percent",
          parameter_mappable=0, **parameter(f"Mixer level value {voice}", 70, 0, 100, unit_style=5))
     p.connect(level_value, 0, f"level_{voice}")
-    p.ui(f"meter_{voice}", "live.meter~", 3, row + 1, 2, y_offset=PLAYBACK_OFFSET, outs=2,
+    p.ui(f"meter_{voice}", "live.meter~", 4, row + 1, y_offset=PLAYBACK_OFFSET, outs=2,
          types=["float", "int"], orientation=1, hint=f"Window {voice} peak after mute and solo.")
 
     for index, key in enumerate(("level", "pan")):

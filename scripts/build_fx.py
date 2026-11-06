@@ -216,8 +216,9 @@ def build():
         rect = [slot * dial_pitch, 48, dial_pitch - gutter, 68]
         dial = p.add("live.dial", rect, view=rect, outs=2, types=["float", "float"],
                      appearance=3, showname=1, shownumber=1, varname="fx_" + key, hint=hint,
-                     **parameter(title, label, initial, low, high, integer=key != "decay",
-                                 units="%.2f" if key == "decay" else None))
+                     # Max integer parameters support only 256 distinct values.
+                     **parameter(title, label, initial, low, high, integer=key not in ("time_ms", "decay"),
+                                 units={"time_ms": "%.0f", "decay": "%.2f"}.get(key)))
         prefix = p.obj("prepend " + key, slot * 118 + 122, 265, 108, ins=2)
         p.cord(dial, prefix)
         p.cord(prefix, gen)

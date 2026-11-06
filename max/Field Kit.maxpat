@@ -2800,7 +2800,7 @@
           "saved_attribute_attributes": {
             "valueof": {
               "parameter_longname": "Selected filter",
-              "parameter_shortname": "LP / HP",
+              "parameter_shortname": "Filter",
               "parameter_type": 0,
               "parameter_mmin": -100,
               "parameter_mmax": 100,
@@ -4643,15 +4643,27 @@
           "numoutlets": 2,
           "patching_rect": [
             16,
-            200,
-            92,
+            196,
+            140,
             20
           ],
           "orientation": 1,
           "showname": 0,
           "shownumber": 0,
-          "relative": 1,
-          "hint": "Window 1 level. This is the base value before level modulation.",
+          "relative": 0,
+          "tricolor": [
+            0.56,
+            0.71,
+            0.96,
+            1.0
+          ],
+          "trioncolor": [
+            0.68,
+            0.8,
+            0.99,
+            1.0
+          ],
+          "hint": "Window 1 volume. Click or drag to set it directly.",
           "parameter_enable": 1,
           "saved_attribute_attributes": {
             "valueof": {
@@ -4674,8 +4686,8 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            200,
-            92,
+            196,
+            140,
             20
           ]
         }
@@ -4688,7 +4700,7 @@
           "numinlets": 1,
           "numoutlets": 2,
           "patching_rect": [
-            112,
+            160,
             198,
             44,
             20
@@ -4716,7 +4728,7 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            112,
+            160,
             198,
             44,
             20
@@ -4731,9 +4743,9 @@
           "numinlets": 1,
           "numoutlets": 2,
           "patching_rect": [
-            160,
+            208,
             196,
-            92,
+            44,
             20
           ],
           "orientation": 1,
@@ -4744,9 +4756,9 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
+            208,
             196,
-            92,
+            44,
             20
           ]
         }
@@ -6391,15 +6403,27 @@
           "numoutlets": 2,
           "patching_rect": [
             16,
-            248,
-            92,
+            244,
+            140,
             20
           ],
           "orientation": 1,
           "showname": 0,
           "shownumber": 0,
-          "relative": 1,
-          "hint": "Window 2 level. This is the base value before level modulation.",
+          "relative": 0,
+          "tricolor": [
+            0.56,
+            0.71,
+            0.96,
+            1.0
+          ],
+          "trioncolor": [
+            0.68,
+            0.8,
+            0.99,
+            1.0
+          ],
+          "hint": "Window 2 volume. Click or drag to set it directly.",
           "parameter_enable": 1,
           "saved_attribute_attributes": {
             "valueof": {
@@ -6422,8 +6446,8 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            248,
-            92,
+            244,
+            140,
             20
           ]
         }
@@ -6436,7 +6460,7 @@
           "numinlets": 1,
           "numoutlets": 2,
           "patching_rect": [
-            112,
+            160,
             246,
             44,
             20
@@ -6464,7 +6488,7 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            112,
+            160,
             246,
             44,
             20
@@ -6479,9 +6503,9 @@
           "numinlets": 1,
           "numoutlets": 2,
           "patching_rect": [
-            160,
+            208,
             244,
-            92,
+            44,
             20
           ],
           "orientation": 1,
@@ -6492,9 +6516,9 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
+            208,
             244,
-            92,
+            44,
             20
           ]
         }
@@ -8139,15 +8163,27 @@
           "numoutlets": 2,
           "patching_rect": [
             16,
-            296,
-            92,
+            292,
+            140,
             20
           ],
           "orientation": 1,
           "showname": 0,
           "shownumber": 0,
-          "relative": 1,
-          "hint": "Window 3 level. This is the base value before level modulation.",
+          "relative": 0,
+          "tricolor": [
+            0.56,
+            0.71,
+            0.96,
+            1.0
+          ],
+          "trioncolor": [
+            0.68,
+            0.8,
+            0.99,
+            1.0
+          ],
+          "hint": "Window 3 volume. Click or drag to set it directly.",
           "parameter_enable": 1,
           "saved_attribute_attributes": {
             "valueof": {
@@ -8170,8 +8206,8 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            296,
-            92,
+            292,
+            140,
             20
           ]
         }
@@ -8184,7 +8220,7 @@
           "numinlets": 1,
           "numoutlets": 2,
           "patching_rect": [
-            112,
+            160,
             294,
             44,
             20
@@ -8212,7 +8248,7 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            112,
+            160,
             294,
             44,
             20
@@ -8227,9 +8263,9 @@
           "numinlets": 1,
           "numoutlets": 2,
           "patching_rect": [
-            160,
+            208,
             292,
-            92,
+            44,
             20
           ],
           "orientation": 1,
@@ -8240,9 +8276,9 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
+            208,
             292,
-            92,
+            44,
             20
           ]
         }
@@ -9887,15 +9923,27 @@
           "numoutlets": 2,
           "patching_rect": [
             16,
-            344,
-            92,
+            340,
+            140,
             20
           ],
           "orientation": 1,
           "showname": 0,
           "shownumber": 0,
-          "relative": 1,
-          "hint": "Window 4 level. This is the base value before level modulation.",
+          "relative": 0,
+          "tricolor": [
+            0.56,
+            0.71,
+            0.96,
+            1.0
+          ],
+          "trioncolor": [
+            0.68,
+            0.8,
+            0.99,
+            1.0
+          ],
+          "hint": "Window 4 volume. Click or drag to set it directly.",
           "parameter_enable": 1,
           "saved_attribute_attributes": {
             "valueof": {
@@ -9918,8 +9966,8 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            344,
-            92,
+            340,
+            140,
             20
           ]
         }
@@ -9932,7 +9980,7 @@
           "numinlets": 1,
           "numoutlets": 2,
           "patching_rect": [
-            112,
+            160,
             342,
             44,
             20
@@ -9960,7 +10008,7 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            112,
+            160,
             342,
             44,
             20
@@ -9975,9 +10023,9 @@
           "numinlets": 1,
           "numoutlets": 2,
           "patching_rect": [
-            160,
+            208,
             340,
-            92,
+            44,
             20
           ],
           "orientation": 1,
@@ -9988,9 +10036,9 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
+            208,
             340,
-            92,
+            44,
             20
           ]
         }

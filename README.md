@@ -9,13 +9,13 @@ FIELD KIT is a Max instrument that turns one audio file into four independent st
 
 The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select an output device, and **Enable audio** starts the engine without starting playback.
 
-![FIELD KIT playing four loops with two mixer channels soloed, one muted, and one filled pattern square](docs/screenshots/field-kit-overview.png)
+![FIELD KIT playing four loops with wide blue volume faders, two soloed tracks, and stereo echo set to 575 ms](docs/screenshots/field-kit-overview.png)
 
 ## Play and shape the loops
 
 1. Drag across a waveform to preview a loop range, then release to apply it. If the window is playing, it fades briefly as it switches to the new range. The moving line shows playback position.
 2. Use **Window 1–4** to pick the window you want to edit. **In %** and **Out %** let you enter the bounds precisely.
-3. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials. **Fade ms** blends each pass into the next. **LP / HP** is flat at zero. Turn left for a low-pass filter or right for a high-pass filter.
+3. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials. **Fade ms** blends each pass into the next. **Filter** is flat at zero. Turn left to cut highs or right to cut lows. The filter works independently of the mix effects switch.
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 
@@ -23,7 +23,7 @@ The eight-second demo loads on startup. Click **Play all** to turn on audio and 
 
 ## Mix the four windows
 
-Each waveform has a mixer strip with playback, level, pan, mute, solo, and a peak meter. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. The meters show what each window sends into the shared effects, and **Capture** records the resulting master mix.
+Each waveform has a mixer strip with playback, level, pan, mute, solo, and a peak meter. Click or drag the blue fader under a window’s playback button to set its volume, or edit the percentage box for a precise level. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. The meters show what each window sends into the shared effects, and **Capture** records the resulting master mix.
 
 ## Store patterns
 
@@ -43,7 +43,7 @@ Click **Use curve** to use a custom breakpoint shape. The graph runs from the st
 
 ## Process and capture
 
-Click **Enable FX** to turn on tone, stereo echo, and room reverb. Set an effect's **Mix %** to zero to remove it from the mix. Tone is neutral at zero.
+During loop playback, click **Enable FX** to turn on tone, stereo echo, and room reverb. Set an effect's **Mix %** to zero to remove it from the mix. Tone is neutral at zero, and echo time ranges from 45 to 850 ms.
 
 With audio enabled, click **Record…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. Capture writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click **Stop** in Capture when the take is finished.
 

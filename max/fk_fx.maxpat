@@ -559,14 +559,16 @@
             "valueof": {
               "parameter_longname": "Echo time",
               "parameter_shortname": "Time ms",
-              "parameter_type": 1,
+              "parameter_type": 0,
               "parameter_mmin": 45,
               "parameter_mmax": 850,
               "parameter_initial": [
                 310
               ],
               "parameter_initial_enable": 1,
-              "parameter_invisible": 1
+              "parameter_invisible": 1,
+              "parameter_unitstyle": 9,
+              "parameter_units": "%.0f"
             }
           },
           "outlettype": [
