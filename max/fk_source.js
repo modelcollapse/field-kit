@@ -7,12 +7,23 @@ var WINDOWS = 4;
 var ALL_WINDOWS = (1 << WINDOWS) - 1;
 var DEFAULT_POSITIONS = [[0, 25], [25, 50], [50, 75], [75, 100]];
 var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "filter", "level", "pan"];
+var BUFFER_OBJECTS = ["buffer", "set_buffer"];
+var INFO_OBJECTS = ["source_info", "set_source_info"];
 var host = this;
 var bufferIds = new Global("field_kit_buffer_ids");
+var bufferNames = [];
+var activeBuffer = 0;
 var bufferName = "";
 var duration = 0;
 var pendingPath = "";
 var pendingName = "";
+var pendingIsDemo = false;
+var pendingSet = false;
+var pendingBuffer = -1;
+var readStarted = false;
+var stagedSource = null;
+var sourcePath = "";
+var sourceLabel = "No source";
 var sourceIsDemo = false;
 var ready = false;
 var audioOn = false;
@@ -31,6 +42,7 @@ var playing = [false, false, false, false];
 var boot = new Task(boot_source, host);
 var read = new Task(read_source, host);
 var waitForRead = new Task(read_timeout, host);
+var commitSet = new Task(commit_set_source, host);
 var waitForAudio = new Task(audio_timeout, host);
 var settleAudio = new Task(audio_settled, host);
 var commitWave = new Task(commit_wave_edits, host);
@@ -58,12 +70,13 @@ function boot_source() {
         return;
     }
     bufferIds.last = (bufferIds.last || 0) + 1;
-    bufferName = "field-kit-source-" + bufferIds.last;
-    send("buffer", "name", bufferName);
-    send("source_info", "set", bufferName);
-    send("normal_voice", "set", bufferName);
+    bufferNames = ["field-kit-source-" + bufferIds.last, "field-kit-set-source-" + bufferIds.last];
+    for (var slot = 0; slot < BUFFER_OBJECTS.length; slot++) {
+        send(BUFFER_OBJECTS[slot], "name", bufferNames[slot]);
+        send(INFO_OBJECTS[slot], "set", bufferNames[slot]);
+    }
+    bind_source(0);
     for (var index = 1; index <= WINDOWS; index++) {
-        send("voice_" + index, "source", bufferName);
         draw_region(index);
     }
     inspect_window(inspectedWindow - 1);
@@ -71,6 +84,16 @@ function boot_source() {
     load_demo();
 }
 boot_source.local = 1;
+
+function bind_source(index) {
+    activeBuffer = index;
+    bufferName = bufferNames[index];
+    send("normal_voice", "set", bufferName);
+    for (var voice = 1; voice <= WINDOWS; voice++) {
+        send("voice_" + voice, "source", bufferName);
+    }
+}
+bind_source.local = 1;
 
 function inspect_window(index) {
     if (typeof index !== "number" || index % 1 !== 0 || index < 0 || index >= WINDOWS) {
@@ -106,6 +129,10 @@ function choose() {
 }
 
 function load_demo() {
+    open_source(demo_path(), true);
+}
+
+function demo_path() {
     var file = host.patcher.filepath;
     var folder = file.slice(0, file.lastIndexOf("/") + 1);
     var demo = folder + "fk_demo.wav";
@@ -122,11 +149,55 @@ function load_demo() {
             }
         }
     }
-    open_source(demo, true);
+    return demo;
+}
+demo_path.local = 1;
+
+function get_set_source() {
+    if (!ready) {
+        return null;
+    }
+    return sourceIsDemo ? {kind: "demo"} : {kind: "file", path: sourcePath};
 }
 
+function open_set_demo() {
+    begin_set_source(demo_path(), true);
+}
+
+function open_set_source(path) {
+    begin_set_source(path, false);
+}
+
+function begin_set_source(path, isDemo) {
+    if (!can_open_source(path)) {
+        send("pattern_control", "set_source_loaded", 0);
+        return;
+    }
+    if (!isDemo && typeof File === "function") {
+        try {
+            var file = new File(path, "read");
+            if (!file.isopen) {
+                throw new Error("Could not open set audio");
+            }
+            file.close();
+        } catch (error) {
+            send("pattern_control", "set_source_loaded", 0);
+            return;
+        }
+    }
+    queuedWindows = 0;
+    queuedNormal = false;
+    begin_source_read(path, isDemo, 1 - activeBuffer, true);
+}
+begin_set_source.local = 1;
+
+function can_open_source(path) {
+    return !!bufferName && !pendingPath && typeof path === "string" && !!path.length;
+}
+can_open_source.local = 1;
+
 function open_source(path, isDemo) {
-    if (!bufferName || pendingPath || typeof path !== "string" || !path.length) {
+    if (!can_open_source(path)) {
         return;
     }
     stop_all();
@@ -134,41 +205,88 @@ function open_source(path, isDemo) {
     pendingWaveEdits = 0;
     ready = false;
     duration = 0;
-    pendingPath = path;
-    sourceIsDemo = !!isDemo;
-    pendingName = sourceIsDemo ? "Demo" : path.split("/").pop();
-    label("source_label", "Loading " + pendingName + "…");
-    update_status();
-    // Release the voices before replacing memory under the Gen readers.
-    read.schedule(40);
+    begin_source_read(path, !!isDemo, activeBuffer, false);
 }
 
+function begin_source_read(path, isDemo, target, isSet) {
+    pendingPath = path;
+    pendingIsDemo = isDemo;
+    pendingBuffer = target;
+    pendingSet = isSet;
+    pendingName = isDemo ? "Demo" : path.split("/").pop();
+    label("source_label", "Loading " + pendingName + "…");
+    update_status();
+    // Normal loads release the voices first. A set reads into the idle buffer.
+    read.schedule(isSet ? 0 : 40);
+}
+begin_source_read.local = 1;
+
 function read_source() {
-    send("buffer", "replace", pendingPath);
-    if (pendingPath) {
+    var target = pendingBuffer;
+    if (pendingSet) {
+        // A failed replace must never validate audio left by an earlier load.
+        send(BUFFER_OBJECTS[target], "sizeinsamps", 1);
+    }
+    readStarted = true;
+    send(BUFFER_OBJECTS[target], "replace", pendingPath);
+    if (readStarted) {
         waitForRead.schedule(15000);
     }
 }
 read_source.local = 1;
 
 function source_loaded(sampleRate) {
-    if (!pendingPath) {
+    finish_source_read(0, sampleRate);
+}
+
+function set_source_read(sampleRate) {
+    finish_source_read(1, sampleRate);
+}
+
+function finish_source_read(target, sampleRate) {
+    if (!pendingPath || !readStarted || target !== pendingBuffer) {
         return;
     }
-    var buffer = new Buffer(bufferName);
+    var buffer = new Buffer(bufferNames[target]);
     var frames = buffer.framecount();
-    if (!isFinite(sampleRate) || sampleRate <= 0 || !isFinite(frames) || frames < 2) {
+    var channels = buffer.channelcount();
+    if (!isFinite(sampleRate) || sampleRate <= 0 || !isFinite(frames) || frames < 2 || !isFinite(channels) || channels < 1) {
         read_timeout();
         return;
     }
 
     waitForRead.cancel();
+    readStarted = false;
+    if (pendingSet) {
+        stop_all();
+        commitWave.cancel();
+        pendingWaveEdits = 0;
+        stagedSource = {sampleRate: sampleRate, frames: frames, channels: channels};
+        commitSet.schedule(40);
+    } else {
+        accept_source(sampleRate, frames, channels);
+    }
+}
+finish_source_read.local = 1;
+
+function commit_set_source() {
+    var source = stagedSource;
+    stagedSource = null;
+    bind_source(pendingBuffer);
+    accept_source(source.sampleRate, source.frames, source.channels);
+    send(BUFFER_OBJECTS[1 - activeBuffer], "sizeinsamps", 1);
+    send("pattern_control", "set_source_loaded", 1);
+}
+commit_set_source.local = 1;
+
+function accept_source(sampleRate, frames, channels) {
     duration = 1000 * frames / sampleRate;
-    var channels = buffer.channelcount();
-    send("normal_right_channel", channels === 1 ? 1 : 2);
+    sourceIsDemo = pendingIsDemo;
+    sourcePath = pendingPath;
     var name = pendingName;
-    pendingPath = "";
-    pendingName = "";
+    clear_pending_source();
+    send("source_rate", sampleRate);
+    send("normal_right_channel", channels === 1 ? 1 : 2);
 
     drawing = true;
     for (var index = 1; index <= WINDOWS; index++) {
@@ -183,23 +301,42 @@ function source_loaded(sampleRate) {
         draw_region(voice);
     }
     var format = channels === 1 ? "mono" : channels === 2 ? "stereo" : channels + " ch";
-    label("source_label", name + "   ·   " + (duration / 1000).toFixed(2) + " s   ·   " + format);
+    sourceLabel = name + "   ·   " + (duration / 1000).toFixed(2) + " s   ·   " + format;
+    label("source_label", sourceLabel);
     start_queued_playback();
     update_status();
 }
+accept_source.local = 1;
+
+function clear_pending_source() {
+    pendingPath = "";
+    pendingName = "";
+    pendingSet = false;
+    pendingIsDemo = false;
+    pendingBuffer = -1;
+    readStarted = false;
+}
+clear_pending_source.local = 1;
 
 function read_timeout() {
     waitForRead.cancel();
-    pendingPath = "";
-    pendingName = "";
+    var isSet = pendingSet;
+    clear_pending_source();
     queuedWindows = 0;
     queuedNormal = false;
+    if (isSet) {
+        label("source_label", sourceLabel);
+        label("status", "Couldn’t load set audio.");
+        send("pattern_control", "set_source_loaded", 0);
+        return;
+    }
     ready = false;
     duration = 0;
+    sourceLabel = "No source";
     for (var voice = 1; voice <= WINDOWS; voice++) {
         send("wave_" + voice, "set");
     }
-    label("source_label", "No source");
+    label("source_label", sourceLabel);
     label("status", "Couldn’t load audio. Try another file.");
 }
 read_timeout.local = 1;
@@ -296,7 +433,7 @@ function audio_timeout() {
 audio_timeout.local = 1;
 
 function start_queued_playback() {
-    if ((!queuedWindows && !queuedNormal) || !ready || audioStarting) {
+    if ((!queuedWindows && !queuedNormal) || !ready || audioStarting || pendingSet) {
         return;
     }
     if (!audioOn) {
@@ -363,6 +500,10 @@ function edit_play(voice, value) {
     if (voice < 1 || voice > WINDOWS || voice % 1 || typeof value !== "number") {
         return;
     }
+    if (pendingSet && value) {
+        send("play_" + voice, "set", playing[voice - 1] ? 1 : 0);
+        return;
+    }
     var windowBit = 1 << (voice - 1);
     if (value && (ready || pendingPath)) {
         stop_normal();
@@ -378,7 +519,7 @@ function edit_play(voice, value) {
 }
 
 function play_all() {
-    if (ready || pendingPath) {
+    if (!pendingSet && (ready || pendingPath)) {
         stop_normal();
         queuedWindows = ALL_WINDOWS;
         start_queued_playback();
@@ -387,7 +528,7 @@ function play_all() {
 }
 
 function play_normal() {
-    if (!normalPlaying && !queuedNormal && (ready || pendingPath)) {
+    if (!pendingSet && !normalPlaying && !queuedNormal && (ready || pendingPath)) {
         stop_all();
         queuedNormal = true;
         start_queued_playback();

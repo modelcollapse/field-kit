@@ -6,6 +6,7 @@ const { join } = require('node:path');
 const root = join(__dirname, '..', 'max');
 const writes = [];
 const messages = [];
+const boxes = new Map();
 let curveDump = null;
 
 const router = {
@@ -17,15 +18,20 @@ const router = {
     arrayfromargs: (args) => Array.from(args),
     outlet: () => {},
     patcher: {
-        getnamed: (name) => ({
-            valid: true,
-            message: (...args) => {
-                messages.push([name, ...args]);
-                if (name === 'fk_curve' && args[0] === 'listdump' && curveDump) {
-                    router.curve_points(...curveDump);
-                }
+        getnamed: (name) => {
+            if (!boxes.has(name)) {
+                boxes.set(name, {
+                    valid: true,
+                    message: (...args) => {
+                        messages.push([name, ...args]);
+                        if (name === 'fk_curve' && args[0] === 'listdump' && curveDump) {
+                            router.curve_dump(...curveDump);
+                        }
+                    },
+                });
             }
-        })
+            return boxes.get(name);
+        },
     }
 };
 
@@ -34,8 +40,23 @@ vm.runInContext(fs.readFileSync(join(root, 'fk_mod_routes.js'), 'utf8'), router)
 router.bang();
 assert.equal(writes.length, 8);
 assert.deepEqual(writes.map(({ name }) => name), Array.from({ length: 8 }, (_, i) => 'field-kit-curve-' + (2 * i + 1)));
+assert.equal(boxes.get('fk_curve').hidden, true);
+assert.equal(boxes.get('fk_lfo_preview').hidden, false);
+assert.deepEqual(messages.findLast(([name]) => name === 'fk_curve_label'), ['fk_curve_label', 'set', 'LFO 1  ·  Sine']);
+router.select_lfo(1);
+assert.deepEqual(messages.findLast(([name]) => name === 'fk_curve_label'), ['fk_curve_label', 'set', 'LFO 2  ·  Triangle']);
+router.set_shape(4);
+assert.deepEqual(messages.findLast(([name]) => name === 'fk_curve_label'), ['fk_curve_label', 'set', 'LFO 2  ·  S&H  ·  example']);
+const untouched = [...router.curves[1]];
+router.curve_edited();
+router.curve_dump(0, -1, 1, 1);
+assert.deepEqual([...router.curves[1]], untouched);
 
 router.select_lfo(7);
+router.use_curve();
+assert.equal(boxes.get('fk_curve').hidden, false);
+assert.equal(boxes.get('fk_curve').ignoreclick, false);
+assert.equal(boxes.get('fk_lfo_preview').hidden, true);
 const table = router.tables[7];
 const firstEdit = [0, -1, 1, 1];
 const middleEdit = [0, -1, 0.5, -0.75, 1, 1];
@@ -71,6 +92,15 @@ assert.equal(writes.length, 10);
 router.curve_ready(7);
 assert.equal(table.active, 0);
 assert.equal(table.fading, false);
+
+router.set_shape(3);
+router.select_lfo(1);
+router.select_lfo(7);
+assert.deepEqual(messages.findLast(([name]) => name === 'fk_curve_label'), ['fk_curve_label', 'set', 'LFO 8  ·  Square']);
+assert.deepEqual([...router.curves[7]], finalEdit);
+router.use_curve();
+assert.deepEqual(messages.filter(([name, command]) => name === 'fk_curve' && command === 'list').slice(-3)
+    .flatMap(([, , ...point]) => point), finalEdit);
 
 curveDump = finalEdit;
 router.curve_edited();

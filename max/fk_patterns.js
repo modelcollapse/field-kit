@@ -12,6 +12,9 @@ var PITCH_SCALE_COUNT = 7;
 var BANK_FORMAT = "field-kit-patterns";
 var BANK_VERSION = 2;
 var LEGACY_BANK_VERSION = 1;
+var SET_FORMAT = "field-kit-set";
+var SET_VERSION = 1;
+var PATTERN_HINT = "Click to recall. Shift-click to store.";
 // Allow all eight slots to hold eight full curves with unrounded values.
 var MAX_BANK_BYTES = 8 * 1024 * 1024;
 var EMPTY_BUTTON = [0.25, 0.25, 0.25, 1];
@@ -43,7 +46,13 @@ var FX_CONTROLS = [
 var host = this;
 var slots = [];
 var armed = false;
+var bankDirty = false;
+var patternStatusText = PATTERN_HINT;
 var lastSlot = -1;
+var activeSetPath = "";
+var pendingSet = null;
+var writingSet = null;
+var writeTimeout = null;
 for (var index = 0; index < SLOT_COUNT; index++) {
     slots.push(null);
 }
@@ -51,12 +60,25 @@ for (var index = 0; index < SLOT_COUNT; index++) {
 function loadbang() {
     set_armed(false);
     render_slots();
+    bank_status(PATTERN_HINT);
 }
 
-function status(text) {
-    host.patcher.getnamed("pattern_status").message("set", text);
+function status(text, showDirty) {
+    patternStatusText = text;
+    var display = showDirty && bankDirty ? text.replace(/\.$/, "") + " · bank unsaved" : text;
+    host.patcher.getnamed("pattern_status").message("set", display);
 }
 status.local = 1;
+
+function bank_status(text) {
+    status(text, true);
+}
+bank_status.local = 1;
+
+function set_status(text) {
+    host.patcher.getnamed("set_status").message("set", text);
+}
+set_status.local = 1;
 
 function render_slots() {
     for (var i = 0; i < SLOT_COUNT; i++) {
@@ -86,7 +108,7 @@ function toggle_store() {
 
 function arm(value) {
     set_armed(!!value);
-    status(armed ? "Choose a square. Filled squares will be replaced." : "Store cancelled. Click a filled square to recall.");
+    bank_status(armed ? "Choose a square to store or replace." : "Store cancelled.");
 }
 
 function set_armed(value) {
@@ -96,28 +118,29 @@ function set_armed(value) {
 }
 set_armed.local = 1;
 
-function slot(number) {
+function slot(number, shift) {
     if (!in_range(number, 1, SLOT_COUNT) || number % 1) {
         return;
     }
     var index = number - 1;
-    if (armed) {
+    if (armed || shift === 1) {
         var snapshot = capture_pattern();
         if (!valid_pattern(snapshot, LFO_COUNT)) {
-            status("Pattern not ready. Try again.");
+            bank_status("Pattern not ready. Try again.");
             return;
         }
         var replacing = slots[index] !== null;
         slots[index] = snapshot;
+        bankDirty = true;
         lastSlot = index;
         set_armed(false);
-        status("Pattern " + number + (replacing ? " replaced." : " stored."));
+        bank_status("Pattern " + number + (replacing ? " replaced." : " stored."));
     } else if (slots[index]) {
         apply_pattern(slots[index]);
         lastSlot = index;
-        status("Pattern " + number + " recalled.");
+        bank_status("Pattern " + number + " recalled.");
     } else {
-        status("Square " + number + " is empty. Click Store pattern first.");
+        bank_status("Square " + number + " is empty. Shift-click to store.");
         return;
     }
     render_slots();
@@ -277,6 +300,7 @@ function write_bank(path) {
             throw new Error("Incomplete write");
         }
         file.eof = file.position;
+        bankDirty = false;
         status("Pattern bank saved.");
     } catch (error) {
         status("Couldn’t save the pattern bank.");
@@ -288,7 +312,7 @@ function write_bank(path) {
 }
 
 function read_bank(path) {
-    if (typeof path !== "string" || !path) {
+    if (typeof path !== "string" || !path || set_busy(bank_status)) {
         return;
     }
     var file;
@@ -298,6 +322,10 @@ function read_bank(path) {
             throw new Error("Invalid bank file");
         }
         var bank = JSON.parse(read_bank_text(file));
+        if (bank && bank.format === SET_FORMAT) {
+            bank_status("This is a set. Choose Open Set.");
+            return;
+        }
         if (!bank || bank.format !== BANK_FORMAT ||
             (bank.version !== BANK_VERSION && bank.version !== LEGACY_BANK_VERSION) ||
             !Array.isArray(bank.slots) || bank.slots.length !== SLOT_COUNT) {
@@ -310,6 +338,7 @@ function read_bank(path) {
         }
         slots = legacy ? bank.slots.map(upgrade_pattern) : bank.slots;
         lastSlot = -1;
+        bankDirty = false;
         set_armed(false);
         render_slots();
         status("Bank loaded. Click a filled square to recall.");
@@ -320,6 +349,229 @@ function read_bank(path) {
             file.close();
         }
     }
+}
+
+function set_busy(report) {
+    if (pendingSet || writingSet) {
+        (report || set_status)(pendingSet ? "Opening a Set…" : "Saving a Set…");
+        return true;
+    }
+    return false;
+}
+set_busy.local = 1;
+
+function file_name(path) {
+    return path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
+}
+file_name.local = 1;
+
+function folder_of(path) {
+    return path.slice(0, path.length - file_name(path).length);
+}
+folder_of.local = 1;
+
+function save_set() {
+    if (set_busy()) return;
+    if (!host.patcher.getnamed("source_control").js.get_set_source()) {
+        set_status("Load a sample before saving a Set.");
+        return;
+    }
+    var dialog = host.patcher.getnamed("set_save_dialog");
+    dialog.message("name", activeSetPath ? file_name(activeSetPath) : "Field Kit Set.json");
+    if (activeSetPath) dialog.message("setpath", folder_of(activeSetPath));
+    dialog.message("bang");
+}
+
+function write_set(path) {
+    if (typeof path !== "string" || !path || set_busy()) return;
+    var folder = folder_of(path);
+    var source = host.patcher.getnamed("source_control").js.get_set_source();
+    var current = capture_pattern();
+    if (!source || !valid_pattern(current, LFO_COUNT)) {
+        set_status("Set isn’t ready. Check the sample.");
+        return;
+    }
+    if (source.kind === "file" && folder && source.path.indexOf(folder) === 0) {
+        source.relative = source.path.slice(folder.length);
+    }
+    var snapshot = slots.slice();
+    var data = {
+        format: SET_FORMAT, version: SET_VERSION, source: source,
+        slots: snapshot, current: current, selectedSlot: lastSlot
+    };
+    var stage = folder + ".field-kit-" + Date.now() + "-" + Math.floor(Math.random() * 1e9) + ".tmp";
+    try {
+        // File positions are byte offsets. ASCII JSON also preserves Unicode paths.
+        var contents = JSON.stringify(data, null, 2).replace(/[^\x00-\x7f]/g, function (character) {
+            return "\\u" + ("0000" + character.charCodeAt(0).toString(16)).slice(-4);
+        }) + "\n";
+        write_set_stage(stage, contents);
+    } catch (error) {
+        set_status("Can’t save Set. Choose a writable folder.");
+        return;
+    }
+    writingSet = { path: path, stage: stage, slots: snapshot };
+    if (!writeTimeout) writeTimeout = new Task(set_write_timed_out, host);
+    writeTimeout.schedule(7000);
+    set_status("Saving " + file_name(path) + "…");
+    host.patcher.getnamed("set_writer").message("commit_set", stage, path);
+}
+
+function write_set_stage(path, contents) {
+    var file = new File(path, "write", "TEXT");
+    try {
+        if (!file.isopen) throw new Error("Could not create staging file");
+        file.position = 0;
+        file.writestring(contents);
+        if (file.position !== contents.length) throw new Error("Incomplete write");
+        file.eof = file.position;
+    } finally {
+        if (file.isopen) file.close();
+    }
+}
+write_set_stage.local = 1;
+
+function set_written(ok, stage) {
+    if (!writingSet || writingSet.stage !== stage) return;
+    writeTimeout.cancel();
+    var saved = writingSet;
+    writingSet = null;
+    if (!ok) {
+        set_status("Couldn’t save Set. Try another folder.");
+        return;
+    }
+    activeSetPath = saved.path;
+    if (slots.every(function (pattern, index) { return pattern === saved.slots[index]; })) {
+        bankDirty = false;
+        status(patternStatusText);
+    }
+    set_status("Set saved · " + file_name(activeSetPath));
+}
+
+function set_write_timed_out() {
+    writingSet = null;
+    set_status("Save timed out. Try Save Set again.");
+}
+set_write_timed_out.local = 1;
+
+function open_set() {
+    if (!set_busy() && !recording_set_guard()) {
+        var dialog = host.patcher.getnamed("set_open_dialog");
+        if (activeSetPath) dialog.message("setpath", folder_of(activeSetPath));
+        dialog.message("bang");
+    }
+}
+
+function recording_set_guard() {
+    var recorder = host.patcher.getnamed("recorder").subpatcher().getnamed("rec_controller").js;
+    if (recorder.state !== "recording" && recorder.state !== "starting") return false;
+    set_status("Stop recording before opening a Set.");
+    return true;
+}
+recording_set_guard.local = 1;
+
+function read_set(path) {
+    if (typeof path !== "string" || !path || set_busy() || recording_set_guard()) return;
+    var file, data;
+    try {
+        file = new File(path, "read");
+        if (!file.isopen || file.eof < 1 || file.eof > 2 * MAX_BANK_BYTES) {
+            throw new Error("Invalid set file");
+        }
+        data = JSON.parse(read_bank_text(file));
+        if (data && data.format === BANK_FORMAT) {
+            set_status("Pattern bank. Use Banks… to import it.");
+            return;
+        }
+        if (!valid_set(data)) throw new Error("Invalid set contents");
+    } catch (error) {
+        set_status("Couldn’t open that Field Kit Set.");
+        return;
+    } finally {
+        if (file && file.isopen) file.close();
+    }
+    pendingSet = { path: path, data: data, relinking: false };
+    var source = data.source;
+    if (source.kind === "demo") {
+        begin_set_source();
+        return;
+    }
+    var relative = source.relative && folder_of(path) + source.relative;
+    if (relative && file_exists(relative)) {
+        begin_set_source(relative);
+    } else if (file_exists(source.path)) {
+        begin_set_source(source.path);
+    } else {
+        pendingSet.relinking = true;
+        set_status("Locate sample · " + file_name(source.path));
+        host.patcher.getnamed("set_relink_dialog").message("bang");
+    }
+}
+
+function file_exists(path) {
+    var file = new File(path, "read");
+    if (!file.isopen) return false;
+    file.close();
+    return true;
+}
+file_exists.local = 1;
+
+function valid_set(data) {
+    if (!data || data.format !== SET_FORMAT || data.version !== SET_VERSION ||
+        !data.source || !valid_pattern(data.current, LFO_COUNT) ||
+        !Array.isArray(data.slots) || data.slots.length !== SLOT_COUNT ||
+        !data.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, LFO_COUNT); }) ||
+        (data.selectedSlot !== -1 &&
+            (!index_valid(data.selectedSlot, SLOT_COUNT) || !data.slots[data.selectedSlot]))) return false;
+    var source = data.source;
+    return source.kind === "demo" ||
+        (source.kind === "file" && typeof source.path === "string" && source.path.length > 0 &&
+            (source.relative === undefined || (typeof source.relative === "string" &&
+                source.relative.length > 0 && !/^(\/|\\)|:|(^|[\/\\])\.\.([\/\\]|$)/.test(source.relative))));
+}
+valid_set.local = 1;
+
+function relink_set(path) {
+    if (!pendingSet || !pendingSet.relinking) return;
+    if (recording_set_guard()) {
+        pendingSet = null;
+        return;
+    }
+    pendingSet.relinking = false;
+    begin_set_source(path);
+}
+
+function cancel_relink() {
+    if (!pendingSet || !pendingSet.relinking) return;
+    pendingSet = null;
+    set_status("Open Set canceled.");
+}
+
+function begin_set_source(path) {
+    set_status("Opening " + file_name(pendingSet.path) + "…");
+    var source = host.patcher.getnamed("source_control");
+    if (path) source.message("open_set_source", path);
+    else source.message("open_set_demo");
+}
+begin_set_source.local = 1;
+
+function set_source_loaded(ok) {
+    if (!pendingSet || pendingSet.relinking) return;
+    var opened = pendingSet;
+    pendingSet = null;
+    if (!ok) {
+        set_status("Couldn’t load the Set’s sample.");
+        return;
+    }
+    apply_pattern(opened.data.current);
+    slots = opened.data.slots;
+    lastSlot = opened.data.selectedSlot;
+    activeSetPath = opened.path;
+    bankDirty = false;
+    set_armed(false);
+    render_slots();
+    status(PATTERN_HINT);
+    set_status("Set opened · " + file_name(activeSetPath));
 }
 
 function upgrade_pattern(pattern) {

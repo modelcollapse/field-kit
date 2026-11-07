@@ -6,6 +6,8 @@ outlets = 2;
 var WINDOWS = 4;
 var DEFAULT_RATES = [0.12, 0.31, 0.73, 0.18, 0.43, 0.67, 1.1, 1.7];
 var DEFAULT_SHAPES = [0, 1, 2, 0, 1, 0, 1, 0];
+var SHAPE_LABELS = ["Sine", "Triangle", "Saw", "Square", "S&H  ·  example", "Breakpoint curve"];
+var BREAKPOINT = 5;
 var LFOS = DEFAULT_RATES.length;
 var TARGETS = ["Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan"];
 var DIRECTIONS = ["Forward", "Reverse", "Ping-pong"];
@@ -107,16 +109,35 @@ function paintCurve() {
 }
 paintCurve.local = 1;
 
+function renderShape() {
+    var shape = shapes[currentLfo];
+    var custom = shape === BREAKPOINT;
+    label("fk_mod_shape", shape);
+    label("fk_curve_label", "LFO " + (currentLfo + 1) + "  ·  " + SHAPE_LABELS[shape]);
+    var curve = patcher.getnamed("fk_curve");
+    if (curve && curve.valid) {
+        curve.hidden = !custom;
+        curve.ignoreclick = !custom;
+    }
+    var preview = patcher.getnamed("fk_lfo_preview");
+    if (preview && preview.valid) preview.hidden = custom;
+    if (custom) {
+        paintCurve();
+    } else {
+        send("fk_lfo_preview", "shape", shape);
+        send("fk_lfo_preview", "phase", -1);
+    }
+}
+renderShape.local = 1;
+
 function renderLfo() {
     label("fk_mod_lfo", currentLfo);
     send("fk_lfo_watch", currentLfo + 1);
     send("fk_phase_watch", currentLfo + 1);
     label("fk_mod_rate", rates[currentLfo]);
-    label("fk_mod_shape", shapes[currentLfo]);
     label("fk_signal_label", "LFO " + (currentLfo + 1) + "  ·  live signal");
-    label("fk_curve_label", "LFO " + (currentLfo + 1) + "  ·  Breakpoint curve");
     label("fk_lfo_value", enabled ? "LFO signal  —" : "LFO signal  ·  Audio off");
-    paintCurve();
+    renderShape();
     renderActiveRoutes();
 }
 renderLfo.local = 1;
@@ -240,12 +261,11 @@ function rate_state(lfo, hz) {
 }
 
 function shape_state(lfo, shape) {
-    if (indexIn(lfo, LFOS) && indexIn(shape, 6)) {
+    if (indexIn(lfo, LFOS) && indexIn(shape, SHAPE_LABELS.length)) {
         shapes[lfo] = shape;
         send("fk_lfo_shape_signal_" + (lfo + 1), shape + 1);
         if (lfo === currentLfo) {
-            label("fk_mod_shape", shape);
-            send("fk_curve", "cursor", -1);
+            renderShape();
         }
     }
 }
@@ -255,17 +275,23 @@ function set_shape(index) {
 }
 
 function use_curve() {
-    set_shape(5);
+    set_shape(BREAKPOINT);
 }
 
 function curve_edited() {
-    if (!painting) {
+    if (!painting && shapes[currentLfo] === BREAKPOINT) {
         // listdump outputs nothing when all points have been removed.
         dumpReceived = false;
         send("fk_curve", "listdump");
         if (!dumpReceived) {
             setCurve(currentLfo, []);
         }
+    }
+}
+
+function curve_dump() {
+    if (shapes[currentLfo] === BREAKPOINT) {
+        curve_points.apply(this, arrayfromargs(arguments));
     }
 }
 
@@ -369,6 +395,7 @@ function running(value) {
         label("fk_lfo_value", "LFO signal  ·  Audio off");
         label("fk_applied_value", "Applied value  ·  Audio off");
         send("fk_curve", "cursor", -1);
+        send("fk_lfo_preview", "phase", -1);
     } else if (!wasEnabled) {
         for (var i = 0; i < tables.length; i++) {
             if (tables[i].fading) {
@@ -404,7 +431,7 @@ function lfo_sample(value) {
 }
 
 function lfo_phase(value) {
-    if (enabled && shapes[currentLfo] === 5) {
-        send("fk_curve", "cursor", value);
-    }
+    if (!enabled || !isFinite(value)) return;
+    if (shapes[currentLfo] === BREAKPOINT) send("fk_curve", "cursor", value);
+    else send("fk_lfo_preview", "phase", value);
 }

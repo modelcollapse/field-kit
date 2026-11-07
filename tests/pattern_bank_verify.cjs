@@ -12,7 +12,10 @@ const sourceState = {
     playing: [true, false, true, false],
     normalPlaying: false,
     path: '/test/audio.wav',
+    get_set_source() { return { kind: 'file', path: this.path }; },
 };
+const recorderState = { state: 'idle' };
+let requestedSource;
 const defaultCurve = [0, 0, 0.25, 1, 0.5, 0, 0.75, -1, 1, 0];
 const defaultRates = [0.12, 0.31, 0.73, 0.18, 0.43, 0.67, 1.1, 1.7];
 const defaultShapes = [0, 1, 2, 0, 1, 0, 1, 0];
@@ -61,6 +64,7 @@ const source = {
             sourceState.normalPlaying = false;
         }
         if (selector === 'inspect_window') sourceState.inspector = args[0];
+        if (selector === 'open_set_source') requestedSource = args[0];
     },
 };
 const mixerState = { mutes: [0, 1, 0, 1], solos: [0, 0, 1, 0] };
@@ -95,12 +99,14 @@ for (const [name, value] of Object.entries({
     pitch_scale: 5, master: -5,
 })) addControl(name, value);
 for (let i = 1; i <= 8; i++) addControl('pattern_' + i, 0);
-for (const name of ['pattern_store', 'pattern_status', 'pattern_save_dialog', 'pattern_load_dialog']) addControl(name, 0);
+for (const name of ['pattern_store', 'pattern_status', 'set_status', 'pattern_save_dialog', 'pattern_load_dialog',
+                    'set_save_dialog', 'set_open_dialog', 'set_relink_dialog', 'set_writer']) addControl(name, 0);
 const named = name => {
     if (name === 'source_control') return source;
     if (name === 'patchbay') return { subpatcher: () => ({ getnamed: () => router }) };
     if (name === 'mix_fx') return { subpatcher: () => ({ getnamed: key => controls[key] }) };
     if (name === 'mixer_control') return mixer;
+    if (name === 'recorder') return { subpatcher: () => ({ getnamed: () => ({ js: recorderState }) }) };
     if (controls[name]) return controls[name];
     throw new Error('Unexpected control ' + name);
 };
@@ -126,12 +132,14 @@ function File(path, mode) {
     this.close = () => { this.isopen = false; };
 }
 
-const host = vm.createContext({ patcher: { getnamed: named }, File });
+const host = vm.createContext({ patcher: { getnamed: named }, File,
+    Task: function () { this.schedule = () => {}; this.cancel = () => {}; } });
 vm.runInContext(readFileSync(join(__dirname, '..', 'max', 'fk_patterns.js'), 'utf8'), host);
 
 host.loadbang();
 assert.equal(controls.pattern_2.text, '2');
 assert.equal(controls.pattern_store.text, 'Store pattern');
+assert.equal(host.bankDirty, false);
 host.slot(2);
 assert.match(controls.pattern_status.value, /empty/);
 host.toggle_store();
@@ -144,7 +152,8 @@ host.toggle_store();
 host.slot(2);
 assert.equal(controls.pattern_2.text, '2 •');
 assert.equal(controls.pattern_store.text, 'Store pattern');
-assert.match(controls.pattern_status.value, /Pattern 2 stored/);
+assert.equal(host.bankDirty, true);
+assert.equal(controls.pattern_status.value, 'Pattern 2 stored · bank unsaved');
 const selectedBackground = controls.pattern_2.background;
 assert.notDeepEqual(selectedBackground, controls.pattern_1.background);
 mixerState.mutes.fill(1);
@@ -223,16 +232,16 @@ assert.deepEqual(modState.rates, defaultRates);
 assert.deepEqual(modState.shapes, defaultShapes);
 assert.deepEqual(modState.curves, Array(8).fill(defaultCurve));
 
-host.toggle_store();
-host.slot(4);
+host.slot(4, 1);
 assert.equal(controls.pattern_4.text, '4 •');
+assert.equal(controls.pattern_status.value, 'Pattern 4 stored · bank unsaved');
 controls.rate_2.value = 0.75;
-host.toggle_store();
-host.slot(4);
-assert.match(controls.pattern_status.value, /Pattern 4 replaced/);
+host.slot(4, 1);
+assert.equal(controls.pattern_status.value, 'Pattern 4 replaced · bank unsaved');
 controls.rate_2.value = 1;
-host.slot(4);
+host.slot(4, 0);
 assert.equal(controls.rate_2.value, 0.75);
+assert.equal(controls.pattern_status.value, 'Pattern 4 recalled · bank unsaved');
 controls.rate_2.value = 1;
 files.set('/test/invalid.json', JSON.stringify({ ...bank, version: 100 }));
 host.read_bank('/test/invalid.json');
@@ -346,3 +355,74 @@ host.slot(8);
 assert.deepEqual(modState.curves[7], denseCurve);
 
 console.log('PASS pattern store, cancel, overwrite, visible slots, pitch snap, mixer mutes, and v1/v2 bank round-trip');
+
+host.read_bank('/test/bank.json');
+sourceState.path = '/test/sets/Écho.wav';
+controls.pan_1.value = -62;
+host.slot(1, 1);
+controls.pan_1.value = 37;
+host.write_set('/test/sets/First.json');
+const [, , stage, destination] = messages.at(-1);
+assert.equal(controls.pattern_status.value, 'Pattern 1 stored · bank unsaved');
+assert.equal(controls.set_status.value, 'Saving First.json…');
+const set = JSON.parse(files.get(stage));
+assert.equal(set.source.path, sourceState.path);
+assert.equal(set.source.relative, 'Écho.wav');
+assert.equal(set.slots[0].windows[0].pan, -62);
+assert.equal(set.current.windows[0].pan, 37);
+files.set(destination, files.get(stage));
+host.set_written(1, stage);
+assert.equal(controls.pattern_status.value, 'Pattern 1 stored.');
+assert.equal(controls.set_status.value, 'Set saved · First.json');
+assert.equal(host.bankDirty, false);
+host.save_set();
+assert.deepEqual(messages.slice(-3), [
+    ['set_save_dialog', 'name', 'First.json'],
+    ['set_save_dialog', 'setpath', '/test/sets/'],
+    ['set_save_dialog', 'bang'],
+]);
+
+files.set('/relocated/First.json', files.get(destination));
+files.set('/relocated/Écho.wav', 'sample');
+host.write_set('/test/sets/Concurrent.json');
+const [, , concurrentStage] = messages.at(-1);
+controls.pan_1.value = 9;
+host.slot(3, 1);
+host.set_written(1, concurrentStage);
+assert.equal(controls.pattern_status.value, 'Pattern 3 stored · bank unsaved');
+assert.equal(controls.set_status.value, 'Set saved · Concurrent.json');
+assert.equal(host.bankDirty, true);
+host.read_set('/relocated/First.json');
+assert.equal(requestedSource, '/relocated/Écho.wav');
+assert.equal(controls.pan_1.value, 9);
+assert.equal(controls.set_status.value, 'Opening First.json…');
+host.set_source_loaded(0);
+assert.equal(controls.pattern_3.text, '3 •');
+assert.equal(controls.pan_1.value, 9);
+assert.equal(controls.pattern_status.value, 'Pattern 3 stored · bank unsaved');
+assert.match(controls.set_status.value, /Couldn’t load/);
+host.read_set('/relocated/First.json');
+host.set_source_loaded(1);
+assert.equal(controls.pattern_3.text, '3');
+assert.equal(controls.pan_1.value, 37);
+assert.equal(controls.pattern_status.value, 'Click to recall. Shift-click to store.');
+assert.equal(controls.set_status.value, 'Set opened · First.json');
+host.slot(1);
+assert.equal(controls.pan_1.value, -62);
+assert.equal(controls.set_status.value, 'Set opened · First.json');
+
+files.delete('/relocated/Écho.wav');
+host.read_set('/relocated/First.json');
+assert.deepEqual(messages.at(-1), ['set_relink_dialog', 'bang']);
+host.cancel_relink();
+assert.equal(controls.pan_1.value, -62);
+assert.equal(controls.set_status.value, 'Open Set canceled.');
+host.read_set('/relocated/First.json');
+host.relink_set('/test/replacement.wav');
+assert.equal(requestedSource, '/test/replacement.wav');
+host.set_source_loaded(1);
+assert.equal(controls.pan_1.value, 37);
+recorderState.state = 'recording';
+host.open_set();
+assert.match(controls.set_status.value, /Stop recording/);
+console.log('PASS set captures unslotted edits, restores after decode, and handles relocation, relink and cancel');

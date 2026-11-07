@@ -24,6 +24,7 @@ CELLS = (
     ("pan", -100, 100, 0, 100, 0.01),
 )
 DIRECTIONS = ["Forward", "Reverse", "Ping-pong"]
+DEFAULT_PANS = (-45, -15, 15, 45)
 PITCH_SCALES = ("Off", "Chromatic", "Major", "Natural Minor", "Dorian",
                 "Major Pentatonic", "Minor Pentatonic")
 DIALS = ("rate", "fade", "drive", "filter", "level", "pan")
@@ -130,42 +131,98 @@ def action(patch, name, label, column, selector, width=2, target="source_control
 def pattern_controls(p):
     row = 3
     y_offset = PATTERNS_TOP - (MARGIN + row * ROW)
-    p.label("pattern_heading", "Patterns", 0, row, 2, heading=True, y_offset=y_offset)
+    p.label("pattern_heading", "Patterns", 0, row, 2, heading=True, y_offset=y_offset + 4)
+    p.label("set_heading", "Set files", SPLIT, row, 2, heading=True, y_offset=y_offset + 4)
+    divider = [MARGIN + TRACK * SPLIT - 7, PATTERNS_TOP, 1, 48]
+    p.add("set_divider", "panel", divider, outs=0, view=divider, background=1,
+          border=0, rounded=0, bgcolor=[0.37, 0.37, 0.37, 1.0])
+
+    def control_rect(col, width):
+        rect = grid_rect(col, row, width, y_offset=y_offset)
+        rect[3] = 30
+        return rect
+
     p.obj("pattern_control", "js fk_patterns.js", 1550, 2010, outs=0)
+    p.obj("pattern_slot_trigger", "t i b", 2460, 2000, outs=2, types=["int", "bang"])
+    p.obj("pattern_modifiers", "modifiers", 2580, 2000, outs=5, types=["int"] * 5)
+    p.obj("pattern_slot_and_shift", "pack 0 0", 2460, 2035, ins=2)
+    p.obj("pattern_slot_command", "prepend slot", 2460, 2070)
+    p.connect("pattern_slot_trigger", 1, "pattern_modifiers")
+    p.connect("pattern_modifiers", 0, "pattern_slot_and_shift", 1)
+    p.connect("pattern_slot_trigger", 0, "pattern_slot_and_shift")
+    p.connect("pattern_slot_and_shift", 0, "pattern_slot_command")
+    p.connect("pattern_slot_command", 0, "pattern_control")
     for slot in range(1, 9):
         name = f"pattern_{slot}"
-        p.ui(name, "live.text", slot + 1, row, 1, 2, y_offset=y_offset, outs=2,
+        rect = control_rect(slot + 1, 1)
+        p.add(name, "live.text", rect, view=rect, outs=2,
              types=["", ""], mode=1, outputmode=1, text=str(slot), texton=str(slot), parameter_enable=0,
-             hint=f"Recall pattern {slot} if this square has a dot. Click Store pattern first to save here.")
+             hint=f"Click to recall pattern {slot}. Shift-click to store or replace it.")
         x = 1540 + (slot - 1) * 112
         p.obj(f"pattern_click_{slot}", "t b", x, 1920, types=["bang"])
-        p.add(f"pattern_slot_{slot}", "message", [x, 1960, 70, 22], ins=2, text=f"slot {slot}")
+        p.add(f"pattern_slot_{slot}", "message", [x, 1960, 70, 22], ins=2, text=str(slot))
         p.connect(name, 0, f"pattern_click_{slot}")
         p.connect(f"pattern_click_{slot}", 0, f"pattern_slot_{slot}")
-        p.connect(f"pattern_slot_{slot}", 0, "pattern_control")
-    p.ui("pattern_store", "live.text", 10, row, 4, 2, y_offset=y_offset, outs=2, types=["", ""],
+        p.connect(f"pattern_slot_{slot}", 0, "pattern_slot_trigger")
+    rect = control_rect(10, 2)
+    p.add("pattern_store", "live.text", rect, view=rect, outs=2, types=["", ""],
          mode=0, text="Store pattern", texton="Store pattern", parameter_enable=0)
     p.obj("pattern_store_click", "sel bang", 1675, 2000, outs=2, types=["bang", ""])
     p.add("pattern_toggle_store", "message", [1675, 2035, 100, 22], ins=2, text="toggle_store")
     p.connect("pattern_store", 0, "pattern_store_click")
     p.connect("pattern_store_click", 0, "pattern_toggle_store")
     p.connect("pattern_toggle_store", 0, "pattern_control")
-    p.label("pattern_status", "Click Store pattern, then choose a square.",
-            SPLIT, row + 1, RIGHT_TRACKS, y_offset=y_offset)
-    for name, label, col, command, result, dialog, outputs in (
-        ("pattern_load", "Load bank…", SPLIT, "load_bank", "read_bank", "opendialog JSON", ["", "bang"]),
-        ("pattern_save", "Save bank…", SPLIT + 4, "save_bank", "write_bank", "savedialog JSON", ["", "", "bang"]),
-    ):
-        p.ui(name, "live.text", col, row, 4, y_offset=y_offset, outs=2, types=["", ""],
-             mode=0, text=label, texton=label, parameter_enable=0)
-        x = 1520 + 50 * (col - SPLIT)
+    p.label("pattern_status", "Click to recall. Shift-click to store.",
+            0, row + 1, SPLIT, y_offset=y_offset + 8)
+    p.label("set_status", "Saves the sample location, patterns, and current mix.",
+            SPLIT, row + 1, RIGHT_TRACKS, y_offset=y_offset + 8)
+
+    rect = control_rect(12, 2)
+    rect[1] += 4
+    rect[2] -= 6
+    rect[3] = 22
+    p.add("pattern_banks", "umenu", rect, view=rect, outs=3, types=["int", "", ""],
+          items=["Banks…", ",", "Load Bank…", ",", "Save Bank…"], align=1, allowdrag=0,
+          parameter_enable=0, hint="Load or save a bank of pattern slots.")
+    p.obj("pattern_bank_action", "t i b", 1955, 2010, outs=2, types=["int", "bang"])
+    p.add("pattern_bank_label", "message", [2050, 2040, 58, 22], ins=2, text="set 0")
+    p.obj("pattern_bank_choice", "sel 1 2", 1955, 2040, outs=3, types=["bang", "bang", ""])
+    p.connect("pattern_banks", 0, "pattern_bank_action")
+    p.connect("pattern_bank_action", 1, "pattern_bank_label")
+    p.connect("pattern_bank_label", 0, "pattern_banks")
+    p.connect("pattern_bank_action", 0, "pattern_bank_choice")
+
+    for offset, (name, label, command, result, dialog, outputs) in enumerate((
+        ("set_open", "Open Set…", "open_set", "read_set", "opendialog JSON", ["", "bang"]),
+        ("set_save", "Save Set…", "save_set", "write_set", "savedialog JSON", ["", "", "bang"]),
+        ("pattern_load", "Load Bank…", "load_bank", "read_bank", "opendialog JSON", ["", "bang"]),
+        ("pattern_save", "Save Bank…", "save_bank", "write_bank", "savedialog JSON", ["", "", "bang"]),
+    )):
+        if offset < 2:
+            rect = control_rect(SPLIT + 2 + offset * 3, 3)
+            p.add(name, "live.text", rect, view=rect, outs=2, types=["", ""],
+                  mode=0, text=label, texton=label, parameter_enable=0)
+        x = 1520 + 145 * offset
         p.add(name + "_message", "message", [x, 2090, 80, 22], ins=2, text=command)
         p.obj(name + "_dialog", dialog, x, 2125, outs=len(outputs), types=outputs)
         p.obj(name + "_result", "prepend " + result, x, 2160, ins=2)
-        p.connect(name, 0, name + "_message")
+        if offset < 2:
+            p.connect(name, 0, name + "_message")
+        else:
+            p.connect("pattern_bank_choice", offset - 2, name + "_message")
         p.connect(name + "_message", 0, "pattern_control")
         p.connect(name + "_dialog", 0, name + "_result")
         p.connect(name + "_result", 0, "pattern_control")
+
+    p.obj("set_relink_dialog", "opendialog", 2125, 2125, outs=2, types=["", "bang"])
+    p.obj("set_relink_result", "prepend relink_set", 2125, 2160, ins=2)
+    p.add("set_relink_cancel", "message", [2280, 2160, 100, 22], ins=2, text="cancel_relink")
+    p.connect("set_relink_dialog", 0, "set_relink_result")
+    p.connect("set_relink_dialog", 1, "set_relink_cancel")
+    p.connect("set_relink_result", 0, "pattern_control")
+    p.connect("set_relink_cancel", 0, "pattern_control")
+    p.obj("set_writer", "node.script fk_set_writer.js @autostart 1", 2425, 2125, outs=2)
+    p.connect("set_writer", 0, "pattern_control")
 
 
 def window_controls(p):
@@ -220,7 +277,7 @@ def window_controls(p):
 
 
 def performance_mixer(p):
-    p.label("mixer_heading", "Performance mixer", 0, 2, 4, heading=True,
+    p.label("mixer_heading", "Mixer", 0, 2, 2, heading=True,
             y_offset=PLAYBACK_OFFSET)
     p.obj("mixer_control", "js fk_mixer.js", 1560, 1880, outs=0)
     p.connect("dsp_enabled", 0, "mixer_control")
@@ -230,6 +287,55 @@ def performance_mixer(p):
     p.add("mixer_unsolo", "message", [1560, 1910, 100, 22], ins=2, text="clear_solos")
     p.connect("mixer_clear_solo", 0, "mixer_unsolo")
     p.connect("mixer_unsolo", 0, "mixer_control")
+
+
+def stereo_field(p):
+    field = Patch()
+    field.add("input", "inlet", [20, 320, 30, 30], ins=0, index=1)
+    field.add("output", "outlet", [20, 365, 30, 30], outs=0, index=1)
+    canvas_rect = [12, 12, 480, 244]
+    field.add("canvas", "jsui", canvas_rect, view=canvas_rect,
+              filename="fk_stereo_field.js", border=0, parameter_enable=0, types=[""])
+    help_rect = [12, 266, 480, 22]
+    field.add("help", "comment", help_rect, outs=0, view=help_rect, fontsize=12,
+              text="Drag left or right to pan, up or down to set level.")
+    field.connect("input", 0, "canvas")
+    field.connect("canvas", 0, "output")
+
+    p.ui("stereo_field_open", "live.text", 2, 2, 2, y_offset=PLAYBACK_OFFSET,
+         outs=2, types=["bang", ""], mode=0, text="Stereo field…", texton="Stereo field…",
+         parameter_enable=0, hint="Open stereo placement and level for the four loops.")
+    p.add("stereo_field_open_message", "message", [3040, 1880, 52, 22], ins=2, text="open")
+    p.obj("stereo_field_window", "pcontrol", 3040, 1910)
+    p.add("stereo_field_panel", "newobj", [3040, 1940, 122, 22],
+          text="p Stereo field", types=[""], patcher=dict(
+              fileversion=1, appversion=VERSION, classnamespace="box",
+              rect=[570, 152, 506, 298], title="Stereo field", openinpresentation=1,
+              boxes=field.boxes, lines=field.lines))
+    p.connect("stereo_field_open", 0, "stereo_field_open_message")
+    p.connect("stereo_field_open_message", 0, "stereo_field_window")
+    p.connect("stereo_field_window", 0, "stereo_field_panel")
+
+    p.obj("stereo_field_position", "route position", 3040, 1970, outs=2)
+    p.obj("stereo_field_voice", "route 1 2 3 4", 3040, 2000, outs=5)
+    p.connect("stereo_field_panel", 0, "stereo_field_position")
+    p.connect("stereo_field_position", 0, "stereo_field_voice")
+    p.obj("stereo_field_init", "loadbang", 3040, 2040, types=["bang"])
+    for voice, pan in enumerate(DEFAULT_PANS, 1):
+        x = 3040 + 150 * (voice - 1)
+        unpack = f"stereo_field_edit_{voice}"
+        state = f"stereo_field_state_{voice}"
+        source = f"stereo_field_source_{voice}"
+        p.obj(unpack, "unpack f f", x, 2080, outs=2, types=["float", "float"])
+        p.obj(state, f"pak {voice} {float(pan)} 70.", x, 2110, ins=3, types=["list"])
+        p.obj(source, "prepend source", x, 2140, ins=2)
+        p.connect("stereo_field_voice", voice - 1, unpack)
+        for axis, control in enumerate((f"pan_{voice}", f"level_{voice}")):
+            p.connect(unpack, axis, control)
+            p.connect(control, 0, state, axis + 1)
+        p.connect("stereo_field_init", 0, state)
+        p.connect(state, 0, source)
+        p.connect(source, 0, "stereo_field_panel")
 
 
 def mixer_strip(p, voice, row, y):
@@ -246,7 +352,7 @@ def mixer_strip(p, voice, row, y):
 
     p.ui(f"mixer_pan_{voice}", "live.numbox", 4, row, y_offset=PLAYBACK_OFFSET,
          outs=2, types=["float", "float"], hint=f"Window {voice} pan",
-         **parameter(f"Mixer pan {voice}", [-45, -15, 15, 45][voice - 1], -100, 100, unit_style=6))
+         **parameter(f"Mixer pan {voice}", DEFAULT_PANS[voice - 1], -100, 100, unit_style=6))
     p.ui(f"mixer_level_{voice}", "live.slider", 0, row + 1, 3, y_offset=PLAYBACK_OFFSET,
          outs=2, types=["float", "float"], orientation=1, showname=0, shownumber=0, relative=0,
          tricolor=[0.56, 0.71, 0.96, 1.0], trioncolor=[0.68, 0.80, 0.99, 1.0],
@@ -293,12 +399,18 @@ def build():
     p.connect("buffer", 1, "source_info")
     p.connect("source_info", 0, "buffer_complete")
     p.connect("buffer_complete", 0, "source_control")
+    p.obj("set_buffer", "buffer~ fk-unbound-set", 630, 2180, outs=2, types=["float", "bang"])
+    p.obj("set_source_info", "info~", 810, 2180, outs=10,
+          types=["float", "list", "float", "float", "float", "float", "float", "", "int", ""])
+    p.obj("set_buffer_complete", "prepend set_source_read", 935, 2180, ins=2)
+    p.connect("set_buffer", 1, "set_source_info")
+    p.connect("set_source_info", 0, "set_buffer_complete")
+    p.connect("set_buffer_complete", 0, "source_control")
     p.obj("dsp_state", "dspstate~", 1130, 808, outs=4, types=["int", "float", "int", "int"])
     p.obj("dsp_enabled", "prepend dsp_enabled", 1130, 846, ins=2)
     p.connect("dsp_state", 0, "dsp_enabled")
     p.connect("dsp_enabled", 0, "source_control")
     p.obj("source_rate", "sig~ 0.", 880, 846, types=["signal"])
-    p.connect("source_info", 0, "source_rate")
 
     for name, label, col, selector, width in (
         ("load", "Load audio…", 0, "choose", 3),
@@ -425,7 +537,7 @@ def build():
             if key in ("start", "end"):
                 default += 25 * (voice - 1)
             if key == "pan":
-                default = [-45, -15, 15, 45][voice - 1]
+                default = DEFAULT_PANS[voice - 1]
             options = DIRECTIONS if key == "direction" else None
             p.add(control, "live.menu" if options else "live.numbox", [1690 + i * 96, y, 92, 20],
                  outs=3 if options else 2,
@@ -495,6 +607,7 @@ def build():
         p.connect(f"playhead_gate_{voice}", 0, f"draw_playhead_{voice}")
         p.connect(f"draw_playhead_{voice}", 0, f"wave_{voice}")
 
+    stereo_field(p)
     p.save()
 
 

@@ -182,7 +182,7 @@ def build():
         wire_message(node, selector, router, x, 280)
 
     label("LFO 1  ·  live signal", 14, 4, 8, varname="fk_signal_label")
-    label("LFO 1  ·  Breakpoint curve", 0, 4, 11, varname="fk_curve_label")
+    label("LFO 1  ·  Sine", 0, 4, 11, varname="fk_curve_label")
     label("Applied value  ·  Audio off", 14, 1, 4, varname="fk_applied_value")
     label("LFO signal  ·  Audio off", 18, 1, 4, varname="fk_lfo_value")
     label("Active routes on LFO 1  /  0", 14, 2, 8, varname="fk_active_label")
@@ -195,11 +195,14 @@ def build():
     curve = control("function", 0, 5, 14, 4, numoutlets=4, outlettype=["float", "", "", "bang"],
                     hint="Click to add a point. Drag to edit. Shift-click to delete.",
                     varname="fk_curve", domain=1.0, range=[-1.0, 1.0], mode=0,
+                    hidden=1, ignoreclick=1,
                     clicksustain=0, addpoints=[0, 0, 0, .25, 1, 0, .5, 0, 0, .75, -1, 0, 1, 0, 0])
+    control("jsui", 0, 5, 14, 4, filename="fk_lfo_preview.js", varname="fk_lfo_preview",
+            ignoreclick=1, border=0, parameter_enable=0)
     done = box("message", [570, 318, 94, 22], numinlets=2, numoutlets=1, text="curve_edited")
     connect(curve, done, 3)
     connect(done, router)
-    wire_message(curve, "curve_points", router, 675, 318, 2)
+    wire_message(curve, "curve_dump", router, 675, 318, 2)
     action("Use curve", "use_curve", 11, 4, 3, router)
 
     lfo_watch = msp(f"selector~ {LFO_COUNT} 1", 0, 864, 140, LFO_COUNT + 1, varname="fk_lfo_watch")
