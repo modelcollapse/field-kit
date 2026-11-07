@@ -373,7 +373,7 @@ folder_of.local = 1;
 function save_set() {
     if (set_busy()) return;
     if (!host.patcher.getnamed("source_control").js.get_set_source()) {
-        set_status("Load a sample before saving a Set.");
+        set_status("Load a sample or save the input WAV first.");
         return;
     }
     var dialog = host.patcher.getnamed("set_save_dialog");

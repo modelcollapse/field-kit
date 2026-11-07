@@ -39,7 +39,9 @@ TRACKS = 22
 SPLIT = 14
 MIXER_TRACKS = 5
 RIGHT_TRACKS = TRACKS - SPLIT
-PATTERNS_TOP = 88
+INPUT_TOP = 80
+INPUT_HEIGHT = 74
+PATTERNS_TOP = INPUT_TOP + INPUT_HEIGHT + SECTION_GAP
 PLAYBACK_TOP = PATTERNS_TOP + 2 * ROW - GUTTER + SECTION_GAP
 PLAYBACK_OFFSET = PLAYBACK_TOP - (MARGIN + 2 * ROW)
 MODULATION_TOP = PLAYBACK_TOP + 9 * ROW - GUTTER + SECTION_GAP
@@ -114,18 +116,116 @@ def parameter(name, initial, low, high, *, options=None, unit_style=0, short=Non
     return dict(parameter_enable=1, saved_attribute_attributes={"valueof": value})
 
 
-def action(patch, name, label, column, selector, width=2, target="source_control", hint=None):
-    rect = grid_rect(column, 1, width)
+def action(patch, name, label, column, selector, width=2, target="source_control", hint=None,
+           *, row=1, y_offset=0, routing_y=728):
+    rect = grid_rect(column, row, width, y_offset=y_offset)
     rect[3] = 32
-    patch.add(name, "live.text", rect, view=rect, outs=2, types=["", ""],
-              mode=0, text=label, texton=label, parameter_enable=0, **({"hint": hint} if hint else {}))
-    patch.obj(name + "_click", "sel bang", 24 + column * 110, 728, outs=2,
+    control = patch.add(name, "live.text", rect, view=rect, outs=2, types=["", ""],
+                        mode=0, text=label, texton=label, parameter_enable=0,
+                        **({"hint": hint} if hint else {}))
+    patch.obj(name + "_click", "sel bang", 24 + column * 110, routing_y, outs=2,
               types=["bang", ""])
-    patch.add(name + "_message", "message", [24 + column * 110, 766, 140, 22],
+    patch.add(name + "_message", "message", [24 + column * 110, routing_y + 38, 140, 22],
               ins=2, text=selector)
     patch.connect(name, 0, name + "_click")
     patch.connect(name + "_click", 0, name + "_message")
     patch.connect(name + "_message", 0, target)
+    return control
+
+
+def source_input(p):
+    band = [MARGIN, INPUT_TOP, TRACKS * TRACK - GUTTER, INPUT_HEIGHT]
+    p.add("input_panel", "panel", band, outs=0, view=band, background=1, ignoreclick=1,
+          border=0, rounded=6, bgcolor=[0.175, 0.175, 0.18, 1.0])
+    for name, text, x, width in (
+        ("input_heading", "Input recording", 28, 248),
+        ("input_gain_label", "Input gain", 312, 104),
+        ("input_level_label", "Input level · after gain", 456, 230),
+        ("input_take_label", "Take", 736, 140),
+    ):
+        heading = name == "input_heading"
+        rect = [x, INPUT_TOP + (8 if heading else 11), width, 22]
+        p.add(name, "comment", rect, outs=0, view=rect, text=text,
+              **({"fontsize": 16, "fontface": 1} if heading else {}))
+    for index, x in enumerate((292, 716)):
+        rect = [x, INPUT_TOP + 10, 1, INPUT_HEIGHT - 20]
+        p.add(f"input_divider_{index}", "panel", rect, outs=0, view=rect, background=1,
+              ignoreclick=1, border=0, rounded=0, bgcolor=[0.29, 0.29, 0.30, 1.0])
+
+    button_row = 2
+    button_offset = INPUT_TOP + 33 - (MARGIN + ROW * button_row)
+    for name, text, column, command, hint in (
+        ("input_record_button", "Record input", 15, "toggle_input_record",
+         "Record the selected inputs as a new source for all four loops."),
+        ("input_save_button", "Save input WAV…", 18, "choose_input_save",
+         "Save the current input take so a Set can reopen it."),
+    ):
+        control = action(p, name, text, column, command, 3, hint=hint,
+                         row=button_row, y_offset=button_offset, routing_y=2230)
+        control["active"] = 0
+
+    for outlet, side, short, x in ((1, "left", "L", 28), (2, "right", "R", 158)):
+        name = "input_" + side
+        label_rect = [x, INPUT_TOP + 38, 48, 20]
+        p.add(name + "_label", "comment", label_rect, outs=0, view=label_rect,
+              text="Input " + short)
+        menu_rect = [x + 52, INPUT_TOP + 37, 64, 22]
+        p.add(name, "umenu", menu_rect, view=menu_rect, outs=3, types=["int", "", ""],
+              items=["—"], allowdrag=0, parameter_enable=0,
+              hint=f"Select the {side} channel from your Audio Setup device. Choose the same input on both sides for mono.")
+        p.obj(name + "_message", f"prepend set_input_channel {outlet}",
+              530 + (outlet - 1) * 280, 2230, ins=2)
+        p.connect(name, 0, name + "_message")
+        p.connect(name + "_message", 0, "source_control")
+
+    gain_rect = [312, INPUT_TOP + 36, 104, 24]
+    p.add("input_gain", "live.numbox", gain_rect, view=gain_rect, outs=2, types=["float", "float"],
+          hint="Adjust both inputs before metering and recording. 0 dB leaves their level unchanged.",
+          **parameter("Input gain", 0, -60, 18, unit_style=4))
+    p.obj("input_amplitude", "dbtoa", 2480, 691, types=["float"])
+    p.obj("input_gain_ramp", "pack 1. 20", 2480, 723, ins=2)
+    p.obj("input_gain_signal", "line~ 1.", 2480, 755, ins=2, outs=2, types=["signal", "bang"])
+    p.connect("input_gain", 0, "input_amplitude")
+    p.connect("input_amplitude", 0, "input_gain_ramp")
+    p.connect("input_gain_ramp", 0, "input_gain_signal")
+
+    p.obj("input_adc", "adc~ 1 2", 2260, 736, outs=2, types=["signal", "signal"])
+    p.obj("input_recorder", "record~ fk-unbound-set 2", 2260, 832, ins=4, types=["signal"])
+    p.obj("input_progress", "peakamp~ 0", 2260, 864, ins=2, types=["float"])
+    p.obj("input_progress_message", "prepend input_record_progress", 2260, 896, ins=2)
+    for channel, side in enumerate(("L", "R")):
+        y = INPUT_TOP + 34 + 17 * channel
+        label_rect = [456, y - 2, 20, 18]
+        meter_rect = [478, y, 216, 12]
+        p.add(f"input_meter_label_{side}", "comment", label_rect, outs=0, view=label_rect,
+              text=side, fontsize=11)
+        meter = f"input_meter_{side}"
+        p.add(meter, "live.meter~", meter_rect, view=meter_rect, outs=2,
+              types=["float", "int"], orientation=1, clip_size=1,
+              hint=f"{side} input peak after gain. Red indicates overload.")
+        trimmed = f"input_trim_{side}"
+        p.obj(trimmed, "*~", 2260 + 88 * channel, 784, ins=2, types=["signal"])
+        p.connect("input_adc", channel, trimmed)
+        p.connect("input_gain_signal", 0, trimmed, 1)
+        p.connect(trimmed, 0, meter)
+        p.connect(trimmed, 0, "input_recorder", channel)
+    p.connect("input_recorder", 0, "input_progress")
+    p.connect("input_progress", 0, "input_progress_message")
+    p.connect("input_progress_message", 0, "source_control")
+
+    p.obj("input_rate_message", "prepend input_sample_rate", 1130, 884, ins=2)
+    p.connect("dsp_state", 1, "input_rate_message")
+    p.connect("input_rate_message", 0, "source_control")
+    p.obj("input_device_channels", "adstatus numinputs", 1150, 2230, ins=2, outs=2,
+          types=["int", "int"])
+    p.obj("input_count_message", "prepend input_channel_count", 1325, 2230, ins=2)
+    p.connect("input_device_channels", 1, "input_count_message")
+    p.connect("input_count_message", 0, "source_control")
+
+    p.obj("input_save_dialog", "savedialog WAVE", 2540, 812, outs=3, types=["", "", "bang"])
+    p.obj("input_save_path", "prepend save_input_path", 2540, 850, ins=2)
+    p.connect("input_save_dialog", 0, "input_save_path")
+    p.connect("input_save_path", 0, "source_control")
 
 
 def pattern_controls(p):
@@ -381,7 +481,7 @@ def build():
     p = Patch()
     p.label("title", "FIELD KIT", 0, 0, 3, heading=True)
     p.label("source_label", "Loading demo…", 3, 0, SPLIT - 3, y_offset=4)
-    p.label("output_heading", "Audio output", SPLIT, 0, 2)
+    p.label("output_heading", "Audio I/O", SPLIT, 0, 2)
     p.label("status", "Loading the demo…", SPLIT, 1, RIGHT_TRACKS, y_offset=6)
     p.obj("standalone", "standalone @bundleidentifier audio.poeticstate.fieldkit @preffilename FieldKit @gensupport 1 @cefsupport 0", 30, 2080, outs=0)
 
@@ -608,6 +708,7 @@ def build():
         p.connect(f"draw_playhead_{voice}", 0, f"wave_{voice}")
 
     stereo_field(p)
+    source_input(p)
     p.save()
 
 

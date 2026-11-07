@@ -9,6 +9,7 @@ var DEFAULT_POSITIONS = [[0, 25], [25, 50], [50, 75], [75, 100]];
 var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "filter", "level", "pan"];
 var BUFFER_OBJECTS = ["buffer", "set_buffer"];
 var INFO_OBJECTS = ["source_info", "set_source_info"];
+var INPUT_LIMIT_SECONDS = 60;
 var host = this;
 var bufferIds = new Global("field_kit_buffer_ids");
 var bufferNames = [];
@@ -25,6 +26,12 @@ var stagedSource = null;
 var sourcePath = "";
 var sourceLabel = "No source";
 var sourceIsDemo = false;
+var inputSampleRate = 0;
+var inputCount = -1;
+var inputChannels = [1, 2];
+var INPUT_MENUS = ["input_left", "input_right"];
+var inputTake = null;
+var inputWritePath = "";
 var ready = false;
 var audioOn = false;
 var audioStarting = false;
@@ -46,6 +53,10 @@ var commitSet = new Task(commit_set_source, host);
 var waitForAudio = new Task(audio_timeout, host);
 var settleAudio = new Task(audio_settled, host);
 var commitWave = new Task(commit_wave_edits, host);
+var inputLimit = new Task(stop_input_record, host);
+var inputReply = new Task(input_record_timeout, host);
+var inputCommit = new Task(commit_input_record, host);
+var inputSaveTimeout = new Task(input_save_failed, host);
 
 function send(name, selector) {
     var object = host.patcher.getnamed(name);
@@ -76,6 +87,7 @@ function boot_source() {
         send(INFO_OBJECTS[slot], "set", bufferNames[slot]);
     }
     bind_source(0);
+    send("input_device_channels", "bang");
     for (var index = 1; index <= WINDOWS; index++) {
         draw_region(index);
     }
@@ -123,7 +135,7 @@ function inspector_sync(voice, key, value) {
 }
 
 function choose() {
-    if (bufferName && !pendingPath) {
+    if (bufferName && !pendingPath && !inputTake && !inputWritePath) {
         send("audio_file", "bang");
     }
 }
@@ -154,7 +166,7 @@ function demo_path() {
 demo_path.local = 1;
 
 function get_set_source() {
-    if (!ready) {
+    if (!ready || (!sourceIsDemo && !sourcePath)) {
         return null;
     }
     return sourceIsDemo ? {kind: "demo"} : {kind: "file", path: sourcePath};
@@ -192,7 +204,8 @@ function begin_set_source(path, isDemo) {
 begin_set_source.local = 1;
 
 function can_open_source(path) {
-    return !!bufferName && !pendingPath && typeof path === "string" && !!path.length;
+    return !!bufferName && !pendingPath && !inputTake && !inputWritePath &&
+        typeof path === "string" && !!path.length;
 }
 can_open_source.local = 1;
 
@@ -244,6 +257,10 @@ function set_source_read(sampleRate) {
 }
 
 function finish_source_read(target, sampleRate) {
+    if (inputWritePath && target === activeBuffer) {
+        finish_input_save();
+        return;
+    }
     if (!pendingPath || !readStarted || target !== pendingBuffer) {
         return;
     }
@@ -280,11 +297,16 @@ function commit_set_source() {
 commit_set_source.local = 1;
 
 function accept_source(sampleRate, frames, channels) {
-    duration = 1000 * frames / sampleRate;
     sourceIsDemo = pendingIsDemo;
     sourcePath = pendingPath;
     var name = pendingName;
     clear_pending_source();
+    activate_source(sampleRate, frames, channels, name);
+}
+accept_source.local = 1;
+
+function activate_source(sampleRate, frames, channels, name) {
+    duration = 1000 * frames / sampleRate;
     send("source_rate", sampleRate);
     send("normal_right_channel", channels === 1 ? 1 : 2);
 
@@ -306,7 +328,7 @@ function accept_source(sampleRate, frames, channels) {
     start_queued_playback();
     update_status();
 }
-accept_source.local = 1;
+activate_source.local = 1;
 
 function clear_pending_source() {
     pendingPath = "";
@@ -342,8 +364,23 @@ function read_timeout() {
 read_timeout.local = 1;
 
 function update_status() {
+    var recording = inputTake && inputTake.state === "recording";
+    var inputButton = recording ? "Stop input" : "Record input";
+    send("input_record_button", "text", inputButton);
+    send("input_record_button", "texton", inputButton);
+    send("input_record_button", "active", recording || (audioOn && !audioStarting &&
+        inputSampleRate > 0 && inputCount > 0 && !pendingPath && !inputWritePath && !inputTake) ? 1 : 0);
+    send("input_save_button", "active", ready && !sourceIsDemo && !sourcePath &&
+        !pendingPath && !inputTake && !inputWritePath ? 1 : 0);
+    INPUT_MENUS.forEach(function (name) {
+        send(name, "ignoreclick", inputTake || inputCount < 1 ? 1 : 0);
+    });
     var count = playing.filter(function (state) { return state; }).length;
-    if (pendingPath) {
+    if (inputTake) {
+        label("status", recording ? "● Recording · Click Stop input." : "Preparing recorded input…");
+    } else if (inputWritePath) {
+        label("status", "Saving recorded input…");
+    } else if (pendingPath) {
         label("status", (queuedWindows || queuedNormal) ? "Loading audio… Playback queued." : "Loading audio…");
     } else if (audioStarting) {
         label("status", "Starting audio…");
@@ -354,16 +391,196 @@ function update_status() {
     } else if (count) {
         label("status", count + " of " + WINDOWS + " windows playing");
     } else if (ready) {
-        label("status", sourceIsDemo ? "Click Play all to hear the demo." : "Ready · Click Play all.");
+        label("status", sourceIsDemo ? "Click Play all to hear the demo." :
+            sourcePath ? "Ready · Click Play all." : "Input ready · Save a WAV to keep the take.");
     } else if (bufferName) {
         label("status", "Choose Load audio… or Load demo.");
     }
 }
 update_status.local = 1;
 
+function input_sample_rate(rate) {
+    if (typeof rate === "number" && isFinite(rate) && rate > 0 && rate !== inputSampleRate) {
+        inputSampleRate = rate;
+        if (inputTake && inputTake.state === "recording") stop_input_record();
+        update_status();
+    }
+}
+
+function input_channel_count(count) {
+    if (typeof count !== "number" || !isFinite(count)) return;
+    count = Math.max(0, Math.min(1024, Math.floor(count)));
+    if (count === inputCount) return;
+    inputCount = count;
+    stop_input_record();
+    INPUT_MENUS.forEach(function (name, side) {
+        send(name, "clear");
+        if (!count) {
+            send(name, "append", "No input");
+            send(name, "set", 0);
+            return;
+        }
+        for (var channel = 1; channel <= count; channel++) send(name, "append", channel);
+        inputChannels[side] = Math.min(inputChannels[side], count);
+        send(name, "set", inputChannels[side] - 1);
+        send("input_adc", "set", side + 1, inputChannels[side]);
+    });
+    update_status();
+}
+
+function set_input_channel(outletNumber, index) {
+    if (outletNumber !== 1 && outletNumber !== 2) return;
+    var side = outletNumber - 1;
+    if (inputTake || typeof index !== "number" || index % 1 || index < 0 || index >= inputCount) {
+        send(INPUT_MENUS[side], "set", inputCount > 0 ? inputChannels[side] - 1 : 0);
+        return;
+    }
+    inputChannels[side] = index + 1;
+    send("input_adc", "set", outletNumber, inputChannels[side]);
+}
+
+function toggle_input_record() {
+    if (inputTake) {
+        if (inputTake.state === "recording") stop_input_record();
+        return;
+    }
+    if (!bufferName || pendingPath || inputWritePath || !audioOn ||
+        audioStarting || !inputSampleRate || inputCount < 1) {
+        return;
+    }
+    var target = 1 - activeBuffer;
+    var frames = Math.round(inputSampleRate * INPUT_LIMIT_SECONDS);
+    var object = BUFFER_OBJECTS[target];
+    send(object, "sr", inputSampleRate);
+    send(object, "sizeinsamps", frames, 2);
+    send(object, "clear");
+    send("input_recorder", "set", bufferNames[target]);
+    send("input_recorder", "reset");
+    send("input_progress", "bang");
+    inputTake = {state: "recording", target: target, frames: frames, sampleRate: inputSampleRate};
+    send("input_recorder", 1);
+    inputLimit.schedule(INPUT_LIMIT_SECONDS * 1000);
+    update_status();
+}
+
+function stop_input_record() {
+    if (!inputTake || inputTake.state !== "recording") return;
+    inputLimit.cancel();
+    inputTake.state = "stopping";
+    update_status();
+    inputReply.schedule(500);
+    send("input_recorder", 0);
+    send("input_progress", "bang");
+}
+stop_input_record.local = 1;
+
+function input_record_progress(phase) {
+    if (!inputTake || inputTake.state !== "stopping") return;
+    inputReply.cancel();
+    var frames = Math.min(inputTake.frames, Math.round(phase * inputTake.frames) + 1);
+    if (!isFinite(frames) || frames < 2) {
+        input_record_timeout();
+        return;
+    }
+    inputTake.state = "committing";
+    send(BUFFER_OBJECTS[inputTake.target], "crop_samples", 0, frames);
+    stop_all();
+    commitWave.cancel();
+    pendingWaveEdits = 0;
+    inputCommit.schedule(40);
+}
+
+function input_record_timeout() {
+    inputTake = null;
+    update_status();
+    label("status", "No input captured. Try a longer take.");
+}
+input_record_timeout.local = 1;
+
+function commit_input_record() {
+    var take = inputTake;
+    var buffer = new Buffer(bufferNames[take.target]);
+    var frames = buffer.framecount();
+    var channels = buffer.channelcount();
+    if (!isFinite(frames) || frames < 2 || channels !== 2) {
+        input_record_timeout();
+        return;
+    }
+    inputTake = null;
+    bind_source(take.target);
+    sourceIsDemo = false;
+    sourcePath = "";
+    activate_source(take.sampleRate, frames, channels, "Recorded input");
+    send(BUFFER_OBJECTS[1 - activeBuffer], "sizeinsamps", 1);
+}
+commit_input_record.local = 1;
+
+function choose_input_save() {
+    if (!ready || sourceIsDemo || sourcePath || pendingPath || inputTake || inputWritePath) return;
+    send("input_save_dialog", "name", "Field Kit Input.wav");
+    send("input_save_dialog", "bang");
+}
+
+function save_input_path(path) {
+    if (!ready || sourceIsDemo || sourcePath || pendingPath || inputTake || inputWritePath ||
+        typeof path !== "string" || !/\.wav$/i.test(path)) return;
+    inputWritePath = path;
+    update_status();
+    inputSaveTimeout.schedule(10000);
+    send(BUFFER_OBJECTS[activeBuffer], "samptype", "int24");
+    send(BUFFER_OBJECTS[activeBuffer], "writewave", path);
+}
+
+function finish_input_save() {
+    var buffer = new Buffer(bufferName);
+    if (!has_input_audio(inputWritePath, buffer.framecount() * 6)) {
+        input_save_failed();
+        return;
+    }
+    inputSaveTimeout.cancel();
+    sourcePath = inputWritePath;
+    inputWritePath = "";
+    sourceLabel = sourcePath.split("/").pop() + "   ·   " + (duration / 1000).toFixed(2) + " s   ·   stereo";
+    label("source_label", sourceLabel);
+    update_status();
+    label("status", "Saved input WAV · Ready for Save Set.");
+}
+finish_input_save.local = 1;
+
+function has_input_audio(path, expectedBytes) {
+    var file = new File(path, "read");
+    if (!file.isopen) return false;
+    try {
+        if (file.eof < 44 + expectedBytes || file.readstring(4) !== "RIFF") return false;
+        file.position = 8;
+        if (file.readstring(4) !== "WAVE") return false;
+        file.byteorder = "little";
+        while (file.position + 8 <= file.eof) {
+            var chunk = file.readstring(4);
+            var size = file.readint32(1)[0];
+            if (size < 0 || file.position + size > file.eof) return false;
+            if (chunk === "data") return size === expectedBytes;
+            file.position += size + (size % 2);
+        }
+        return false;
+    } finally {
+        file.close();
+    }
+}
+has_input_audio.local = 1;
+
+function input_save_failed() {
+    inputSaveTimeout.cancel();
+    inputWritePath = "";
+    update_status();
+    label("status", "Couldn’t save input WAV. Try another location.");
+}
+input_save_failed.local = 1;
+
 function dsp_enabled(state) {
     var wasAudioOn = audioOn;
     audioOn = !!state;
+    if (audioOn) send("input_device_channels", "bang");
     if (audioStarting) {
         // Core Audio can report on, off, on while Max rebuilds its DSP graph.
         // Leave the requested transport queued until the graph stays on.
@@ -378,6 +595,7 @@ function dsp_enabled(state) {
         audioStartFailed = false;
         start_queued_playback();
     } else if (wasAudioOn) {
+        stop_input_record();
         stop_all();
     }
     update_status();
@@ -411,6 +629,7 @@ function set_audio(state) {
         waitForAudio.schedule(3000);
         send("dac", "start");
     } else {
+        stop_input_record();
         waitForAudio.cancel();
         settleAudio.cancel();
         audioStarting = false;
@@ -433,7 +652,8 @@ function audio_timeout() {
 audio_timeout.local = 1;
 
 function start_queued_playback() {
-    if ((!queuedWindows && !queuedNormal) || !ready || audioStarting || pendingSet) {
+    if ((!queuedWindows && !queuedNormal) || !ready || audioStarting || pendingSet ||
+        (inputTake && inputTake.state === "committing")) {
         return;
     }
     if (!audioOn) {

@@ -39,43 +39,6 @@ def write_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
-def disable_standalone_input(patcher):
-    # FIELD KIT plays files and records its mix, so the app needs no live input.
-    # Only the runtime should set this. Opening the export project in Max must
-    # leave the editor's audio preferences alone.
-    boxes = patcher["boxes"]
-    used_ids = {entry["box"]["id"] for entry in boxes}
-    suffix = len(used_ids) + 1
-    ids = []
-    for kind, text, rect, inlets, outlets in (
-        ("newobj", "loadbang", [24, 2130, 62, 22], 1, ["bang"]),
-        ("message", "; max getruntime field-kit-standalone-runtime", [24, 2165, 290, 22], 2, [""]),
-        ("newobj", "receive field-kit-standalone-runtime", [355, 2130, 215, 22], 0, [""]),
-        ("newobj", "sel 1", [355, 2165, 45, 22], 2, ["bang", ""]),
-        ("message", "; max dsp_inputdevice 0", [355, 2200, 175, 22], 2, [""]),
-    ):
-        while f"obj-{suffix}" in used_ids:
-            suffix += 1
-        object_id = f"obj-{suffix}"
-        suffix += 1
-        ids.append(object_id)
-        boxes.append({"box": {
-            "id": object_id,
-            "maxclass": kind,
-            "text": text,
-            "hidden": 1,
-            "patching_rect": rect,
-            "numinlets": inlets,
-            "numoutlets": len(outlets),
-            "outlettype": outlets,
-        }})
-    for source, target in ((0, 1), (2, 3), (3, 4)):
-        patcher["lines"].append({"patchline": {
-            "source": [ids[source], 0],
-            "destination": [ids[target], 0],
-        }})
-
-
 def set_app_window(path):
     document = json.loads(path.read_text())
     patcher = document["patcher"]
@@ -102,7 +65,6 @@ def set_app_window(path):
         }
         patcher["boxes"].append({"box": standalone})
     standalone["text"] = STANDALONE_OPTIONS
-    disable_standalone_input(patcher)
     write_json(path, document)
 
 

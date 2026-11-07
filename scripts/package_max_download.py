@@ -8,15 +8,24 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from prepare_max_project import RUNTIME_ASSETS, TOP_LEVEL
 
 
-ROOT = "Field Kit - LFO Shapes"
+ROOT = "Field Kit - Live Input"
 LAUNCHER = "Open FIELD KIT.maxpat"
 SUPPORT = "Support"
 SUPPORT_PATH = "Patcher:/Support/"
 START_HERE = """FIELD KIT for Max
 
-1. Extract the ZIP and open the Field Kit - LFO Shapes folder.
+1. Extract the ZIP and open the Field Kit - Live Input folder.
 2. Double-click Open FIELD KIT.maxpat. This download requires Max 9.
 3. Click Play all to hear the demo, or Load audio... to choose a sample.
+
+Select your interface in Audio Setup and enable audio. In Input recording,
+choose the left and right channels. For mono, select the same channel twice.
+Input gain adjusts both channels from −60 to +18 dB and starts at 0 dB.
+The two post-gain peak meters show the recording levels with peak hold
+and a red overload indicator.
+Click Record input to capture the selected channels, then Stop input to use the take.
+Recording stops automatically after 60 seconds. Click Save input WAV… before
+saving a Set with the take or replacing it with a different source.
 
 Click Stereo field in the Mixer. Each dot is one loop.
 Drag left or right to pan, and up or down to set level.
@@ -51,7 +60,7 @@ def make_download(source, archive):
             raise FileNotFoundError(source / name)
 
     document = json.loads((source / TOP_LEVEL).read_text(encoding="utf-8"))
-    document["patcher"]["title"] = "Field Kit — LFO Shapes"
+    document["patcher"]["title"] = "Field Kit — Live Input"
     replacements = {
         "js fk_mixer.js": f"js {SUPPORT_PATH}fk_mixer.js",
         "js fk_source.js": f"js {SUPPORT_PATH}fk_source.js",

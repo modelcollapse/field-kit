@@ -1,15 +1,21 @@
 # FIELD KIT
 
-FIELD KIT is a Max instrument that turns one audio file into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, and filter. Blend the loops in the performance mixer, move them with eight LFOs, and capture the stereo mix with the built-in recorder.
+FIELD KIT is a Max instrument that turns an audio file or a live recording into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, and filter. Blend the loops in the performance mixer, move them with eight LFOs, and capture the stereo mix with the built-in recorder.
 
 ## Start here
 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** beside the launcher so Max can load its files automatically.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**.
 
-The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select an output device, and **Enable audio** starts the engine without starting playback.
+The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select your audio devices, and **Enable audio** starts the engine without starting playback.
 
 ![FIELD KIT playing four loops with wide blue volume faders, two soloed tracks, and stereo echo set to 575 ms](docs/screenshots/field-kit-overview.png)
+
+## Record a source
+
+1. Select your interface in **Audio Setup…** and click **Enable audio**. In the **Input recording** section, choose the left and right channels. Select the same channel on both sides for a mono source.
+2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
+3. Click **Record input** to capture up to 60 seconds. **Stop input** loads the take into all four loops. Use **Save input WAV…** before saving a Set that uses the take or replacing the source.
 
 ## Play and shape the loops
 
@@ -59,10 +65,11 @@ Run `python3 scripts/build.py` to regenerate the patch, subpatchers, and demo. R
 
 To build the standalone app, run `python3 scripts/prepare_max_project.py max build/standalone`. Open the generated **Field Kit.maxproj** in Max and choose **File → Build Collective / Application… → Application**. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
 
-Run the playback startup, pattern bank, curve editing, and Set writer tests with Node.js.
+Run the playback startup, input recording, pattern bank, curve editing, and Set writer tests with Node.js.
 
 ```sh
 node tests/source_launch_verify.cjs
+node tests/input_record_verify.cjs
 node tests/pattern_bank_verify.cjs
 node tests/curve_fade_verify.cjs
 node tests/set_writer_verify.cjs
