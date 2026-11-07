@@ -23,7 +23,8 @@ choose the left and right channels. For mono, select the same channel twice.
 Input gain adjusts both channels from −60 to +18 dB and starts at 0 dB.
 The two post-gain peak meters show the recording levels with peak hold
 and a red overload indicator.
-Click Record input to capture the selected channels, then Stop input to use the take.
+Click Record input and watch for the red RECORDING badge and timer.
+Click Stop input to use the take in all four loops.
 Recording stops automatically after 60 seconds. Click Save input WAV… before
 saving a Set with the take or replacing it with a different source.
 

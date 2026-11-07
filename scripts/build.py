@@ -141,12 +141,18 @@ def source_input(p):
         ("input_heading", "Input recording", 28, 248),
         ("input_gain_label", "Input gain", 312, 104),
         ("input_level_label", "Input level · after gain", 456, 230),
-        ("input_take_label", "Take", 736, 140),
     ):
         heading = name == "input_heading"
         rect = [x, INPUT_TOP + (8 if heading else 11), width, 22]
         p.add(name, "comment", rect, outs=0, view=rect, text=text,
               **({"fontsize": 16, "fontface": 1} if heading else {}))
+    state_rect = [736, INPUT_TOP + 10, 145, 20]
+    p.add("input_record_state", "comment", state_rect, outs=0, view=state_rect,
+          text="Enable audio to record", fontface=1, textcolor=[0.96, 0.96, 0.97, 1.0])
+    time_rect = [946, INPUT_TOP + 10, 74, 20]
+    p.add("input_record_time", "comment", time_rect, outs=0, view=time_rect,
+          text="00:00.0", fontface=1, textjustification=2,
+          hint="Elapsed audio captured in the current or last input take.")
     for index, x in enumerate((292, 716)):
         rect = [x, INPUT_TOP + 10, 1, INPUT_HEIGHT - 20]
         p.add(f"input_divider_{index}", "panel", rect, outs=0, view=rect, background=1,
@@ -212,6 +218,11 @@ def source_input(p):
     p.connect("input_recorder", 0, "input_progress")
     p.connect("input_progress", 0, "input_progress_message")
     p.connect("input_progress_message", 0, "source_control")
+    p.obj("input_clock", "snapshot~ 100 @active 0", 2470, 864, ins=2, types=["float"])
+    p.obj("input_clock_message", "prepend input_elapsed_phase", 2470, 896, ins=2)
+    p.connect("input_recorder", 0, "input_clock")
+    p.connect("input_clock", 0, "input_clock_message")
+    p.connect("input_clock_message", 0, "source_control")
 
     p.obj("input_rate_message", "prepend input_sample_rate", 1130, 884, ins=2)
     p.connect("dsp_state", 1, "input_rate_message")

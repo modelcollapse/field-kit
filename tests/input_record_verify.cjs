@@ -126,11 +126,13 @@ function indexOf(...expected) {
 
 const sent = (...args) => indexOf(...args) !== -1;
 const bound = () => trace.some(([target, selector]) => target === 'normal_voice' && selector === 'set');
+const displayed = name => trace.filter(([target, selector]) => target === name && selector === 'set').at(-1)?.[2];
 
 host.initialize();
 advance(100);
 host.source_loaded(44100);
 assert.equal(host.get_set_source().kind, 'demo');
+assert.equal(displayed('input_record_state'), 'Enable audio to record');
 
 trace.length = 0;
 host.input_sample_rate(sampleRate);
@@ -148,6 +150,7 @@ for (const menu of ['input_left', 'input_right']) {
     assert(sent(menu, 'clear'));
     for (let channel = 1; channel <= 8; channel++) assert(sent(menu, 'append', channel));
 }
+assert.equal(displayed('input_record_state'), 'Ready to record');
 
 host.open_source(fixturePath);
 host.toggle_input_record();
@@ -176,6 +179,9 @@ assert(indexOf('set_buffer', 'clear') < indexOf('input_recorder', 1));
 assert(indexOf('input_progress', 'bang') < indexOf('input_recorder', 1));
 assert(!bound(), 'the previous source remains active during capture');
 assert.equal(host.get_set_source().path, fixturePath);
+assert.equal(displayed('input_record_state'), 'Starting…');
+assert.equal(displayed('input_record_time'), '00:00.0');
+assert(sent('input_clock', 'start'));
 
 const beforeChannelEdits = trace.length;
 host.set_input_channel(1, 2);
@@ -195,12 +201,14 @@ assert(!trace.some(([, selector]) => selector === 'replace'), 'file loads cannot
 trace.length = 0;
 host.toggle_input_record();
 assert(sent('input_recorder', 0));
+assert.equal(displayed('input_record_state'), 'Preparing take…');
 assert(sent('input_progress', 'bang'));
 assert(indexOf('input_recorder', 0) < indexOf('input_progress', 'bang'));
 host.input_record_progress(0);
 advance(100);
 assert(!bound(), 'an empty recording leaves the current source bound');
 assert.equal(host.get_set_source().path, fixturePath);
+assert.equal(displayed('input_record_state'), 'Ready to record');
 
 trace.length = 0;
 host.toggle_input_record();
@@ -208,18 +216,45 @@ host.toggle_input_record();
 advance(1000);
 assert(!bound(), 'a missing progress reply leaves the current source bound');
 assert.equal(host.get_set_source().path, fixturePath);
+assert.equal(displayed('input_record_state'), 'Ready to record');
 
 trace.length = 0;
 host.toggle_input_record();
 assert(sent('input_recorder', 1), 'a missing progress reply allows another take');
+assert.equal(displayed('input_record_time'), '00:00.0');
+host.input_elapsed_phase(0);
+assert.equal(displayed('input_record_state'), 'Starting…');
+host.input_elapsed_phase(0.05);
+assert.equal(displayed('input_record_state'), '● RECORDING');
+assert.equal(displayed('input_record_time'), '00:03.0');
+host.input_elapsed_phase(0.025);
+assert.equal(displayed('input_record_time'), '00:03.0', 'the elapsed clock never runs backward');
+
+host.stop_all();
+assert(sent('run_1', 0), 'Stop all stops the loops during capture');
+assert.equal(displayed('input_record_state'), '● RECORDING');
+host.play_all();
+assert(sent('run_1', 1), 'Play all starts the loops during capture');
+host.play_normal();
+assert(sent('normal_voice', 'start'), 'Play normal starts the current sample during capture');
+assert(!sent('input_recorder', 0), 'loop transport does not stop recording');
+assert.equal(displayed('input_record_state'), '● RECORDING');
+
 host.toggle_input_record();
-host.input_record_progress(2 / 60);
+host.input_elapsed_phase(0.1);
+assert.equal(displayed('input_record_time'), '00:03.0', 'stopped capture ignores further clock samples');
+assert.deepEqual(trace.filter(([target]) => target === 'input_clock'), [
+    ['input_clock', 'start'], ['input_clock', 'stop'],
+]);
+const capturedSeconds = 3.125;
+host.input_record_progress(capturedSeconds / 60);
 const trim = trace.find(([target, selector]) => target === 'set_buffer' && selector === 'crop_samples');
 assert(trim, 'recorded audio is cropped before becoming the source');
 assert.equal(trim[2], 0);
-assert(Math.abs(trim[3] - 2 * sampleRate) <= 1, 'trim tracks the recorded frame count');
+assert(Math.abs(trim[3] - capturedSeconds * sampleRate) <= 1, 'trim tracks the recorded frame count');
 assert(!bound(), 'playing voices are released before switching buffers');
 assert.equal(host.get_set_source().path, fixturePath);
+assert.equal(displayed('input_record_state'), 'Preparing take…');
 advance(100);
 assert(sent('normal_voice', 'set', 'field-kit-set-source-1'));
 for (let voice = 1; voice <= 4; voice++) {
@@ -228,8 +263,13 @@ for (let voice = 1; voice <= 4; voice++) {
 }
 assert(sent('source_rate', sampleRate));
 assert(sent('normal_right_channel', 2));
-assert(Math.abs(regions.at(-1)[2] - 2000) <= 1000 / sampleRate);
+assert(Math.abs(regions.at(-1)[2] - trim[3] * 1000 / sampleRate) < 1e-9);
 assert.equal(host.get_set_source(), null, 'an unsaved recording has no Set file path');
+assert.equal(displayed('input_record_state'), 'Ready to record');
+const stoppedTime = displayed('input_record_time');
+host.input_elapsed_phase(0.15);
+assert.equal(displayed('input_record_state'), 'Ready to record', 'a late clock sample cannot restart the marker');
+assert.equal(displayed('input_record_time'), stoppedTime, 'a late clock sample cannot change a finished take time');
 
 trace.length = 0;
 host.choose_input_save();
@@ -265,7 +305,10 @@ assert(sent('input_adc', 'set', 1, 1), 'a one-input device uses channel 1 on the
 assert(sent('input_adc', 'set', 2, 1), 'the same input can feed the right channel');
 host.toggle_input_record();
 assert(sent('input_recorder', 1), 'recording works with a single hardware input');
-host.toggle_input_record();
+host.dsp_enabled(0);
+assert(sent('input_recorder', 0), 'turning off DSP stops capture');
+assert.equal(displayed('input_record_state'), 'Preparing take…');
 host.input_record_progress(0);
+assert.equal(displayed('input_record_state'), 'Enable audio to record');
 
-console.log('Verified Field Kit input routing, recording, source switching, and saved Set paths.');
+console.log('Verified Field Kit input routing, recording indicator, playback independence, and saved Set paths.');

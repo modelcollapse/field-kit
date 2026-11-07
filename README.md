@@ -15,7 +15,7 @@ The eight-second demo loads on startup. Click **Play all** to turn on audio and 
 
 1. Select your interface in **Audio Setup…** and click **Enable audio**. In the **Input recording** section, choose the left and right channels. Select the same channel on both sides for a mono source.
 2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
-3. Click **Record input** to capture up to 60 seconds. **Stop input** loads the take into all four loops. Use **Save input WAV…** before saving a Set that uses the take or replacing the source.
+3. Click **Record input** to capture up to 60 seconds. The red **RECORDING** badge and timer show when audio is being captured. **Stop input** loads the take into all four loops. Use **Save input WAV…** before saving a Set that uses the take or replacing the source.
 
 ## Play and shape the loops
 

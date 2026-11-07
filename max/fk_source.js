@@ -365,6 +365,23 @@ read_timeout.local = 1;
 
 function update_status() {
     var recording = inputTake && inputTake.state === "recording";
+    var capturing = recording && inputTake.started;
+    if (recording) {
+        label("input_record_state", capturing ? "● RECORDING" : "Starting…");
+    } else if (inputTake) {
+        label("input_record_state", "Preparing take…");
+    } else if (inputWritePath) {
+        label("input_record_state", "Saving WAV…");
+    } else if (!audioOn || audioStarting) {
+        label("input_record_state", "Enable audio to record");
+    } else {
+        label("input_record_state", inputCount > 0 ? "Ready to record" : "Choose an input device");
+    }
+    if (capturing) {
+        send("input_record_state", "bgcolor", 0.64, 0.10, 0.16, 1);
+    } else {
+        send("input_record_state", "bgcolor", 0, 0, 0, 0);
+    }
     var inputButton = recording ? "Stop input" : "Record input";
     send("input_record_button", "text", inputButton);
     send("input_record_button", "texton", inputButton);
@@ -457,22 +474,48 @@ function toggle_input_record() {
     send("input_recorder", "set", bufferNames[target]);
     send("input_recorder", "reset");
     send("input_progress", "bang");
-    inputTake = {state: "recording", target: target, frames: frames, sampleRate: inputSampleRate};
+    inputTake = {
+        state: "recording", target: target, frames: frames,
+        sampleRate: inputSampleRate, started: false, tenths: 0
+    };
+    label("input_record_time", "00:00.0");
     send("input_recorder", 1);
     inputLimit.schedule(INPUT_LIMIT_SECONDS * 1000);
     update_status();
+    send("input_clock", "start");
 }
 
 function stop_input_record() {
     if (!inputTake || inputTake.state !== "recording") return;
     inputLimit.cancel();
     inputTake.state = "stopping";
+    send("input_clock", "stop");
     update_status();
     inputReply.schedule(500);
     send("input_recorder", 0);
     send("input_progress", "bang");
 }
 stop_input_record.local = 1;
+
+function input_elapsed_phase(phase) {
+    if (!inputTake || inputTake.state !== "recording" ||
+        typeof phase !== "number" || !isFinite(phase) || phase <= 0) return;
+    if (!inputTake.started) {
+        inputTake.started = true;
+        update_status();
+    }
+    update_input_time(Math.min(phase, 1) * inputTake.frames);
+}
+
+function update_input_time(frames) {
+    var tenths = Math.floor(frames * 10 / inputTake.sampleRate);
+    if (tenths <= inputTake.tenths) return;
+    inputTake.tenths = tenths;
+    var minutes = ("0" + Math.floor(tenths / 600)).slice(-2);
+    var seconds = ("0" + Math.floor(tenths / 10) % 60).slice(-2);
+    label("input_record_time", minutes + ":" + seconds + "." + tenths % 10);
+}
+update_input_time.local = 1;
 
 function input_record_progress(phase) {
     if (!inputTake || inputTake.state !== "stopping") return;
@@ -483,6 +526,7 @@ function input_record_progress(phase) {
         return;
     }
     inputTake.state = "committing";
+    update_input_time(frames);
     send(BUFFER_OBJECTS[inputTake.target], "crop_samples", 0, frames);
     stop_all();
     commitWave.cancel();
