@@ -12,6 +12,12 @@ ROOT = "Field Kit - Live Input"
 LAUNCHER = "Open FIELD KIT.maxpat"
 SUPPORT = "Support"
 SUPPORT_PATH = "Patcher:/Support/"
+EMBEDDED_PATCHERS = {"fk_fx.maxpat", "fk_modulation.maxpat", "fk_record.maxpat"}
+SUPPORT_JSUI = {"fk_lfo_preview.js", "fk_stereo_field.js"}
+EMBEDDED_SCRIPTS = {
+    "js fk_mod_routes.js": f"js {SUPPORT_PATH}fk_mod_routes.js",
+    "js fk_recorder.js": f"js {SUPPORT_PATH}fk_recorder.js",
+}
 START_HERE = """FIELD KIT for Max
 
 1. Extract the ZIP and open the Field Kit - Live Input folder.
@@ -41,17 +47,34 @@ Open Set restores them with playback stopped. If the source moved, choose its ne
 Use Banks… → Save Bank or Load Bank to exchange patterns with earlier builds.
 
 Keep the Support folder beside Open FIELD KIT.maxpat.
-Max loads the scripts, patchers, and demo in Support automatically.
+Max loads the scripts and demo in Support automatically.
 """
 
 
-def qualify_stereo_script(patcher):
+def qualify_support_scripts(patcher):
     for entry in patcher["boxes"]:
         box = entry["box"]
-        if box.get("filename") == "fk_stereo_field.js":
+        if box.get("text") in EMBEDDED_SCRIPTS:
+            box["text"] = EMBEDDED_SCRIPTS[box["text"]]
+        if box.get("filename") in SUPPORT_JSUI:
             box["filename"] = SUPPORT_PATH + box["filename"]
         if "patcher" in box:
-            qualify_stereo_script(box["patcher"])
+            qualify_support_scripts(box["patcher"])
+
+
+def embed_support_patchers(patcher, source):
+    """Embed the three panels so Max can reopen the launcher after saving it."""
+    for entry in patcher["boxes"]:
+        box = entry["box"]
+        if box.get("maxclass") != "bpatcher":
+            continue
+        name = box.get("name", "").removeprefix(SUPPORT_PATH)
+        if name not in EMBEDDED_PATCHERS:
+            continue
+        if not box.get("embed") or "patcher" not in box:
+            box["patcher"] = json.loads((source / name).read_text(encoding="utf-8"))["patcher"]
+        box.update(name=name, embed=1)
+    qualify_support_scripts(patcher)
 
 
 def make_download(source, archive):
@@ -74,10 +97,8 @@ def make_download(source, archive):
         box = entry["box"]
         if box.get("text") in replacements:
             box["text"] = replacements[box["text"]]
-        if box.get("maxclass") == "bpatcher" and box.get("name") in assets:
-            box["name"] = SUPPORT_PATH + box["name"]
 
-    qualify_stereo_script(document["patcher"])
+    embed_support_patchers(document["patcher"], source)
     archive.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(archive, "w", compression=ZIP_DEFLATED) as bundle:
         bundle.writestr(f"{ROOT}/{LAUNCHER}", json.dumps(document, ensure_ascii=False, indent=2) + "\n")
