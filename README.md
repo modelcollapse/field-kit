@@ -5,7 +5,7 @@ FIELD KIT is a Max instrument that turns one audio file into four independent st
 ## Start here
 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** beside the launcher so Max can load its files automatically.
-- **[Download the standalone macOS app (v0.4.1)](https://github.com/modelcollapse/field-kit/releases/download/v0.4.1/field-kit-macos.zip).** Unzip it and open **Field Kit.app**.
+- **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**.
 
 The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select an output device, and **Enable audio** starts the engine without starting playback.
 
