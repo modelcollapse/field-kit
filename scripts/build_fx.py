@@ -5,6 +5,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "max"
 VERSION = dict(major=9, minor=2, revision=0, architecture="arm64", modernui=1)
+DIALS = (
+    ("tone", "Tone tilt", "Tilt", 0, -100, 100, "Turn left to darken and right to brighten."),
+    ("echo", "Echo mix", "Mix %", 20, 0, 100, "Amount of stereo echo."),
+    ("time_ms", "Echo time", "Time ms", 310, 45, 850, "Delay time in milliseconds."),
+    ("repeats", "Echo feedback", "Feedback %", 28, 0, 78, "How long the echo repeats."),
+    ("space", "Room mix", "Mix %", 18, 0, 100, "Amount of room reverb."),
+    ("decay", "Room decay", "Decay s", 1.7, 0.25, 5, "Reverb tail length in seconds."),
+)
 
 # Turn-on defaults match the parameters in the native controls. Gen handles
 # smoothing so moving a dial or switching bypass does not jump the audio.
@@ -20,6 +28,9 @@ History fxMix(0);
 History toneMix(0);
 History echoMix(0.20);
 History echoTime(310);
+History echoNextTime(310);
+History echoTimeBlend(1);
+History echoTimeMod(0);
 History echoRepeats(0.28);
 History spaceMix(0.18);
 History roomDecay(1.7);
@@ -43,14 +54,30 @@ Delay roomLineD(32768);
 
 controlRamp = 1 - exp(-1 / (0.020 * samplerate));
 timeRamp = 1 - exp(-1 / (0.060 * samplerate));
+samplesPerMs = samplerate * 0.001;
 bypassStep = 1 / (0.020 * samplerate);
 fxMix = clamp(clamp(enabled, 0, 1), fxMix - bypassStep, fxMix + bypassStep);
-toneMix = mix(toneMix, clamp(tone * 0.01, -1, 1), controlRamp);
-echoMix = mix(echoMix, clamp(echo * 0.01, 0, 1), controlRamp);
-echoTime = mix(echoTime, clamp(time_ms, 45, 850), timeRamp);
-echoRepeats = mix(echoRepeats, clamp(repeats * 0.01, 0, 0.78), controlRamp);
-spaceMix = mix(spaceMix, clamp(space * 0.01, 0, 1), controlRamp);
-roomDecay = mix(roomDecay, clamp(decay, 0.25, 5), controlRamp);
+toneMix = mix(toneMix, clamp(tone * 0.01 + in3, -1, 1), controlRamp);
+echoMix = mix(echoMix, clamp(echo * 0.01 + in4, 0, 1), controlRamp);
+// Changing the knob or recalling a pattern switches between two fixed taps.
+requestedTime = clamp(time_ms, 45, 850);
+if (echoTimeBlend >= 1 && requestedTime != echoNextTime) {
+    echoTime = echoNextTime;
+    echoNextTime = requestedTime;
+    echoTimeBlend = 0;
+}
+echoTimeBlend = min(1, echoTimeBlend + 1 / (0.035 * samplerate));
+echoWeight = echoTimeBlend * echoTimeBlend * (3 - 2 * echoTimeBlend);
+// Cap the LFO offset and the delay-head motion per sample, including square waves.
+delayStep = 0.25 / samplesPerMs;
+echoTimeMod = clamp(mix(echoTimeMod, clamp(in5, -1, 1) * 30, timeRamp),
+                    echoTimeMod - delayStep, echoTimeMod + delayStep);
+oldDelayTime = clamp(echoTime + echoTimeMod, 45, 850);
+newDelayTime = clamp(echoNextTime + echoTimeMod, 45, 850);
+delayTime = mix(oldDelayTime, newDelayTime, echoWeight);
+echoRepeats = mix(echoRepeats, clamp(repeats * 0.01 + in6 * 0.78, 0, 0.78), controlRamp);
+spaceMix = mix(spaceMix, clamp(space * 0.01 + in7, 0, 1), controlRamp);
+roomDecay = mix(roomDecay, clamp(decay + in8 * 2, 0.25, 5), controlRamp);
 
 // Tone tilts around 1.2 kHz. At zero the direct signal passes through.
 toneCutoff = 1 - exp(-7539.822369 / samplerate);
@@ -62,9 +89,12 @@ toneL = in1 - dark * (in1 - toneLowL) - bright * toneLowL;
 toneR = in2 - dark * (in2 - toneLowR) - bright * toneLowR;
 
 // A slight difference in times and crossfeed opens up the repeats in stereo.
-samplesPerMs = samplerate * 0.001;
-echoTapL = echoLineL.read(clamp(echoTime * samplesPerMs, 1, 262141));
-echoTapR = echoLineR.read(clamp(echoTime * 1.17 * samplesPerMs, 1, 262141));
+oldTapL = echoLineL.read(clamp(oldDelayTime * samplesPerMs, 1, 262141));
+oldTapR = echoLineR.read(clamp(oldDelayTime * 1.17 * samplesPerMs, 1, 262141));
+newTapL = echoLineL.read(clamp(newDelayTime * samplesPerMs, 1, 262141));
+newTapR = echoLineR.read(clamp(newDelayTime * 1.17 * samplesPerMs, 1, 262141));
+echoTapL = mix(oldTapL, newTapL, echoWeight);
+echoTapR = mix(oldTapR, newTapR, echoWeight);
 echoCutoff = 1 - exp(-28274.33388 / samplerate);
 echoLowL = mix(echoLowL, echoTapL, echoCutoff);
 echoLowR = mix(echoLowR, echoTapR, echoCutoff);
@@ -112,6 +142,12 @@ wetR = echoR * (1 - 0.18 * spaceMix) + roomR * spaceMix * 0.70;
 // The bypass branch has no filter, gain, or delay.
 out1 = mix(in1, wetL, fxMix);
 out2 = mix(in2, wetR, fxMix);
+out3 = toneMix;
+out4 = echoMix;
+out5 = delayTime;
+out6 = echoRepeats;
+out7 = spaceMix;
+out8 = roomDecay;
 """
 
 
@@ -150,15 +186,15 @@ class Patch:
 
 def gen_patcher():
     p = Patch()
-    left = p.obj("in 1", 40, 32, 48, ins=0, types=[""])
-    right = p.obj("in 2", 110, 32, 48, ins=0, types=[""])
-    code = p.add("codebox", [40, 86, 600, 420], ins=2, outs=2, types=["", ""], code=CODE)
-    output_left = p.obj("out 1", 40, 545, 48, outs=0)
-    output_right = p.obj("out 2", 110, 545, 48, outs=0)
-    p.cord(left, code)
-    p.cord(right, code, inlet=1)
-    p.cord(code, output_left)
-    p.cord(code, output_right, outlet=1)
+    channels = 2 + len(DIALS)
+    code = p.add("codebox", [40, 86, 600, 420], ins=channels, outs=channels,
+                 types=[""] * channels, code=CODE)
+    for i in range(channels):
+        x = 40 + i * 70
+        source = p.obj(f"in {i + 1}", x, 32, 48, ins=0, types=[""])
+        target = p.obj(f"out {i + 1}", x, 545, 48, outs=0)
+        p.cord(source, code, inlet=i)
+        p.cord(code, target, outlet=i)
     return p.patcher(rect=[0, 0, 680, 600], namespace="dsp.gen",
                      description="Tone tilt, crossfed stereo echo, and a damped stereo room")
 
@@ -187,7 +223,8 @@ def build():
                  comment="Mix left")
     right = p.add("inlet", [144, 172, 26, 26], ins=0, outs=1, types=["signal"], index=2,
                   comment="Mix right")
-    gen = p.obj("gen~", 0, 320, 105, ins=2, outs=2, types=["signal", "signal"],
+    channels = 2 + len(DIALS)
+    gen = p.obj("gen~", 0, 320, 105, ins=channels, outs=channels, types=["signal"] * channels,
                 patcher=gen_patcher(), varname="fk_fx_dsp")
     output_left = p.add("outlet", [0, 370, 26, 26], types=[], index=1, comment="Effects left")
     output_right = p.add("outlet", [144, 370, 26, 26], types=[], index=2, comment="Effects right")
@@ -205,14 +242,16 @@ def build():
     p.cord(enabled, prefix)
     p.cord(prefix, gen)
 
-    for slot, key, title, label, initial, low, high, hint in (
-        (0, "tone", "Tone tilt", "Tilt", 0, -100, 100, "Turn left to darken and right to brighten."),
-        (1, "echo", "Echo mix", "Mix %", 20, 0, 100, "Amount of stereo echo."),
-        (2, "time_ms", "Echo time", "Time ms", 310, 45, 850, "Delay time in milliseconds."),
-        (3, "repeats", "Echo feedback", "Feedback %", 28, 0, 78, "How long the echo repeats."),
-        (4, "space", "Room mix", "Mix %", 18, 0, 100, "Amount of room reverb."),
-        (5, "decay", "Room decay", "Decay s", 1.7, 0.25, 5, "Reverb tail length in seconds."),
-    ):
+    for slot, (key, title, label, initial, low, high, hint) in enumerate(DIALS):
+        index = slot + 3
+        x = 288 + slot * 72
+        modulation = p.add("inlet", [x, 172, 26, 26], ins=0, outs=1, types=["signal"],
+                           index=index, comment=f"{title} modulation")
+        effective = p.add("outlet", [x, 370, 26, 26], types=[], index=index,
+                          comment=f"Applied {title.lower()}")
+        p.cord(modulation, gen, inlet=index - 1)
+        p.cord(gen, effective, outlet=index - 1)
+
         rect = [slot * dial_pitch, 48, dial_pitch - gutter, 68]
         dial = p.add("live.dial", rect, view=rect, outs=2, types=["float", "float"],
                      appearance=3, showname=1, shownumber=1, varname="fx_" + key, hint=hint,

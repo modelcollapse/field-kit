@@ -27,6 +27,7 @@ const modState = {
     DEFAULT_SHAPES: defaultShapes,
     DEFAULT_CURVE: defaultCurve,
     gains: Array(288).fill(0),
+    globalGains: Array(64).fill(0),
     curves: structuredClone(initialCurves),
     rates: [0.1, 0.5, 15, 0.2, 0.3, 0.4, 0.5, 19],
     shapes: [5, 0, 5, 0, 0, 0, 0, 5],
@@ -37,6 +38,7 @@ const modState = {
 modState.gains[9] = 25;
 modState.gains[241] = -100;
 modState.gains[287] = 42;
+modState.globalGains[63] = -35;
 
 const router = {
     js: modState,
@@ -48,7 +50,12 @@ const router = {
         case 'curve_points': modState.curves[modState.currentLfo] = args; break;
         case 'view': modState.selected = args[0] - 1; break;
         case 'select_destination': modState.targetIndex = args[0]; break;
-        case 'depth': modState.gains[((args[0] - 1) * 8 + args[1] - 1) * 9 + args[2] - 1] = args[3]; break;
+        case 'depth': {
+            const [scope, lfo, destination, depth] = args;
+            if (scope === 5) modState.globalGains[(lfo - 1) * 8 + destination - 1] = depth;
+            else modState.gains[((scope - 1) * 8 + lfo - 1) * 9 + destination - 1] = depth;
+            break;
+        }
         case 'bang': break;
         default: throw new Error('Unexpected route selector ' + selector);
         }
@@ -100,7 +107,8 @@ for (const [name, value] of Object.entries({
 })) addControl(name, value);
 for (let i = 1; i <= 8; i++) addControl('pattern_' + i, 0);
 for (const name of ['pattern_store', 'pattern_status', 'set_status', 'pattern_save_dialog', 'pattern_load_dialog',
-                    'set_save_dialog', 'set_open_dialog', 'set_relink_dialog', 'set_writer']) addControl(name, 0);
+                    'set_save_dialog', 'set_open_dialog', 'set_relink_dialog', 'set_writer',
+                    'pattern_gain', 'pattern_gain_sample']) addControl(name, 0);
 const named = name => {
     if (name === 'source_control') return source;
     if (name === 'patchbay') return { subpatcher: () => ({ getnamed: () => router }) };
@@ -169,6 +177,7 @@ assert.equal(bank.slots[1].pitchScale, 5);
 assert.deepEqual(bank.slots[1].mixerMutes, [0, 1, 0, 1]);
 assert.equal(bank.slots[1].mixerSolos, undefined);
 assert.deepEqual(bank.slots[1].curves, initialCurves);
+assert.equal(bank.slots[1].globalGains[63], -35);
 assert.deepEqual(bank.slots[1].selection, { window: 3, lfo: 7, target: 7 });
 
 sourceState.positions[1][0] = 26;
@@ -176,6 +185,8 @@ modState.curves[0][1] = 0;
 modState.gains[0] = 100;
 modState.gains[241] = 25;
 modState.gains[287] = 0;
+modState.globalGains[0] = 10;
+modState.globalGains[63] = 0;
 modState.rates[7] = 5;
 modState.shapes[7] = 1;
 modState.currentLfo = 0;
@@ -195,6 +206,8 @@ assert.deepEqual(modState.curves, initialCurves);
 assert.equal(modState.gains[0], 0);
 assert.equal(modState.gains[241], -100);
 assert.equal(modState.gains[287], 42);
+assert.equal(modState.globalGains[0], 0);
+assert.equal(modState.globalGains[63], -35);
 assert.equal(modState.rates[7], 19);
 assert.equal(modState.shapes[7], 5);
 assert.equal(modState.currentLfo, 7);
@@ -228,6 +241,7 @@ assert.notDeepEqual(controls.pattern_2.background, selectedBackground);
 assert.notDeepEqual(controls.pattern_2.background, controls.pattern_1.background);
 assert.equal(modState.targetIndex, 0);
 assert(modState.gains.every(value => value === 0));
+assert(modState.globalGains.every(value => value === 0));
 assert.deepEqual(modState.rates, defaultRates);
 assert.deepEqual(modState.shapes, defaultShapes);
 assert.deepEqual(modState.curves, Array(8).fill(defaultCurve));
@@ -284,6 +298,7 @@ assert.deepEqual(mixerState.mutes, [0, 1, 0, 1]);
 const oldV2Pattern = { ...bank.slots[1] };
 delete oldV2Pattern.pitchScale;
 delete oldV2Pattern.mixerMutes;
+delete oldV2Pattern.globalGains;
 const oldV2Slots = bank.slots.slice();
 oldV2Slots[1] = oldV2Pattern;
 files.set('/test/old-v2.json', JSON.stringify({ ...bank, slots: oldV2Slots }));
@@ -292,6 +307,7 @@ assert.match(controls.pattern_status.value, /Bank loaded/);
 host.slot(2);
 assert.equal(controls.pitch_scale.value, 0);
 assert.deepEqual(mixerState.mutes, [0, 0, 0, 0]);
+assert(modState.globalGains.every(value => value === 0));
 
 // These are version 1 indices for W1 LFO 2 Start, W2 LFO 1 Speed,
 // W3 LFO 2 Level, and W4 LFO 3 Level.
@@ -357,6 +373,9 @@ assert.deepEqual(modState.curves[7], denseCurve);
 console.log('PASS pattern store, cancel, overwrite, visible slots, pitch snap, mixer mutes, and v1/v2 bank round-trip');
 
 host.read_bank('/test/bank.json');
+modState.selected = 4;
+modState.targetIndex = 7;
+modState.globalGains[63] = -75;
 sourceState.path = '/test/sets/Écho.wav';
 controls.pan_1.value = -62;
 host.slot(1, 1);
@@ -370,6 +389,8 @@ assert.equal(set.source.path, sourceState.path);
 assert.equal(set.source.relative, 'Écho.wav');
 assert.equal(set.slots[0].windows[0].pan, -62);
 assert.equal(set.current.windows[0].pan, 37);
+assert.equal(set.current.globalGains[63], -75);
+assert.equal(set.current.selection.globalTarget, 7);
 files.set(destination, files.get(stage));
 host.set_written(1, stage);
 assert.equal(controls.pattern_status.value, 'Pattern 1 stored.');
@@ -426,3 +447,27 @@ recorderState.state = 'recording';
 host.open_set();
 assert.match(controls.set_status.value, /Stop recording/);
 console.log('PASS set captures unslotted edits, restores after decode, and handles relocation, relink and cancel');
+
+sourceState.audioOn = true;
+controls.pan_1.value = 13;
+host.slot(2, 1);
+controls.pan_1.value = 37;
+host.slot(1);
+assert.equal(controls.pan_1.value, 37);
+assert.deepEqual(messages.slice(-2), [
+    ['pattern_gain', 'list', 0, 20],
+    ['pattern_gain_sample', 'start'],
+]);
+host.slot(2);
+assert.equal(controls.pan_1.value, 37);
+host.recall_silent();
+assert.equal(controls.pan_1.value, 13);
+host.restore_recall_level();
+assert.deepEqual(messages.at(-1), ['pattern_gain', 'list', 1, 30]);
+host.slot(1);
+sourceState.audioOn = false;
+host.recall_dsp(0);
+assert.equal(controls.pan_1.value, -62);
+host.recall_silent();
+assert.equal(controls.pan_1.value, -62);
+console.log('PASS live recall waits for silence, coalesces rapid selection and recovers if DSP stops');

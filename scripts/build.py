@@ -8,6 +8,8 @@ import struct
 import wave
 from pathlib import Path
 
+from build_fx import DIALS as FX_DIALS
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent / "max"
 VERSION = dict(major=9, minor=2, revision=0, architecture="arm64", modernui=1)
@@ -29,6 +31,9 @@ PITCH_SCALES = ("Off", "Chromatic", "Major", "Natural Minor", "Dorian",
                 "Major Pentatonic", "Minor Pentatonic")
 DIALS = ("rate", "fade", "drive", "filter", "level", "pan")
 DIAL_LABELS = ("Speed ×", "Fade ms", "Drive %", "Filter", "Level %", "Pan %")
+WINDOW_MOD_CHANNELS = 4 * len(CELLS)
+FX_MOD_CHANNELS = len(FX_DIALS)
+MOD_CHANNELS = WINDOW_MOD_CHANNELS + 2 + FX_MOD_CHANNELS
 
 MARGIN = 16
 TRACK = 48
@@ -116,6 +121,26 @@ def parameter(name, initial, low, high, *, options=None, unit_style=0, short=Non
     return dict(parameter_enable=1, saved_attribute_attributes={"valueof": value})
 
 
+def modulated_gain(p, control, output, initial, low, high, depth, x, y):
+    ramp = f"{control}_ramp"
+    base = f"{control}_base"
+    mod = f"{control}_mod"
+    total = f"{control}_sum"
+    effective = f"{control}_effective"
+    p.obj(ramp, f"pack {initial}. 20", x, y, ins=2)
+    p.obj(base, f"line~ {initial}.", x, y + 32, ins=2, outs=2, types=["signal", "bang"])
+    p.obj(mod, f"*~ {depth}.", x + 105, y + 32, ins=2, types=["signal"])
+    p.obj(total, "+~", x, y + 64, ins=2, types=["signal"])
+    p.obj(effective, f"clip~ {low}. {high}.", x, y + 96, ins=3, types=["signal"])
+    p.obj(output, "dbtoa~", x, y + 128, types=["signal"])
+    p.connect(control, 0, ramp)
+    p.connect(ramp, 0, base)
+    p.connect(base, 0, total)
+    p.connect(mod, 0, total, 1)
+    p.connect(total, 0, effective)
+    p.connect(effective, 0, output)
+
+
 def action(patch, name, label, column, selector, width=2, target="source_control", hint=None,
            *, row=1, y_offset=0, routing_y=728):
     rect = grid_rect(column, row, width, y_offset=y_offset)
@@ -188,12 +213,7 @@ def source_input(p):
     p.add("input_gain", "live.numbox", gain_rect, view=gain_rect, outs=2, types=["float", "float"],
           hint="Adjust both inputs before metering and recording. 0 dB leaves their level unchanged.",
           **parameter("Input gain", 0, -60, 18, unit_style=4))
-    p.obj("input_amplitude", "dbtoa", 2480, 691, types=["float"])
-    p.obj("input_gain_ramp", "pack 1. 20", 2480, 723, ins=2)
-    p.obj("input_gain_signal", "line~ 1.", 2480, 755, ins=2, outs=2, types=["signal", "bang"])
-    p.connect("input_gain", 0, "input_amplitude")
-    p.connect("input_amplitude", 0, "input_gain_ramp")
-    p.connect("input_gain_ramp", 0, "input_gain_signal")
+    modulated_gain(p, "input_gain", "input_gain_signal", 0, -60, 18, 24, 2750, 691)
 
     p.obj("input_adc", "adc~ 1 2", 2260, 736, outs=2, types=["signal", "signal"])
     p.obj("input_recorder", "record~ fk-unbound-set 2", 2260, 832, ins=4, types=["signal"])
@@ -254,6 +274,19 @@ def pattern_controls(p):
         return rect
 
     p.obj("pattern_control", "js fk_patterns.js", 1550, 2010, outs=0)
+    p.obj("pattern_gain", "line~ 1.", 1550, 2120, ins=2, outs=2, types=["signal", "bang"])
+    p.obj("pattern_gain_sample", "snapshot~ 5 @active 0", 1550, 2155, ins=2, types=["float"])
+    p.obj("pattern_gain_zero", "sel 0.", 1550, 2190, outs=2, types=["bang", "float"])
+    p.obj("pattern_gain_defer", "deferlow", 1550, 2225, types=["bang"])
+    p.add("pattern_gain_ready", "message", [1550, 2260, 95, 22], ins=2, text="recall_silent")
+    p.connect("pattern_gain", 0, "pattern_gain_sample")
+    p.connect("pattern_gain_sample", 0, "pattern_gain_zero")
+    p.connect("pattern_gain_zero", 0, "pattern_gain_defer")
+    p.connect("pattern_gain_defer", 0, "pattern_gain_ready")
+    p.connect("pattern_gain_ready", 0, "pattern_control")
+    p.obj("pattern_dsp", "prepend recall_dsp", 1550, 2295, ins=2)
+    p.connect("dsp_state", 0, "pattern_dsp")
+    p.connect("pattern_dsp", 0, "pattern_control")
     p.obj("pattern_slot_trigger", "t i b", 2460, 2000, outs=2, types=["int", "bang"])
     p.obj("pattern_modifiers", "modifiers", 2580, 2000, outs=5, types=["int"] * 5)
     p.obj("pattern_slot_and_shift", "pack 0 0", 2460, 2035, ins=2)
@@ -556,18 +589,13 @@ def build():
          types=["float", "int"], orientation=1, hint="Post-effects master peak. Capture records this signal.")
     p.obj("mix_peak", "maximum~", 640, 1958, ins=2, types=["signal"])
     p.connect("mix_peak", 0, "mix_meter")
-    p.obj("master_amplitude", "dbtoa", 22, 1840, types=["float"])
-    p.obj("master_ramp", "pack 0. 20", 105, 1840, ins=2)
-    p.obj("master_gain", "line~ 0.2511886432", 220, 1840, ins=2, outs=2, types=["signal", "bang"])
-    p.connect("master", 0, "master_amplitude")
-    p.connect("master_amplitude", 0, "master_ramp")
-    p.connect("master_ramp", 0, "master_gain")
-    for name, file, col, width, outputs in (
-        ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 2),
-        ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 0),
+    modulated_gain(p, "master", "master_gain", -12, -70, 0, 36, 22, 1840)
+    for name, file, col, width, inputs, outputs in (
+        ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 2 + FX_MOD_CHANNELS, 2 + FX_MOD_CHANNELS),
+        ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 2, 0),
     ):
         rect = grid_rect(col, 22, width, 5, FOOTER_OFFSET)
-        p.add(name, "bpatcher", rect, ins=2, outs=outputs, types=["signal"] * outputs,
+        p.add(name, "bpatcher", rect, ins=inputs, outs=outputs, types=["signal"] * outputs,
               view=rect)
         p.boxes[-1]["box"].update(name=file, args=[], offset=[0.0, 0.0], border=0, clickthrough=0,
                    enablehscroll=0, enablevscroll=0, lockeddragscroll=0)
@@ -579,17 +607,34 @@ def build():
     p.obj("normal_right_channel", "selector~ 2 2", 1100, 1840, ins=3, types=["signal"])
     p.connect("normal_voice", 0, "normal_right_channel", 1)
     p.connect("normal_voice", 1, "normal_right_channel", 2)
+    p.obj("normal_blend", "line~ 0.", 1100, 1880, ins=2, outs=2, types=["signal", "bang"])
+    p.add("normal_fade_done", "message", [1240, 1880, 115, 22], ins=2, text="normal_faded")
+    p.connect("normal_blend", 1, "normal_fade_done")
+    p.connect("normal_fade_done", 0, "source_control")
     for channel, suffix in enumerate(("left", "right")):
         mix = "normal_mix_" + suffix[0]
-        p.obj(mix, "selector~ 2 1", 820 + 140 * channel, 1880, ins=3, types=["signal"])
-        p.connect("mix_fx", channel, mix, 1)
-        p.connect("normal_voice" if channel == 0 else "normal_right_channel", 0, mix, 2)
+        difference = "normal_difference_" + suffix
+        blend = "normal_blend_" + suffix
+        x = 820 + 140 * channel
+        # Interpolate from the loop mix to the original sample and back.
+        p.obj(difference, "-~", x, 1840, ins=2, types=["signal"])
+        p.obj(blend, "*~", x, 1880, ins=2, types=["signal"])
+        p.obj(mix, "+~", x, 1920, ins=2, types=["signal"])
+        p.connect("normal_voice" if channel == 0 else "normal_right_channel", 0, difference)
+        p.connect("mix_fx", channel, difference, 1)
+        p.connect(difference, 0, blend)
+        p.connect("normal_blend", 0, blend, 1)
+        p.connect("mix_fx", channel, mix)
+        p.connect(blend, 0, mix, 1)
         p.obj("master_" + suffix, "*~", 360 + 140 * channel, 1840, ins=2, types=["signal"])
+        p.obj("pattern_level_" + suffix, "*~", 360 + 140 * channel, 1862, ins=2, types=["signal"])
         p.obj("output_" + suffix, "clip~ -0.99 0.99", 360 + 140 * channel, 1880,
               ins=3, types=["signal"])
         p.connect(mix, 0, "master_" + suffix)
         p.connect("master_gain", 0, "master_" + suffix, 1)
-        p.connect("master_" + suffix, 0, "output_" + suffix)
+        p.connect("master_" + suffix, 0, "pattern_level_" + suffix)
+        p.connect("pattern_gain", 0, "pattern_level_" + suffix, 1)
+        p.connect("pattern_level_" + suffix, 0, "output_" + suffix)
         p.connect("output_" + suffix, 0, "dac", channel)
         p.connect("output_" + suffix, 0, "recorder", channel)
         p.obj("output_peak_" + suffix, "abs~", 640 + 140 * channel, 1920, types=["signal"])
@@ -607,10 +652,10 @@ def build():
     patchbay = p.boxes[-1]["box"]
     patchbay.update(name="fk_modulation.maxpat", args=[], offset=[0.0, 0.0],
                     border=0, clickthrough=0, enablehscroll=0, enablevscroll=0, lockeddragscroll=0)
-    p.obj("mod_signals", "mc.unpack~ 36", 28, 886, outs=36,
-          types=["signal"] * 36, width=1016)
+    p.obj("mod_signals", f"mc.unpack~ {MOD_CHANNELS}", 28, 886, outs=MOD_CHANNELS,
+          types=["signal"] * MOD_CHANNELS, width=1016)
     p.connect("patchbay", 0, "mod_signals")
-    p.obj("watch_target", "selector~ 36 1", 1560, 886, ins=37,
+    p.obj("watch_target", f"selector~ {MOD_CHANNELS} 1", 1560, 886, ins=MOD_CHANNELS + 1,
           types=["signal"], width=660)
     p.obj("watch_snapshot", "snapshot~ 50", 1560, 928, ins=2, types=["float"])
     p.obj("watch_value", "prepend effective", 1560, 965, ins=2)
@@ -660,7 +705,8 @@ def build():
             result = f"sum_{control}"
             p.obj(mod, f"*~ {float(depth)}", x, y + 32, ins=2, types=["signal"])
             p.obj(result, "+~", x, y + 64, ins=2, types=["signal"])
-            p.connect("mod_signals", (voice - 1) * 9 + i, mod)
+            route = (voice - 1) * len(CELLS) + i
+            p.connect("mod_signals", route, mod)
             p.connect(base, 0, result)
             p.connect(mod, 0, result, 1)
             if unit != 1:
@@ -674,7 +720,7 @@ def build():
                 p.connect(result, 0, limit)
                 result = limit
             p.connect(result, 0, f"voice_{voice}", i)
-            p.connect(f"voice_{voice}", i + 3, "watch_target", (voice - 1) * 9 + i + 1)
+            p.connect(f"voice_{voice}", i + 3, "watch_target", route + 1)
             if key in ("start", "end"):
                 p.obj(f"edit_{control}", f"prepend edit_{key} {voice}", 1110 + i * 180, y,
                       ins=2)
@@ -720,6 +766,13 @@ def build():
 
     stereo_field(p)
     source_input(p)
+    for index, control in enumerate(("master", "input_gain"), WINDOW_MOD_CHANNELS):
+        p.connect("mod_signals", index, f"{control}_mod")
+        p.connect(f"{control}_effective", 0, "watch_target", index + 1)
+    for channel in range(2, 2 + FX_MOD_CHANNELS):
+        index = WINDOW_MOD_CHANNELS + channel
+        p.connect("mod_signals", index, "mix_fx", channel)
+        p.connect("mix_fx", channel, "watch_target", index + 1)
     p.save()
 
 

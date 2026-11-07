@@ -273,7 +273,7 @@
             92,
             20
           ],
-          "text": "Window"
+          "text": "Scope"
         }
       },
       {
@@ -397,8 +397,11 @@
             ",",
             "Window 3",
             ",",
-            "Window 4"
-          ]
+            "Window 4",
+            ",",
+            "Global"
+          ],
+          "hint": "Choose a loop window or route to shared effects, master or input gain."
         }
       },
       {
@@ -1259,15 +1262,23 @@
           "id": "obj-52",
           "maxclass": "newobj",
           "numinlets": 8,
-          "numoutlets": 37,
+          "numoutlets": 45,
           "patching_rect": [
             0,
             980,
             1052,
             22
           ],
-          "text": "matrix~ 8 36 1. @ramp 20",
+          "text": "matrix~ 8 44 1. @ramp 20",
           "outlettype": [
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
             "signal",
             "signal",
             "signal",
@@ -4410,7 +4421,7 @@
         "box": {
           "id": "obj-222",
           "maxclass": "newobj",
-          "numinlets": 36,
+          "numinlets": 44,
           "numoutlets": 1,
           "patching_rect": [
             0,
@@ -4418,7 +4429,7 @@
             1052,
             22
           ],
-          "text": "mc.pack~ 36",
+          "text": "mc.pack~ 44",
           "outlettype": [
             "multichannelsignal"
           ]
@@ -4437,7 +4448,7 @@
             30
           ],
           "index": 1,
-          "comment": "36 signed modulation channels"
+          "comment": "44 signed modulation channels"
         }
       },
       {
@@ -8115,6 +8126,102 @@
           "destination": [
             "obj-222",
             35
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            36
+          ],
+          "destination": [
+            "obj-222",
+            36
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            37
+          ],
+          "destination": [
+            "obj-222",
+            37
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            38
+          ],
+          "destination": [
+            "obj-222",
+            38
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            39
+          ],
+          "destination": [
+            "obj-222",
+            39
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            40
+          ],
+          "destination": [
+            "obj-222",
+            40
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            41
+          ],
+          "destination": [
+            "obj-222",
+            41
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            42
+          ],
+          "destination": [
+            "obj-222",
+            42
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            43
+          ],
+          "destination": [
+            "obj-222",
+            43
           ]
         }
       },

@@ -12,7 +12,7 @@ SHAPES = ("Sine", "Triangle", "Saw", "Square", "S&H", "Breakpoint")
 RATES = (0.12, 0.31, 0.73, 0.18, 0.43, 0.67, 1.1, 1.7)
 DEFAULT_SHAPES = (0, 1, 2, 0, 1, 0, 1, 0)
 LFO_COUNT = len(RATES)
-MOD_CHANNELS = 4 * len(DESTINATIONS)
+MOD_CHANNELS = 4 * len(DESTINATIONS) + 8
 
 
 def box(maxclass, rect, numinlets=1, numoutlets=0, **attrs):
@@ -156,12 +156,13 @@ def build():
     label("Feedback", 14, 0, 8, fontsize=16, fontface=1)
     for text, col, width in (
         ("LFO", 0, 3), ("Shape", 3, 3), ("Rate", 6, 1),
-        ("Window", 7, 2), ("Destination", 9, 3), ("Depth (%)", 12, 2),
+        ("Scope", 7, 2), ("Destination", 9, 3), ("Depth (%)", 12, 2),
     ):
         label(text, col, 1, width)
     lfo = menu("fk_mod_lfo", (f"LFO {i + 1}" for i in range(LFO_COUNT)), 0, 3,
                hint="Choose which LFO to edit. All eight run independently.")
-    window = menu("fk_mod_window", [f"Window {i}" for i in range(1, 5)], 7, 2)
+    window = menu("fk_mod_window", [*(f"Window {i}" for i in range(1, 5)), "Global"], 7, 2,
+                  hint="Choose a loop window or route to shared effects, master or input gain.")
     target = menu("fk_mod_target", DESTINATIONS, 9, 3)
     depth = control("live.dial", 12, 2, 2, 2, numoutlets=2, outlettype=["float", "float"],
                     appearance=3, showname=0, shownumber=1,

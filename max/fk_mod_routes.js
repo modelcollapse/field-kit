@@ -10,6 +10,7 @@ var SHAPE_LABELS = ["Sine", "Triangle", "Saw", "Square", "S&H  ·  example", "Br
 var BREAKPOINT = 5;
 var LFOS = DEFAULT_RATES.length;
 var TARGETS = ["Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan"];
+var GLOBAL_TARGETS = ["Master", "Input gain", "Tone tilt", "Echo mix", "Echo time", "Echo feedback", "Room mix", "Room decay"];
 var DIRECTIONS = ["Forward", "Reverse", "Ping-pong"];
 var TABLE_SIZE = 1025;
 var CURVE_FADE_MS = 24;
@@ -19,6 +20,7 @@ var selected = 0;
 var currentLfo = 0;
 var targetIndex = 0;
 var gains = [];
+var globalGains = [];
 var curves = [];
 var tables = [];
 var rates = DEFAULT_RATES.slice();
@@ -31,6 +33,9 @@ var initialized = false;
 
 for (var i = 0; i < WINDOWS * LFOS * TARGETS.length; i++) {
     gains.push(0);
+}
+for (var k = 0; k < LFOS * GLOBAL_TARGETS.length; k++) {
+    globalGains.push(0);
 }
 for (var j = 0; j < LFOS; j++) {
     curves.push(DEFAULT_CURVE.slice());
@@ -55,12 +60,28 @@ function indexIn(value, size) {
 indexIn.local = 1;
 
 function offset(windowIndex, lfo, destination) {
+    if (windowIndex === WINDOWS) return lfo * GLOBAL_TARGETS.length + destination;
     return (windowIndex * LFOS + lfo) * TARGETS.length + destination;
 }
 offset.local = 1;
 
+function destinations(windowIndex) {
+    return windowIndex === WINDOWS ? GLOBAL_TARGETS : TARGETS;
+}
+destinations.local = 1;
+
+function routeGains(windowIndex) {
+    return windowIndex === WINDOWS ? globalGains : gains;
+}
+routeGains.local = 1;
+
+function channel(windowIndex, destination) {
+    return windowIndex * TARGETS.length + destination;
+}
+channel.local = 1;
+
 function currentDepth() {
-    return gains[offset(selected, currentLfo, targetIndex)];
+    return routeGains(selected)[offset(selected, currentLfo, targetIndex)];
 }
 currentDepth.local = 1;
 
@@ -72,17 +93,18 @@ formatDepth.local = 1;
 function renderRoute() {
     var value = currentDepth();
     label("fk_mod_depth", value);
-    label("fk_mod_status", "LFO " + (currentLfo + 1) + " → W" + (selected + 1) + " " +
-        TARGETS[targetIndex] + "  /  " + (value ? formatDepth(value) : "Off"));
+    var scope = selected === WINDOWS ? "Global" : "W" + (selected + 1);
+    label("fk_mod_status", "LFO " + (currentLfo + 1) + " → " + scope + " " +
+        destinations(selected)[targetIndex] + "  /  " + (value ? formatDepth(value) : "Off"));
 }
 renderRoute.local = 1;
 
 function renderActiveRoutes() {
     activeRoutes = [];
     send("fk_active_routes", "clear");
-    for (var w = 0; w < WINDOWS; w++) {
-        for (var d = 0; d < TARGETS.length; d++) {
-            if (gains[offset(w, currentLfo, d)]) {
+    for (var w = 0; w <= WINDOWS; w++) {
+        for (var d = 0; d < destinations(w).length; d++) {
+            if (routeGains(w)[offset(w, currentLfo, d)]) {
                 activeRoutes.push([w, d]);
             }
         }
@@ -90,7 +112,8 @@ function renderActiveRoutes() {
     send("fk_active_routes", "append", activeRoutes.length ? "Jump to an active route…" : "No active routes");
     for (var i = 0; i < activeRoutes.length; i++) {
         var route = activeRoutes[i];
-        send("fk_active_routes", "append", "Window " + (route[0] + 1) + "  ·  " + TARGETS[route[1]]);
+        var scope = route[0] === WINDOWS ? "Global" : "Window " + (route[0] + 1);
+        send("fk_active_routes", "append", scope + "  ·  " + destinations(route[0])[route[1]]);
     }
     label("fk_active_routes", 0);
     label("fk_active_label", "Active routes on LFO " + (currentLfo + 1) + "  /  " + activeRoutes.length);
@@ -146,10 +169,19 @@ function watch() {
     label("fk_mod_window", selected);
     label("fk_mod_target", targetIndex);
     label("fk_applied_value", enabled ? "Applied value  —" : "Applied value  ·  Audio off");
-    outlet(1, selected * TARGETS.length + targetIndex + 1);
+    outlet(1, channel(selected, targetIndex) + 1);
     renderRoute();
 }
 watch.local = 1;
+
+function renderDestinations() {
+    var targets = destinations(selected);
+    send("fk_mod_target", "clear");
+    for (var i = 0; i < targets.length; i++) {
+        send("fk_mod_target", "append", targets[i]);
+    }
+}
+renderDestinations.local = 1;
 
 function bang() {
     if (!initialized) {
@@ -166,6 +198,7 @@ function bang() {
             tables.push({ buffers: buffers, active: 0, fading: false, dirty: false });
             writeCurveTable(i, 0);
         }
+        renderDestinations();
         initialized = true;
     }
     renderLfo();
@@ -173,14 +206,24 @@ function bang() {
 }
 
 function view(windowNumber) {
-    if (indexIn(windowNumber - 1, WINDOWS)) {
-        selected = windowNumber - 1;
+    if (indexIn(windowNumber - 1, WINDOWS + 1)) {
+        select_scope(windowNumber - 1);
         watch();
     }
 }
 
+function select_scope(windowIndex) {
+    var oldTargets = destinations(selected);
+    selected = windowIndex;
+    if (oldTargets !== destinations(selected)) {
+        targetIndex = 0;
+        renderDestinations();
+    }
+}
+select_scope.local = 1;
+
 function select_destination(index) {
-    if (indexIn(index, TARGETS.length)) {
+    if (indexIn(index, destinations(selected).length)) {
         targetIndex = index;
         watch();
     }
@@ -197,7 +240,7 @@ function select_lfo(index) {
 function jump_route(index) {
     var route = activeRoutes[index - 1];
     if (route) {
-        selected = route[0];
+        select_scope(route[0]);
         targetIndex = route[1];
         watch();
     }
@@ -226,17 +269,19 @@ function depth(windowNumber, lfoNumber, destinationNumber, percent) {
     var windowIndex = windowNumber - 1;
     var lfo = lfoNumber - 1;
     var destination = destinationNumber - 1;
-    if (!indexIn(windowIndex, WINDOWS) || !indexIn(lfo, LFOS) ||
-        !indexIn(destination, TARGETS.length) || typeof percent !== "number" || !isFinite(percent)) {
+    if (!indexIn(windowIndex, WINDOWS + 1) || !indexIn(lfo, LFOS) ||
+        !indexIn(destination, destinations(windowIndex).length) ||
+        typeof percent !== "number" || !isFinite(percent)) {
         return;
     }
 
     var index = offset(windowIndex, lfo, destination);
     var bounded = Math.round(Math.max(-100, Math.min(100, percent)));
-    var previous = gains[index];
+    var routes = routeGains(windowIndex);
+    var previous = routes[index];
     if (bounded !== previous) {
-        gains[index] = bounded;
-        outlet(0, [lfo, windowIndex * TARGETS.length + destination, bounded / 100]);
+        routes[index] = bounded;
+        outlet(0, [lfo, channel(windowIndex, destination), bounded / 100]);
         if (lfo === currentLfo && Boolean(bounded) !== Boolean(previous)) {
             renderActiveRoutes();
         }
@@ -412,11 +457,17 @@ function effective(value) {
         return;
     }
     var display;
-    if (targetIndex === 3) {
+    if (selected === WINDOWS && targetIndex < 2) {
+        display = value.toFixed(1) + " dB";
+    } else if (selected === WINDOWS && targetIndex === 4) {
+        display = value.toFixed(1) + " ms";
+    } else if (selected === WINDOWS && targetIndex === 7) {
+        display = value.toFixed(2) + " s";
+    } else if (selected !== WINDOWS && targetIndex === 3) {
         display = DIRECTIONS[Math.max(0, Math.min(2, Math.round(value)))];
-    } else if (targetIndex === 2) {
+    } else if (selected !== WINDOWS && targetIndex === 2) {
         display = value.toFixed(2) + "×";
-    } else if (targetIndex === 4) {
+    } else if (selected !== WINDOWS && targetIndex === 4) {
         display = value.toFixed(1) + " ms";
     } else {
         display = (value * 100).toFixed(1) + "%";

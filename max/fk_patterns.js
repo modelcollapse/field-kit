@@ -8,6 +8,7 @@ var VOICE_COUNT = 4;
 var LFO_COUNT = 8;
 var LEGACY_LFO_COUNT = 3;
 var TARGET_COUNT = 9;
+var GLOBAL_TARGET_COUNT = 8;
 var PITCH_SCALE_COUNT = 7;
 var BANK_FORMAT = "field-kit-patterns";
 var BANK_VERSION = 2;
@@ -17,6 +18,9 @@ var SET_VERSION = 1;
 var PATTERN_HINT = "Click to recall. Shift-click to store.";
 // Allow all eight slots to hold eight full curves with unrounded values.
 var MAX_BANK_BYTES = 8 * 1024 * 1024;
+var RECALL_FADE_OUT_MS = 20;
+var RECALL_SETTLE_MS = 24;
+var RECALL_FADE_IN_MS = 30;
 var EMPTY_BUTTON = [0.25, 0.25, 0.25, 1];
 var STORED_BUTTON = [0.40, 0.29, 0.09, 1];
 var SELECTED_BUTTON = [0.92, 0.62, 0.08, 1];
@@ -53,6 +57,8 @@ var activeSetPath = "";
 var pendingSet = null;
 var writingSet = null;
 var writeTimeout = null;
+var pendingRecall = null;
+var restoreLevel = new Task(restore_recall_level, host);
 for (var index = 0; index < SLOT_COUNT; index++) {
     slots.push(null);
 }
@@ -124,6 +130,10 @@ function slot(number, shift) {
     }
     var index = number - 1;
     if (armed || shift === 1) {
+        if (pendingRecall) {
+            bank_status("Wait for the pattern switch to finish.");
+            return;
+        }
         var snapshot = capture_pattern();
         if (!valid_pattern(snapshot, LFO_COUNT)) {
             bank_status("Pattern not ready. Try again.");
@@ -136,9 +146,8 @@ function slot(number, shift) {
         set_armed(false);
         bank_status("Pattern " + number + (replacing ? " replaced." : " stored."));
     } else if (slots[index]) {
-        apply_pattern(slots[index]);
-        lastSlot = index;
-        bank_status("Pattern " + number + " recalled.");
+        request_recall(index);
+        return;
     } else {
         bank_status("Square " + number + " is empty. Shift-click to store.");
         return;
@@ -170,13 +179,20 @@ function capture_pattern() {
     FX_CONTROLS.forEach(function (spec) {
         effects[spec[0]] = value_of(fx.getnamed(spec[0]));
     });
+    var selection = { window: router.selected, lfo: router.currentLfo, target: router.targetIndex };
+    if (router.selected === VOICE_COUNT) {
+        selection.window = 0;
+        selection.target = 0;
+        selection.globalTarget = router.targetIndex;
+    }
     return {
         windows: windows,
         gains: router.gains.slice(),
+        globalGains: router.globalGains.slice(),
         rates: router.rates.slice(),
         shapes: router.shapes.slice(),
         curves: router.curves.map(function (curve) { return curve.slice(); }),
-        selection: { window: router.selected, lfo: router.currentLfo, target: router.targetIndex },
+        selection: selection,
         effects: effects,
         mixerMutes: mixer.mutes.slice(),
         pitchScale: value_of(patch.getnamed("pitch_scale")),
@@ -184,6 +200,57 @@ function capture_pattern() {
     };
 }
 capture_pattern.local = 1;
+
+function request_recall(index) {
+    var startFade = !pendingRecall;
+    pendingRecall = { index: index, pattern: slots[index] };
+    if (!host.patcher.getnamed("source_control").js.audioOn) {
+        finish_recall(0);
+    } else if (startFade) {
+        restoreLevel.cancel();
+        host.patcher.getnamed("pattern_gain").message("list", 0, RECALL_FADE_OUT_MS);
+        host.patcher.getnamed("pattern_gain_sample").message("start");
+    }
+}
+request_recall.local = 1;
+
+function recall_silent() {
+    finish_recall(RECALL_FADE_IN_MS);
+}
+
+function recall_dsp(state) {
+    if (!state && pendingRecall) finish_recall(0);
+}
+
+function finish_recall(fadeIn) {
+    if (!pendingRecall) return;
+    var recall = pendingRecall;
+    pendingRecall = null;
+    if (fadeIn) host.patcher.getnamed("pattern_gain_sample").message("stop");
+    try {
+        apply_pattern(recall.pattern);
+        lastSlot = recall.index;
+        bank_status("Pattern " + (recall.index + 1) + " recalled.");
+        render_slots();
+    } finally {
+        if (fadeIn) restoreLevel.schedule(RECALL_SETTLE_MS);
+        else cancel_recall();
+    }
+}
+finish_recall.local = 1;
+
+function restore_recall_level() {
+    host.patcher.getnamed("pattern_gain").message("list", 1, RECALL_FADE_IN_MS);
+}
+restore_recall_level.local = 1;
+
+function cancel_recall() {
+    restoreLevel.cancel();
+    pendingRecall = null;
+    host.patcher.getnamed("pattern_gain_sample").message("stop");
+    restore_recall_level();
+}
+cancel_recall.local = 1;
 
 function apply_pattern(pattern) {
     var patch = host.patcher;
@@ -219,9 +286,23 @@ function apply_pattern(pattern) {
                            group % LFO_COUNT + 1, route % TARGET_COUNT + 1, pattern.gains[route]);
         }
     }
+    var savedGlobalGains = pattern.globalGains || [];
+    var currentGlobalGains = router.js.globalGains.slice();
+    for (var globalRoute = 0; globalRoute < currentGlobalGains.length; globalRoute++) {
+        var depth = savedGlobalGains[globalRoute] || 0;
+        if (depth !== currentGlobalGains[globalRoute]) {
+            router.message("depth", VOICE_COUNT + 1, Math.floor(globalRoute / GLOBAL_TARGET_COUNT) + 1,
+                           globalRoute % GLOBAL_TARGET_COUNT + 1, depth);
+        }
+    }
     router.message("select_lfo", pattern.selection.lfo);
-    router.message("view", pattern.selection.window + 1);
-    router.message("select_destination", pattern.selection.target);
+    if (pattern.selection.globalTarget === undefined) {
+        router.message("view", pattern.selection.window + 1);
+        router.message("select_destination", pattern.selection.target);
+    } else {
+        router.message("view", VOICE_COUNT + 1);
+        router.message("select_destination", pattern.selection.globalTarget);
+    }
     router.message("bang");
 
     var mixer = patch.getnamed("mixer_control");
@@ -242,6 +323,7 @@ modulation_defaults.local = 1;
 function reset() {
     var patch = host.patcher;
     patch.getnamed("source_control").message("stop_all");
+    cancel_recall();
     var windows = [];
     for (var i = 0; i < VOICE_COUNT; i++) {
         var span = 100 / VOICE_COUNT;
@@ -336,6 +418,7 @@ function read_bank(path) {
         if (!bank.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, count); })) {
             throw new Error("Invalid bank patterns");
         }
+        cancel_recall();
         slots = legacy ? bank.slots.map(upgrade_pattern) : bank.slots;
         lastSlot = -1;
         bankDirty = false;
@@ -563,6 +646,7 @@ function set_source_loaded(ok) {
         set_status("Couldn’t load the Set’s sample.");
         return;
     }
+    cancel_recall();
     apply_pattern(opened.data.current);
     slots = opened.data.slots;
     lastSlot = opened.data.selectedSlot;
@@ -592,6 +676,11 @@ function upgrade_pattern(pattern) {
         }
     }
     pattern.gains = gains;
+    if (pattern.globalGains) {
+        while (pattern.globalGains.length < LFO_COUNT * GLOBAL_TARGET_COUNT) {
+            pattern.globalGains.push(0);
+        }
+    }
     pattern.rates = pattern.rates.concat(defaults.rates.slice(LEGACY_LFO_COUNT));
     pattern.shapes = pattern.shapes.concat(defaults.shapes.slice(LEGACY_LFO_COUNT));
     pattern.curves = pattern.curves.concat(defaults.curves.slice(LEGACY_LFO_COUNT));
@@ -663,12 +752,16 @@ function valid_pattern(pattern, lfoCount) {
                 numbers_valid(window.region, 2, 0, 100) && window.region[0] < window.region[1];
         }) && numbers_valid(pattern.gains, VOICE_COUNT * lfoCount * TARGET_COUNT, -100, 100) &&
         pattern.gains.every(function (gain) { return gain % 1 === 0; }) &&
+        (pattern.globalGains === undefined ||
+            (numbers_valid(pattern.globalGains, lfoCount * GLOBAL_TARGET_COUNT, -100, 100) &&
+                pattern.globalGains.every(function (gain) { return gain % 1 === 0; }))) &&
         numbers_valid(pattern.rates, lfoCount, 0.01, 20) &&
         numbers_valid(pattern.shapes, lfoCount, 0, 5) &&
         pattern.shapes.every(function (shape) { return shape % 1 === 0; }) &&
         Array.isArray(pattern.curves) && pattern.curves.length === lfoCount &&
         pattern.curves.every(valid_curve) && pattern.selection &&
         index_valid(pattern.selection.window, VOICE_COUNT) && index_valid(pattern.selection.lfo, lfoCount) &&
+        (pattern.selection.globalTarget === undefined || index_valid(pattern.selection.globalTarget, GLOBAL_TARGET_COUNT)) &&
         index_valid(pattern.selection.target, TARGET_COUNT) && controls_valid(pattern.effects, FX_CONTROLS) &&
         pattern.effects.fx_enabled % 1 === 0 && in_range(pattern.master, -70, 0) &&
         (pattern.pitchScale === undefined || index_valid(pattern.pitchScale, PITCH_SCALE_COUNT)) &&

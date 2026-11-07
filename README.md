@@ -4,7 +4,7 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 
 ## Start here
 
-- **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** beside the launcher so Max can load its files automatically.
+- **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**.
 
 The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select your audio devices, and **Enable audio** starts the engine without starting playback.
@@ -25,7 +25,7 @@ The eight-second demo loads on startup. Click **Play all** to turn on audio and 
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 
-**Play normal** plays the original sample once at its original speed, with the window mixer and effects bypassed. **Stop all** stops playback. **Reset** also restores the default loop, mixer, modulation, and effects settings. It keeps the current sample and stored patterns.
+**Play normal** plays the original sample once at its original speed, with the window mixer and effects bypassed. Switching between normal playback and the loop mix uses a short crossfade. **Stop all** stops playback. **Reset** also restores the default loop, mixer, modulation, and effects settings. It keeps the current sample and stored patterns.
 
 ## Mix the four windows
 
@@ -35,7 +35,7 @@ Open **Stereo field…** in the **Mixer** header to place all four loops togethe
 
 ## Store patterns
 
-Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. Recall clears active solos. Click **Cancel store** to exit store mode.
+Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. During playback, the output briefly fades down and back up around the switch. Recall clears active solos. Click **Cancel store** to exit store mode.
 
 Use **Save Set…** in **Set files** to save the source file location, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
 
@@ -45,7 +45,7 @@ Banks from the three-LFO version still open. Their settings are restored on LFOs
 
 ## Patch modulation
 
-Choose **LFO 1–8** from the dropdown and set its rate and shape. Choose a window and destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the playback control receives.
+Choose **LFO 1–8** from the dropdown and set its rate and shape. Choose a window, or select **Global** for master level, input gain, tone, echo, and room controls. Pick a destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the destination receives.
 
 The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Breakpoint** or click **Use curve** to edit that LFO’s custom curve. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO keeps its curve when you switch shapes. The graph on the right shows the live signal when audio is on.
 

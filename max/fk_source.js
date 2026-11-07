@@ -10,6 +10,7 @@ var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "f
 var BUFFER_OBJECTS = ["buffer", "set_buffer"];
 var INFO_OBJECTS = ["source_info", "set_source_info"];
 var INPUT_LIMIT_SECONDS = 60;
+var NORMAL_FADE_MS = 16;
 var host = this;
 var bufferIds = new Global("field_kit_buffer_ids");
 var bufferNames = [];
@@ -39,6 +40,7 @@ var audioStartFailed = false;
 var queuedWindows = 0;
 var queuedNormal = false;
 var normalPlaying = false;
+var normalStopping = false;
 var drawing = false;
 var inspectedWindow = 1;
 var positions = DEFAULT_POSITIONS.map(function (range) { return range.slice(); });
@@ -705,13 +707,17 @@ function start_queued_playback() {
         return;
     }
     if (queuedNormal) {
+        if (normalStopping) {
+            return;
+        }
         queuedNormal = false;
         normalPlaying = true;
-        select_mix(2);
+        // Keep both fades within the sample, including very short sources.
+        var fade = Math.min(NORMAL_FADE_MS, duration * 0.5);
+        send("normal_blend", "list", 1, fade, 1, duration - 2 * fade, 0, fade);
         send("normal_voice", "start");
         return;
     }
-    select_mix(1);
     var windows = queuedWindows;
     queuedWindows = 0;
     for (var voice = 1; voice <= WINDOWS; voice++) {
@@ -722,26 +728,35 @@ function start_queued_playback() {
 }
 start_queued_playback.local = 1;
 
-function select_mix(input) {
-    send("normal_mix_l", input);
-    send("normal_mix_r", input);
-}
-select_mix.local = 1;
-
 function stop_normal() {
     queuedNormal = false;
     if (normalPlaying) {
         normalPlaying = false;
-        select_mix(0);
-        send("normal_voice", "stop");
+        normalStopping = true;
+        if (audioOn) {
+            send("normal_blend", "list", 0, NORMAL_FADE_MS);
+        }
+    }
+    if (normalStopping && !audioOn) {
+        send("normal_blend", 0);
+        normal_faded();
     }
 }
 stop_normal.local = 1;
 
+function normal_faded() {
+    if (normalStopping) {
+        // Keep play~ running until its output has faded out.
+        normalStopping = false;
+        send("normal_voice", "stop");
+        start_queued_playback();
+        update_status();
+    }
+}
+
 function normal_finished() {
     if (normalPlaying) {
         normalPlaying = false;
-        select_mix(0);
         update_status();
     }
 }
@@ -851,18 +866,16 @@ function draw_region(voice) {
 draw_region.local = 1;
 
 function edit_start(voice, value) {
-    if (voice >= 1 && voice <= WINDOWS && typeof value === "number" && isFinite(value)) {
+    if (voice >= 1 && voice <= WINDOWS && voice % 1 === 0 && typeof value === "number" && isFinite(value)) {
         var range = positions[voice - 1];
-        range[0] = clip(value, 0, Math.max(0, range[1] - min_width()));
-        draw_region(voice);
+        set_region(voice, clip(value, 0, Math.max(0, range[1] - min_width())), range[1]);
     }
 }
 
 function edit_end(voice, value) {
-    if (voice >= 1 && voice <= WINDOWS && typeof value === "number" && isFinite(value)) {
+    if (voice >= 1 && voice <= WINDOWS && voice % 1 === 0 && typeof value === "number" && isFinite(value)) {
         var range = positions[voice - 1];
-        range[1] = clip(value, Math.min(100, range[0] + min_width()), 100);
-        draw_region(voice);
+        set_region(voice, range[0], clip(value, Math.min(100, range[0] + min_width()), 100));
     }
 }
 
@@ -879,7 +892,13 @@ function set_region(voice, start, end) {
         high = Math.min(100, low + width);
         low = Math.max(0, high - width);
     }
-    positions[voice - 1] = [low, high];
+    var index = voice - 1;
+    var previous = positions[index];
+    if (Math.abs(low - previous[0]) >= 0.00001 || Math.abs(high - previous[1]) >= 0.00001) {
+        waveRevisions[index] = (waveRevisions[index] + 1) % 1048576;
+        send("wave_edit_revision_" + voice, waveRevisions[index]);
+    }
+    positions[index] = [low, high];
     draw_region(voice);
 }
 
@@ -918,8 +937,6 @@ function commit_wave_edits() {
             continue;
         }
         var voice = index + 1;
-        waveRevisions[index] = (waveRevisions[index] + 1) % 1048576;
-        send("wave_edit_revision_" + voice, waveRevisions[index]);
         set_region(voice, next[0], next[1]);
         if (voice !== inspectedWindow) {
             inspect_window(index);
