@@ -30913,6 +30913,39 @@
             22
           ]
         }
+      },
+      {
+        "box": {
+          "id": "obj-726",
+          "varname": "surface_visuals",
+          "maxclass": "panel",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            8,
+            670,
+            1068,
+            224
+          ],
+          "background": 1,
+          "ignoreclick": 1,
+          "border": 0,
+          "rounded": 8,
+          "bgcolor": [
+            0.14,
+            0.19,
+            0.25,
+            1
+          ],
+          "hidden": 1,
+          "presentation": 1,
+          "presentation_rect": [
+            8,
+            670,
+            1068,
+            224
+          ]
+        }
       }
     ],
     "lines": [

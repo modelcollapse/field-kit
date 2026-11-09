@@ -121,6 +121,7 @@ def layout_performance(p, parameter):
     for name in ("workspace_label", "workspace_view", "fullscreen_toggle"):
         move_to_y(name, 641)
     place("surface_modulation", [8, 670, 1068, 224])
+    backdrop("surface_visuals", [8, 670, 1068, 224], hidden=1)
     for name in ("sequence_panel", "patchbay", "visuals_panel", "performance_mix",
                  "performance_sends", "drifting_memory"):
         move_to_y(name, 676)

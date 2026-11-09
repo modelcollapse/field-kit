@@ -5,6 +5,7 @@ outlets = 0;
 
 var patch = this.patcher;
 var fullScreen = false;
+var wideLayout = false;
 var activeWorkspace = 0;
 var driftAdvanced = false;
 var sourceDrawerOpen = false;
@@ -13,6 +14,42 @@ var windowLayout = [];
 var frameWidth = 0;
 var frameHeight = 0;
 var fitTask = new Task(fit_full_screen, this);
+var sideColumnX = 1084;
+var sideColumnWidth = 320;
+var wideFrameWidth = sideColumnX + sideColumnWidth + 8;
+var wideLayoutRects = {
+    main: {
+        surface_effects: [8, 496, 1068, 128],
+        mix_fx: [16, 502, 1052, 116],
+        surface_capture: [sideColumnX, 176, sideColumnWidth, 128],
+        recorder: [sideColumnX + 8, 184, sideColumnWidth - 16, 112],
+        surface_visuals: [sideColumnX, 312, sideColumnWidth, 582],
+        visuals_panel: [sideColumnX + 8, 320, sideColumnWidth - 16, 566]
+    },
+    recorder: {
+        capture_title: [0, 0, 190, 20],
+        record_time: [219, 0, 85, 20],
+        record_format: [0, 24, 304, 17],
+        record_button: [0, 46, 149, 22],
+        stop_button: [157, 46, 147, 22],
+        record_status: [0, 71, 304, 18],
+        record_file: [0, 91, 304, 17]
+    },
+    visuals_panel: {
+        visuals_heading: [0, 0, 156, 23],
+        visuals_mode_label: [161, 2, 54, 20],
+        visuals_mode: [218, 0, 86, 22],
+        visuals_mix_help: [0, 26, 304, 18],
+        visuals_left_label: [0, 46, 304, 20],
+        visuals_left: [0, 68, 304, 112],
+        visuals_right_label: [0, 186, 304, 20],
+        visuals_right: [0, 208, 304, 112],
+        visuals_frequency_help: [0, 322, 304, 19],
+        visuals_stereo_label: [0, 346, 304, 20],
+        visuals_stereo: [68, 368, 168, 168],
+        visuals_stereo_help: [0, 540, 304, 19]
+    }
+};
 var schemes = [
     {
         colors: ["141A23", "202936", "151E2A", "303F51", "F3F7FC", "B6C5D5", "8FB9F0", "365D88"],
@@ -73,11 +110,17 @@ function workspace(view) {
     activeWorkspace = view;
     patch.getnamed("workspace_view").message("set", view);
     update_mix_panels();
-    patch.getnamed("sequence_panel").hidden = view !== 1;
-    patch.getnamed("patchbay").hidden = view !== 2;
-    patch.getnamed("visuals_panel").hidden = view !== 3;
-    patch.getnamed("surface_modulation").hidden = view === 4;
+    update_workspace_panels();
 }
+
+function update_workspace_panels() {
+    patch.getnamed("sequence_panel").hidden = activeWorkspace !== 1;
+    patch.getnamed("patchbay").hidden = activeWorkspace !== 2;
+    patch.getnamed("visuals_panel").hidden = !wideLayout && activeWorkspace !== 3;
+    patch.getnamed("surface_visuals").hidden = !wideLayout;
+    patch.getnamed("surface_modulation").hidden = activeWorkspace === 4 || (wideLayout && activeWorkspace === 3);
+}
+update_workspace_panels.local = 1;
 
 function drift_advanced(value) {
     if (value !== 0 && value !== 1) return;
@@ -109,7 +152,7 @@ function source_drawer(value) {
     if (sourceDrawerOpen === (value === 1)) return;
     sourceDrawerOpen = value === 1;
     if (fullScreen) fit_full_screen();
-    else resize_workspace(1, 1);
+    else resize_workspace(1, 1, false);
 }
 
 function full_screen() {
@@ -120,7 +163,7 @@ function full_screen() {
         patch.fullscreen(1);
         fitTask.schedule(160);
     } else {
-        resize_workspace(1, 1);
+        resize_workspace(1, 1, false);
         patch.fullscreen(0);
     }
     label_full_screen();
@@ -138,15 +181,15 @@ function remember_layout() {
         sourceDrawerHeight = drawer[3];
         anchor.hidden = true;
     }
-    remember_rects(patch, drawer);
+    remember_rects(patch, "main", drawer);
     ["mix_fx", "recorder", "performance_mix", "performance_sends", "drifting_memory",
         "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
-        remember_rects(patch.getnamed(name).subpatcher());
+        remember_rects(patch.getnamed(name).subpatcher(), name);
     });
 }
 remember_layout.local = 1;
 
-function remember_rects(target, drawer) {
+function remember_rects(target, panel, drawer) {
     target.apply(function (box) {
         if (!Number(box.getboxattr("presentation")) || box.varname === "source_drawer_anchor") return;
         var rect = box.getboxattr("presentation_rect");
@@ -157,7 +200,13 @@ function remember_rects(target, drawer) {
             isDrawerControl = String(annotation) === "source_drawer";
         }
         var shiftDown = drawer && !isDrawerControl && rect[1] >= drawer[1] + 2;
-        windowLayout.push({ box: box, rect: rect.slice(), drawer: isDrawerControl, shiftDown: shiftDown });
+        var alternate = wideLayoutRects[panel];
+        windowLayout.push({
+            box: box, rect: rect.slice(), wideRect: alternate && alternate[box.varname],
+            drawer: isDrawerControl, shiftDown: shiftDown,
+            wideTop: panel === "main" && (isDrawerControl || rect[1] < wideLayoutRects.main.surface_capture[1]),
+            wideFx: panel === "mix_fx"
+        });
         if (target === patch && !isDrawerControl) {
             frameWidth = Math.max(frameWidth, rect[0] + rect[2] + 8);
             frameHeight = Math.max(frameHeight, rect[1] + rect[3] + 8);
@@ -170,25 +219,34 @@ function fit_full_screen() {
     if (!fullScreen || !patch.wind) return;
     var size = patch.wind.size;
     if (!size[0] || !size[1]) return;
-    var width = Math.min(1.8, size[0] / frameWidth);
+    var wide = size[0] >= 1400;
+    var width = Math.min(1.8, size[0] / (wide ? wideFrameWidth : frameWidth));
     var height = Math.min(1.18, size[1] / (frameHeight + (sourceDrawerOpen ? sourceDrawerHeight : 0)));
-    resize_workspace(width, height);
+    resize_workspace(width, height, wide);
     label_full_screen();
     patch.wind.bringtofront();
 }
 fit_full_screen.local = 1;
 
-function resize_workspace(width, height) {
+function resize_workspace(width, height, wide) {
     var wind = patch.wind;
     var dirty = wind && wind.dirty;
+    if (wideLayout !== wide) {
+        wideLayout = wide;
+        update_workspace_panels();
+    }
+    var wideFxScale = wideLayoutRects.main.mix_fx[2] / patch.getnamed("mix_fx").getboxattr("patching_rect")[2];
     windowLayout.forEach(function (item) {
         var box = item.box;
         if (!box.valid) return;
         if (item.drawer) box.hidden = !sourceDrawerOpen;
-        var rect = item.rect;
-        var w = rect[2] * width;
+        var rect = wide && item.wideRect ? item.wideRect : item.rect;
+        var horizontal = width;
+        if (wide && item.wideTop) horizontal *= wideFrameWidth / frameWidth;
+        if (wide && item.wideFx) horizontal *= wideFxScale;
+        var w = rect[2] * horizontal;
         var h = rect[3] * height;
-        var x = rect[0] * width;
+        var x = rect[0] * horizontal;
         var y = (rect[1] + (item.shiftDown && sourceDrawerOpen ? sourceDrawerHeight : 0)) * height;
         // A jsui draws at its patching size. Center it inside its larger presentation cell.
         if (box.maxclass === "jsui") {

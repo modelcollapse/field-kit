@@ -63,7 +63,7 @@ The scene strip at the top, between **Transport** and **Master**, shows the curr
 
 ![The scene sequencer running at 112 BPM with four steps lasting four or eight bars each](docs/screenshots/field-kit-scenes.png)
 
-Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. **Full screen** expands the workspace for performance.
+Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Mix recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to collapse the lower panel and focus on the analyzers.
 
 **Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. The stereo scope plots left against right. Matching left and right signals trace a rising diagonal.
 
