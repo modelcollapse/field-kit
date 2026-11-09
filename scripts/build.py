@@ -11,6 +11,7 @@ from pathlib import Path
 from build_drift_advanced import layout_drift_advanced
 from build_fx import DIALS as FX_DIALS
 from build_master_meter import append_master_meter
+from build_performance_layout import PERFORMANCE_WINDOW_HEIGHT, layout_performance
 from build_mix_scene_strip import append_mix_scene_strip
 from build_mix_sends import PERFORMANCE_SENDS, append_sends_strip
 from build_mix_workspace import append_drifting_strip, append_drifting_taps
@@ -78,7 +79,6 @@ PERFORMANCE_RIGHT_OFFSET = 612
 PERFORMANCE_RIGHT_WIDTH = 440
 PERFORMANCE_HEIGHT = 212
 FRAME_WIDTH = 2 * MARGIN + TRACKS * TRACK - GUTTER
-FRAME_HEIGHT = MODULATION_TOP + MODULATION_ROWS * ROW - GUTTER + MARGIN
 SLATE_CANVAS = [20 / 255, 26 / 255, 35 / 255, 1.0]
 SLATE_PANEL = [32 / 255, 41 / 255, 54 / 255, 1.0]
 SLATE_CONTROL = [48 / 255, 63 / 255, 81 / 255, 1.0]
@@ -131,7 +131,7 @@ class Patch:
 
     def save(self):
         patch = dict(fileversion=1, appversion=VERSION, classnamespace="box",
-                     rect=[60, 70, FRAME_WIDTH, FRAME_HEIGHT], openinpresentation=1,
+                     rect=[60, 70, FRAME_WIDTH, PERFORMANCE_WINDOW_HEIGHT], openinpresentation=1,
                      toolbarvisible=0,
                      locked_bgcolor=SLATE_CANVAS,
                      gridsize=[8, 8], isolateaudio=1, description="Four-window sample instrument with modulation, mix effects and stereo capture",
@@ -1110,6 +1110,7 @@ def build():
         index = WINDOW_MOD_CHANNELS + channel
         p.connect("mod_signals", index, "mix_fx", channel)
         p.connect("mix_fx", channel, "watch_target", index + 1)
+    layout_performance(p, parameter)
     p.save()
 
 

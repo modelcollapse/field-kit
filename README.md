@@ -11,7 +11,7 @@ The v0.7.0 standalone is ad hoc signed and is not notarized by Apple. macOS may 
 
 [See what's new in v0.7.0](CHANGELOG.md).
 
-The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select your audio devices, and **Enable audio** starts the engine without starting playback.
+The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Open **Source, Input & Files** to load a sample, select audio devices, record a source, or open or save a Set. **Enable audio** starts the engine without starting playback.
 
 Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header. Each theme uses related background shades to separate source setup, the mixer, loop controls, effects, and recording.
 
@@ -21,13 +21,13 @@ In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to 
 
 ## Record a source
 
-1. Select your interface in **Audio Setup…** and click **Enable audio**. In **Source**, directly below transport, choose the left and right channels. Select the same channel on both sides for a mono source.
+1. Open **Source, Input & Files**, select your interface in **Audio Setup…**, and click **Enable audio**. In **Input**, choose the left and right channels. Select the same channel on both sides for a mono source.
 2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
 3. Click **Record source** to capture up to 60 seconds. The red **RECORDING** badge and timer show when audio is being captured. **Stop source** loads the take into all four loops. Use **Save source WAV…** before saving a Set that uses the take or replacing the source.
 
 ## Play and shape the loops
 
-1. Click a loop number or waveform to select it. **Editing Loop** below the waveform shows the selected loop's settings. Drag across a waveform and release to change its range. The moving line shows playback position.
+1. Click a loop number or waveform to select it. **Editing Loop** sits beside the waveforms and shows the selected loop's settings. Drag across a waveform and release to change its range. The moving line shows playback position.
 2. Use **In %** and **Out %** to enter the bounds precisely. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials.
 3. **Fade ms** blends each pass into the next. **Fade preview** shows the two gain curves and the overlap duration. The live duration reflects short-loop limits, speed, and modulation. **Filter** is flat at zero. Turn left to cut highs or right to cut lows.
 
@@ -49,7 +49,7 @@ To record movement, select a loop, click **Record**, then drag and release its d
 
 Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. During playback, the output briefly fades down and back up around the switch. Recall clears active solos. Click **Cancel store** to exit store mode.
 
-Use **Save Set…** in the **Set files…** menu at the top to save the source file location, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
+Open **Source, Input & Files** and use **Save Set…** in the **Set files…** menu to save the source file location, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
 
 Open **Banks…** to load or save a bank of patterns.
 
@@ -59,7 +59,7 @@ Open **Scene sequencer…** beside **Banks…** to show the Scenes workspace and
 
 The scene clock controls when patterns change. Set the tempo and meter before you start. Loop speed still follows each loop's **Speed ×** setting. **Save Set…** saves the sequence, tempo, and meter with the patterns. **Open Set…** restores them ready to start.
 
-The scene strip beside the workspace tabs stays visible while you mix. It shows the current scene, the next playable scene, and progress through the current scene’s bars. Use **Start** or **Stop** and **Next bar** directly from the strip.
+The scene strip at the top, between **Transport** and **Master**, shows the current scene, the next playable scene, and progress through the current scene’s bars. Use **Start** or **Stop** and **Next bar** directly from the strip.
 
 ![The scene sequencer running at 112 BPM with four steps lasting four or eight bars each](docs/screenshots/field-kit-scenes.png)
 

@@ -13,7 +13,7 @@
       60,
       70,
       1084,
-      958
+      900
     ],
     "openinpresentation": 1,
     "toolbarvisible": 0,
@@ -62,9 +62,9 @@
           "presentation": 1,
           "presentation_rect": [
             12,
-            248,
-            1060,
-            48
+            213,
+            644,
+            62
           ]
         }
       },
@@ -100,9 +100,9 @@
           "presentation": 1,
           "presentation_rect": [
             12,
-            296,
-            1060,
-            48
+            280,
+            644,
+            62
           ]
         }
       },
@@ -138,9 +138,9 @@
           "presentation": 1,
           "presentation_rect": [
             12,
-            344,
-            1060,
-            48
+            347,
+            644,
+            62
           ]
         }
       },
@@ -176,9 +176,9 @@
           "presentation": 1,
           "presentation_rect": [
             12,
-            392,
-            1060,
-            48
+            414,
+            644,
+            62
           ]
         }
       },
@@ -209,8 +209,8 @@
           "presentation_rect": [
             8,
             8,
-            674,
-            68
+            637,
+            40
           ]
         }
       },
@@ -239,10 +239,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            686,
+            651,
             8,
-            390,
-            68
+            425,
+            40
           ]
         }
       },
@@ -272,10 +272,12 @@
           "presentation": 1,
           "presentation_rect": [
             8,
-            80,
-            255,
-            86
-          ]
+            120,
+            284,
+            102
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -303,11 +305,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            267,
-            80,
-            446,
-            86
-          ]
+            298,
+            120,
+            358,
+            102
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -335,11 +339,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            717,
-            80,
-            359,
-            86
-          ]
+            662,
+            120,
+            238,
+            102
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -368,7 +374,7 @@
           "presentation": 1,
           "presentation_rect": [
             8,
-            170,
+            122,
             1068,
             46
           ]
@@ -400,9 +406,9 @@
           "presentation": 1,
           "presentation_rect": [
             8,
-            220,
-            245,
-            224
+            176,
+            226,
+            310
           ]
         }
       },
@@ -431,10 +437,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            256,
-            220,
-            820,
-            224
+            240,
+            176,
+            420,
+            310
           ]
         }
       },
@@ -463,10 +469,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            8,
-            448,
-            397,
-            112
+            668,
+            176,
+            408,
+            104
           ]
         }
       },
@@ -495,10 +501,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
+            668,
+            285,
             408,
-            448,
-            243,
-            112
+            87
           ]
         }
       },
@@ -527,10 +533,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            654,
-            448,
-            115,
-            112
+            668,
+            377,
+            103,
+            109
           ]
         }
       },
@@ -559,10 +565,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            772,
-            448,
-            113,
-            112
+            776,
+            377,
+            103,
+            109
           ]
         }
       },
@@ -591,10 +597,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            888,
-            448,
-            188,
-            112
+            884,
+            377,
+            192,
+            109
           ]
         }
       },
@@ -624,7 +630,7 @@
           "presentation": 1,
           "presentation_rect": [
             8,
-            564,
+            496,
             676,
             128
           ]
@@ -655,10 +661,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            686,
-            564,
-            390,
-            38
+            714,
+            54,
+            362,
+            60
           ]
         }
       },
@@ -688,9 +694,9 @@
           "presentation": 1,
           "presentation_rect": [
             686,
-            606,
+            496,
             390,
-            86
+            128
           ]
         }
       },
@@ -720,8 +726,8 @@
           "presentation": 1,
           "presentation_rect": [
             8,
-            696,
-            622,
+            636,
+            1068,
             28
           ]
         }
@@ -752,7 +758,7 @@
           "presentation": 1,
           "presentation_rect": [
             8,
-            724,
+            670,
             1068,
             224
           ]
@@ -776,10 +782,10 @@
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            16,
-            16,
-            140,
-            20
+            18,
+            13,
+            125,
+            27
           ]
         }
       },
@@ -799,10 +805,10 @@
           "text": "Loading demo…",
           "presentation": 1,
           "presentation_rect": [
-            160,
-            19,
-            284,
-            20
+            150,
+            17,
+            220,
+            22
           ]
         }
       },
@@ -820,7 +826,7 @@
             20
           ],
           "text": "Audio",
-          "presentation": 1,
+          "presentation": 0,
           "presentation_rect": [
             688,
             19,
@@ -845,11 +851,12 @@
           "text": "Loading the demo…",
           "presentation": 1,
           "presentation_rect": [
-            688,
-            46,
-            380,
-            20
-          ]
+            379,
+            17,
+            256,
+            22
+          ],
+          "fontsize": 11
         }
       },
       {
@@ -882,10 +889,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            544,
-            18,
-            140,
-            20
+            771,
+            16,
+            124,
+            24
           ]
         }
       },
@@ -1212,10 +1219,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            40,
-            140,
-            32
+            18,
+            81,
+            67,
+            25
           ]
         }
       },
@@ -1278,10 +1285,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            40,
-            92,
-            32
+            90,
+            81,
+            65,
+            25
           ]
         }
       },
@@ -1345,10 +1352,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            256,
-            40,
-            92,
-            32
+            160,
+            81,
+            86,
+            25
           ]
         }
       },
@@ -1407,7 +1414,7 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            180,
+            132,
             92,
             20
           ]
@@ -1640,7 +1647,7 @@
           "presentation": 1,
           "presentation_rect": [
             112,
-            176,
+            128,
             44,
             30
           ]
@@ -1707,7 +1714,7 @@
           "presentation": 1,
           "presentation_rect": [
             160,
-            176,
+            128,
             44,
             30
           ]
@@ -1774,7 +1781,7 @@
           "presentation": 1,
           "presentation_rect": [
             208,
-            176,
+            128,
             44,
             30
           ]
@@ -1841,7 +1848,7 @@
           "presentation": 1,
           "presentation_rect": [
             256,
-            176,
+            128,
             44,
             30
           ]
@@ -1908,7 +1915,7 @@
           "presentation": 1,
           "presentation_rect": [
             304,
-            176,
+            128,
             44,
             30
           ]
@@ -1975,7 +1982,7 @@
           "presentation": 1,
           "presentation_rect": [
             352,
-            176,
+            128,
             44,
             30
           ]
@@ -2042,7 +2049,7 @@
           "presentation": 1,
           "presentation_rect": [
             400,
-            176,
+            128,
             44,
             30
           ]
@@ -2109,7 +2116,7 @@
           "presentation": 1,
           "presentation_rect": [
             448,
-            176,
+            128,
             44,
             30
           ]
@@ -2174,7 +2181,7 @@
           "presentation": 1,
           "presentation_rect": [
             496,
-            176,
+            128,
             92,
             30
           ]
@@ -2233,7 +2240,7 @@
           "presentation": 1,
           "presentation_rect": [
             820,
-            182,
+            134,
             248,
             20
           ]
@@ -2255,11 +2262,14 @@
           "text": "Source, patterns, and current mix",
           "presentation": 1,
           "presentation_rect": [
-            448,
-            46,
-            236,
-            20
-          ]
+            918,
+            182,
+            146,
+            36
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "fontsize": 10
         }
       },
       {
@@ -2292,11 +2302,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            448,
-            18,
-            92,
-            20
-          ]
+            918,
+            155,
+            146,
+            24
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -2388,7 +2400,7 @@
           "presentation": 1,
           "presentation_rect": [
             592,
-            180,
+            132,
             86,
             22
           ]
@@ -2754,7 +2766,7 @@
           "presentation": 1,
           "presentation_rect": [
             688,
-            177,
+            129,
             124,
             28
           ]
@@ -5315,7 +5327,7 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            730,
+            676,
             1052,
             212
           ]
@@ -5356,7 +5368,7 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            702,
+            641,
             100,
             20
           ]
@@ -5409,7 +5421,7 @@
           "presentation": 1,
           "presentation_rect": [
             250,
-            702,
+            641,
             374,
             20
           ]
@@ -5462,7 +5474,7 @@
           "presentation": 1,
           "presentation_rect": [
             122,
-            702,
+            641,
             116,
             20
           ]
@@ -5552,7 +5564,7 @@
           "background": 1,
           "ignoreclick": 1,
           "border": 0,
-          "rounded": 6,
+          "rounded": 8,
           "bgcolor": [
             0.15294117647058825,
             0.20392156862745098,
@@ -5561,10 +5573,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            633,
-            700,
-            440,
-            24
+            314,
+            54,
+            392,
+            60
           ]
         }
       },
@@ -5582,7 +5594,7 @@
             19
           ],
           "text": "Scenes",
-          "fontsize": 12,
+          "fontsize": 15,
           "fontface": 1,
           "textcolor": [
             0.9529411764705882,
@@ -5592,9 +5604,9 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            638,
-            703,
-            58,
+            324,
+            59,
+            90,
             19
           ]
         }
@@ -5613,7 +5625,7 @@
             19
           ],
           "text": "Now —",
-          "fontsize": 11,
+          "fontsize": 12,
           "fontface": 0,
           "textcolor": [
             0.9529411764705882,
@@ -5623,10 +5635,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            698,
-            703,
-            52,
-            19
+            324,
+            84,
+            56,
+            20
           ]
         }
       },
@@ -5644,7 +5656,7 @@
             19
           ],
           "text": "Next —",
-          "fontsize": 11,
+          "fontsize": 12,
           "fontface": 0,
           "textcolor": [
             0.9529411764705882,
@@ -5654,10 +5666,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            754,
-            703,
-            82,
-            19
+            387,
+            84,
+            69,
+            20
           ]
         }
       },
@@ -5675,7 +5687,7 @@
             19
           ],
           "text": "Bar —",
-          "fontsize": 11,
+          "fontsize": 12,
           "fontface": 0,
           "textcolor": [
             0.9529411764705882,
@@ -5685,10 +5697,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            840,
-            703,
-            74,
-            19
+            461,
+            84,
+            68,
+            20
           ]
         }
       },
@@ -5717,10 +5729,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            918,
-            702,
-            62,
-            20
+            535,
+            81,
+            73,
+            25
           ]
         }
       },
@@ -5765,10 +5777,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            988,
-            702,
-            80,
-            20
+            614,
+            81,
+            82,
+            25
           ]
         }
       },
@@ -5812,10 +5824,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            352,
-            40,
-            92,
-            32
+            251,
+            81,
+            45,
+            25
           ]
         }
       },
@@ -5878,11 +5890,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            928,
-            16,
-            140,
-            20
-          ]
+            500,
+            127,
+            144,
+            24
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -5919,10 +5933,10 @@
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            698,
-            576,
-            65,
-            22
+            724,
+            59,
+            69,
+            19
           ]
         }
       },
@@ -5960,10 +5974,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            764,
-            577,
-            55,
-            19
+            724,
+            81,
+            65,
+            25
           ]
         }
       },
@@ -6009,10 +6023,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            784,
+            661,
             16,
-            140,
-            20
+            103,
+            24
           ]
         }
       },
@@ -6189,7 +6203,7 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            570,
+            502,
             668,
             116
           ],
@@ -6223,7 +6237,7 @@
           "presentation": 1,
           "presentation_rect": [
             688,
-            608,
+            520,
             380,
             78
           ],
@@ -13582,7 +13596,7 @@
           "presentation": 1,
           "presentation_rect": [
             628,
-            730,
+            676,
             440,
             212
           ]
@@ -15216,7 +15230,7 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            730,
+            676,
             600,
             212
           ]
@@ -17335,7 +17349,7 @@
           "presentation": 1,
           "presentation_rect": [
             628,
-            730,
+            676,
             440,
             212
           ]
@@ -18100,7 +18114,7 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            730,
+            676,
             1052,
             212
           ]
@@ -18440,14 +18454,14 @@
             14
           ],
           "text": "L",
-          "fontsize": 10,
+          "fontsize": 11,
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            832,
-            571,
+            798,
+            67,
             14,
-            14
+            16
           ]
         }
       },
@@ -18473,10 +18487,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            847,
-            573,
-            163,
-            11
+            815,
+            70,
+            194,
+            12
           ]
         }
       },
@@ -18520,10 +18534,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            1016,
-            573,
-            10,
-            10
+            1019,
+            71,
+            11,
+            11
           ]
         }
       },
@@ -18541,14 +18555,14 @@
             14
           ],
           "text": "Clip",
-          "fontsize": 10,
+          "fontsize": 11,
           "hint": "Lights when the left master clips and stays lit for 1.5 seconds after the last overload.",
           "presentation": 1,
           "presentation_rect": [
-            1029,
-            571,
-            34,
-            14
+            1034,
+            67,
+            32,
+            16
           ]
         }
       },
@@ -18703,14 +18717,14 @@
             14
           ],
           "text": "R",
-          "fontsize": 10,
+          "fontsize": 11,
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            832,
-            586,
+            798,
+            88,
             14,
-            14
+            16
           ]
         }
       },
@@ -18736,10 +18750,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            847,
-            588,
-            163,
-            11
+            815,
+            91,
+            194,
+            12
           ]
         }
       },
@@ -18783,10 +18797,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            1016,
-            588,
-            10,
-            10
+            1019,
+            92,
+            11,
+            11
           ]
         }
       },
@@ -18804,14 +18818,14 @@
             14
           ],
           "text": "Clip",
-          "fontsize": 10,
+          "fontsize": 11,
           "hint": "Lights when the right master clips and stays lit for 1.5 seconds after the last overload.",
           "presentation": 1,
           "presentation_rect": [
-            1029,
-            586,
-            34,
-            14
+            1034,
+            88,
+            32,
+            16
           ]
         }
       },
@@ -18970,10 +18984,10 @@
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            16,
-            226,
-            92,
-            20
+            18,
+            184,
+            110,
+            22
           ]
         }
       },
@@ -19018,10 +19032,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            226,
-            44,
-            20
+            160,
+            183,
+            64,
+            22
           ]
         }
       },
@@ -19059,10 +19073,10 @@
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            256,
-            226,
-            236,
-            20
+            249,
+            184,
+            157,
+            22
           ]
         }
       },
@@ -19079,14 +19093,15 @@
             572,
             20
           ],
-          "text": "Click to select · Drag to set the loop range",
+          "text": "Click to select · Drag to set range",
           "presentation": 1,
           "presentation_rect": [
-            496,
-            230,
-            572,
+            408,
+            186,
+            242,
             20
-          ]
+          ],
+          "fontsize": 11
         }
       },
       {
@@ -19107,10 +19122,10 @@
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            16,
-            454,
-            236,
-            20
+            680,
+            183,
+            384,
+            23
           ]
         }
       },
@@ -19187,10 +19202,10 @@
           "text": "In %",
           "presentation": 1,
           "presentation_rect": [
-            16,
-            477,
+            680,
+            210,
             64,
-            20
+            17
           ]
         }
       },
@@ -19210,10 +19225,10 @@
           "text": "Out %",
           "presentation": 1,
           "presentation_rect": [
-            85,
-            477,
+            752,
+            210,
             64,
-            20
+            17
           ]
         }
       },
@@ -19233,10 +19248,10 @@
           "text": "Direction",
           "presentation": 1,
           "presentation_rect": [
-            154,
-            477,
-            124,
-            20
+            824,
+            210,
+            120,
+            17
           ]
         }
       },
@@ -19275,10 +19290,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            498,
+            680,
+            228,
             64,
-            24
+            22
           ]
         }
       },
@@ -19333,10 +19348,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            85,
-            498,
+            752,
+            228,
             64,
-            24
+            22
           ]
         }
       },
@@ -19394,10 +19409,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            289,
-            479,
-            55,
-            72
+            950,
+            209,
+            56,
+            66
           ]
         }
       },
@@ -19444,10 +19459,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            154,
-            498,
-            124,
-            24
+            824,
+            228,
+            120,
+            22
           ]
         }
       },
@@ -19504,10 +19519,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            346,
-            479,
+            1010,
+            209,
             55,
-            72
+            66
           ]
         }
       },
@@ -19564,10 +19579,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            412,
-            479,
-            56,
-            72
+            678,
+            310,
+            58,
+            55
           ]
         }
       },
@@ -19627,10 +19642,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            474,
-            527,
-            110,
-            22
+            836,
+            336,
+            165,
+            20
           ]
         }
       },
@@ -19670,10 +19685,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            590,
-            528,
+            1008,
+            336,
             56,
-            21
+            20
           ]
         }
       },
@@ -19730,10 +19745,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            657,
-            479,
-            52,
-            72
+            673,
+            406,
+            44,
+            69
           ]
         }
       },
@@ -19790,10 +19805,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            713,
-            479,
-            52,
-            72
+            722,
+            406,
+            44,
+            69
           ]
         }
       },
@@ -19850,10 +19865,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            776,
-            479,
-            51,
-            72
+            781,
+            406,
+            44,
+            69
           ]
         }
       },
@@ -19910,10 +19925,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            831,
-            479,
-            51,
-            72
+            830,
+            406,
+            44,
+            69
           ]
         }
       },
@@ -19979,10 +19994,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            474,
-            477,
-            172,
-            24
+            744,
+            309,
+            320,
+            22
           ]
         }
       },
@@ -20018,10 +20033,10 @@
           "text": "Loop FX",
           "presentation": 1,
           "presentation_rect": [
-            412,
-            454,
-            62,
-            20
+            680,
+            291,
+            61,
+            17
           ]
         }
       },
@@ -20041,10 +20056,10 @@
           "text": "Filter type",
           "presentation": 1,
           "presentation_rect": [
-            474,
-            454,
-            172,
-            20
+            744,
+            291,
+            320,
+            17
           ]
         }
       },
@@ -20064,10 +20079,10 @@
           "text": "Filter sweep",
           "presentation": 1,
           "presentation_rect": [
-            474,
-            504,
-            172,
-            20
+            744,
+            336,
+            87,
+            19
           ]
         }
       },
@@ -20087,10 +20102,10 @@
           "text": "Loop mix",
           "presentation": 1,
           "presentation_rect": [
-            657,
-            454,
-            106,
-            20
+            678,
+            383,
+            83,
+            19
           ]
         }
       },
@@ -20110,10 +20125,10 @@
           "text": "Loop sends",
           "presentation": 1,
           "presentation_rect": [
-            776,
-            454,
-            104,
-            20
+            786,
+            383,
+            83,
+            19
           ]
         }
       },
@@ -20133,10 +20148,10 @@
           "text": "Fade preview",
           "presentation": 1,
           "presentation_rect": [
-            893,
-            454,
-            175,
-            20
+            894,
+            383,
+            172,
+            19
           ]
         }
       },
@@ -20156,9 +20171,9 @@
           "text": "Pitch snap · All loops",
           "presentation": 1,
           "presentation_rect": [
-            16,
-            530,
-            128,
+            680,
+            254,
+            130,
             20
           ]
         }
@@ -20173,18 +20188,18 @@
           "patching_rect": [
             893,
             479,
-            175,
-            72
+            176,
+            73
           ],
           "border": 0,
           "filename": "fk_loop_fade.js",
           "parameter_enable": 0,
           "presentation": 1,
           "presentation_rect": [
-            893,
-            479,
-            175,
-            72
+            892,
+            405,
+            176,
+            73
           ]
         }
       },
@@ -20225,10 +20240,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            146,
-            529,
-            132,
-            22
+            813,
+            254,
+            131,
+            20
           ]
         }
       },
@@ -20328,7 +20343,7 @@
           "presentation": 1,
           "presentation_rect": [
             16,
-            730,
+            676,
             1052,
             212
           ],
@@ -20519,10 +20534,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            48,
-            250,
-            60,
-            20
+            47,
+            219,
+            58,
+            22
           ]
         }
       },
@@ -20550,10 +20565,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            256,
-            250,
-            812,
-            44
+            242,
+            215,
+            410,
+            58
           ]
         }
       },
@@ -21775,10 +21790,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            250,
-            28,
-            20
+            18,
+            219,
+            24,
+            22
           ]
         }
       },
@@ -21841,10 +21856,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            112,
-            250,
-            44,
-            20
+            110,
+            219,
+            47,
+            22
           ]
         }
       },
@@ -21888,10 +21903,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            250,
-            44,
-            20
+            162,
+            219,
+            62,
+            22
           ]
         }
       },
@@ -21946,10 +21961,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            250,
-            44,
-            20
+            149,
+            248,
+            37,
+            19
           ]
         }
       },
@@ -21992,10 +22007,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            274,
-            140,
-            20
+            18,
+            247,
+            78,
+            19
           ]
         }
       },
@@ -22035,10 +22050,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            276,
-            44,
-            20
+            101,
+            248,
+            43,
+            19
           ]
         }
       },
@@ -22063,10 +22078,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            274,
-            44,
-            20
+            191,
+            249,
+            33,
+            16
           ]
         }
       },
@@ -22669,10 +22684,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            48,
-            298,
-            60,
-            20
+            47,
+            286,
+            58,
+            22
           ]
         }
       },
@@ -22700,10 +22715,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            256,
-            298,
-            812,
-            44
+            242,
+            282,
+            410,
+            58
           ]
         }
       },
@@ -23925,10 +23940,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            298,
-            28,
-            20
+            18,
+            286,
+            24,
+            22
           ]
         }
       },
@@ -23991,10 +24006,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            112,
-            298,
-            44,
-            20
+            110,
+            286,
+            47,
+            22
           ]
         }
       },
@@ -24038,10 +24053,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            298,
-            44,
-            20
+            162,
+            286,
+            62,
+            22
           ]
         }
       },
@@ -24096,10 +24111,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            298,
-            44,
-            20
+            149,
+            315,
+            37,
+            19
           ]
         }
       },
@@ -24142,10 +24157,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            322,
-            140,
-            20
+            18,
+            314,
+            78,
+            19
           ]
         }
       },
@@ -24185,10 +24200,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            324,
-            44,
-            20
+            101,
+            315,
+            43,
+            19
           ]
         }
       },
@@ -24213,10 +24228,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            322,
-            44,
-            20
+            191,
+            316,
+            33,
+            16
           ]
         }
       },
@@ -24819,10 +24834,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            48,
-            346,
-            60,
-            20
+            47,
+            353,
+            58,
+            22
           ]
         }
       },
@@ -24850,10 +24865,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            256,
-            346,
-            812,
-            44
+            242,
+            349,
+            410,
+            58
           ]
         }
       },
@@ -26075,10 +26090,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            346,
-            28,
-            20
+            18,
+            353,
+            24,
+            22
           ]
         }
       },
@@ -26141,10 +26156,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            112,
-            346,
-            44,
-            20
+            110,
+            353,
+            47,
+            22
           ]
         }
       },
@@ -26188,10 +26203,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            346,
-            44,
-            20
+            162,
+            353,
+            62,
+            22
           ]
         }
       },
@@ -26246,10 +26261,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            346,
-            44,
-            20
+            149,
+            382,
+            37,
+            19
           ]
         }
       },
@@ -26292,10 +26307,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            370,
-            140,
-            20
+            18,
+            381,
+            78,
+            19
           ]
         }
       },
@@ -26335,10 +26350,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            372,
-            44,
-            20
+            101,
+            382,
+            43,
+            19
           ]
         }
       },
@@ -26363,10 +26378,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            370,
-            44,
-            20
+            191,
+            383,
+            33,
+            16
           ]
         }
       },
@@ -26969,10 +26984,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            48,
-            394,
-            60,
-            20
+            47,
+            420,
+            58,
+            22
           ]
         }
       },
@@ -27000,10 +27015,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            256,
-            394,
-            812,
-            44
+            242,
+            416,
+            410,
+            58
           ]
         }
       },
@@ -28225,10 +28240,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            394,
-            28,
-            20
+            18,
+            420,
+            24,
+            22
           ]
         }
       },
@@ -28291,10 +28306,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            112,
-            394,
-            44,
-            20
+            110,
+            420,
+            47,
+            22
           ]
         }
       },
@@ -28338,10 +28353,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            394,
-            44,
-            20
+            162,
+            420,
+            62,
+            22
           ]
         }
       },
@@ -28396,10 +28411,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            394,
-            44,
-            20
+            149,
+            449,
+            37,
+            19
           ]
         }
       },
@@ -28442,10 +28457,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            16,
-            418,
-            140,
-            20
+            18,
+            448,
+            78,
+            19
           ]
         }
       },
@@ -28485,10 +28500,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            420,
-            44,
-            20
+            101,
+            449,
+            43,
+            19
           ]
         }
       },
@@ -28513,10 +28528,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            208,
-            418,
-            44,
-            20
+            191,
+            450,
+            33,
+            16
           ]
         }
       },
@@ -29565,11 +29580,13 @@
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            28,
-            94,
-            225,
-            20
-          ]
+            20,
+            128,
+            255,
+            22
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -29588,11 +29605,13 @@
           "text": "Input gain",
           "presentation": 1,
           "presentation_rect": [
-            434,
-            96,
-            83,
-            20
-          ]
+            452,
+            154,
+            74,
+            19
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -29608,14 +29627,17 @@
             171,
             20
           ],
-          "text": "Input level · after gain",
+          "text": "Input level",
           "presentation": 1,
           "presentation_rect": [
-            532,
-            96,
-            171,
-            20
-          ]
+            538,
+            154,
+            108,
+            19
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "fontsize": 11
         }
       },
       {
@@ -29641,11 +29663,14 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            736,
-            96,
-            206,
+            674,
+            153,
+            157,
             20
-          ]
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "fontsize": 11
         }
       },
       {
@@ -29667,11 +29692,13 @@
           "hint": "Elapsed audio captured in the current or last input take.",
           "presentation": 1,
           "presentation_rect": [
-            946,
-            96,
-            74,
+            832,
+            153,
+            55,
             20
-          ]
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -29697,11 +29724,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            28,
-            121,
-            126,
+            20,
+            163,
+            125,
             28
-          ]
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -29763,11 +29792,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            160,
-            121,
-            94,
+            154,
+            163,
+            126,
             28
-          ]
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -29830,12 +29861,14 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            736,
-            121,
-            140,
-            28
+            674,
+            184,
+            98,
+            26
           ],
-          "active": 0
+          "active": 0,
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -29898,12 +29931,15 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            880,
-            121,
-            140,
-            28
+            778,
+            184,
+            110,
+            26
           ],
-          "active": 0
+          "active": 0,
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "fontsize": 10
         }
       },
       {
@@ -29958,11 +29994,13 @@
           "text": "Input L",
           "presentation": 1,
           "presentation_rect": [
-            280,
-            96,
-            64,
-            20
-          ]
+            310,
+            154,
+            65,
+            19
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -29991,11 +30029,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            280,
-            123,
-            64,
+            310,
+            178,
+            61,
             24
-          ]
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -30030,11 +30070,13 @@
           "text": "Input R",
           "presentation": 1,
           "presentation_rect": [
-            356,
-            96,
-            64,
-            20
-          ]
+            381,
+            154,
+            65,
+            19
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -30063,11 +30105,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            356,
-            123,
-            64,
+            381,
+            178,
+            61,
             24
-          ]
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -30121,11 +30165,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            434,
-            123,
-            83,
+            452,
+            178,
+            74,
             24
-          ]
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -30331,11 +30377,13 @@
           "fontsize": 11,
           "presentation": 1,
           "presentation_rect": [
-            532,
-            119,
-            16,
-            16
-          ]
+            539,
+            174,
+            15,
+            15
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -30360,11 +30408,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            552,
-            120,
-            152,
-            12
-          ]
+            557,
+            177,
+            87,
+            10
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -30403,11 +30453,13 @@
           "fontsize": 11,
           "presentation": 1,
           "presentation_rect": [
-            532,
-            136,
-            16,
-            16
-          ]
+            539,
+            191,
+            15,
+            15
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -30432,11 +30484,13 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            552,
-            137,
-            152,
-            12
-          ]
+            557,
+            194,
+            87,
+            10
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1
         }
       },
       {
@@ -30580,6 +30634,284 @@
             22
           ],
           "text": "prepend save_input_path"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-717",
+          "varname": "source_drawer_toggle",
+          "maxclass": "live.text",
+          "numinlets": 1,
+          "numoutlets": 2,
+          "patching_rect": [
+            903,
+            16,
+            164,
+            24
+          ],
+          "text": "Source, Input & Files",
+          "texton": "Hide Source, Input & Files",
+          "mode": 1,
+          "fontsize": 11,
+          "parameter_mappable": 0,
+          "hint": "Show or hide source loading, input routing, source recording and Set files.",
+          "parameter_enable": 1,
+          "saved_attribute_attributes": {
+            "valueof": {
+              "parameter_longname": "Source drawer view",
+              "parameter_shortname": "Source drawer view",
+              "parameter_type": 2,
+              "parameter_mmin": 0,
+              "parameter_mmax": 1,
+              "parameter_initial": [
+                0
+              ],
+              "parameter_initial_enable": 1,
+              "parameter_unitstyle": 0,
+              "parameter_enum": [
+                "Closed",
+                "Open"
+              ]
+            }
+          },
+          "outlettype": [
+            "int",
+            ""
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            903,
+            16,
+            164,
+            24
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-718",
+          "varname": "source_drawer_command",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3240,
+            1856,
+            159,
+            22
+          ],
+          "text": "prepend source_drawer"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-719",
+          "varname": "surface_transport",
+          "maxclass": "panel",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            8,
+            54,
+            298,
+            60
+          ],
+          "background": 1,
+          "ignoreclick": 1,
+          "border": 0,
+          "rounded": 8,
+          "bgcolor": [
+            0.14901960784313725,
+            0.18823529411764706,
+            0.25098039215686274,
+            1.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            8,
+            54,
+            298,
+            60
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-720",
+          "varname": "transport_label",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            18,
+            59,
+            125,
+            19
+          ],
+          "text": "Transport",
+          "fontsize": 15,
+          "fontface": 1,
+          "textcolor": [
+            0.9529411764705882,
+            0.9686274509803922,
+            0.9882352941176471,
+            1.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            18,
+            59,
+            125,
+            19
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-721",
+          "varname": "source_drawer_anchor",
+          "maxclass": "panel",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            8,
+            120,
+            1068,
+            108
+          ],
+          "background": 1,
+          "ignoreclick": 1,
+          "border": 0,
+          "rounded": 8,
+          "bgcolor": [
+            0.14,
+            0.19,
+            0.25,
+            1
+          ],
+          "hidden": 1,
+          "presentation": 1,
+          "presentation_rect": [
+            8,
+            120,
+            1068,
+            108
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-722",
+          "varname": "surface_source_files",
+          "maxclass": "panel",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            906,
+            120,
+            170,
+            102
+          ],
+          "background": 1,
+          "ignoreclick": 1,
+          "border": 0,
+          "rounded": 8,
+          "bgcolor": [
+            0.14,
+            0.19,
+            0.25,
+            1
+          ],
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "presentation": 1,
+          "presentation_rect": [
+            906,
+            120,
+            170,
+            102
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-723",
+          "varname": "drawer_input_title",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            310,
+            128,
+            110,
+            22
+          ],
+          "text": "Input",
+          "fontsize": 15,
+          "fontface": 1,
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "presentation": 1,
+          "presentation_rect": [
+            310,
+            128,
+            110,
+            22
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-724",
+          "varname": "drawer_capture_title",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            674,
+            128,
+            211,
+            22
+          ],
+          "text": "Source recording",
+          "fontsize": 15,
+          "fontface": 1,
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "presentation": 1,
+          "presentation_rect": [
+            674,
+            128,
+            211,
+            22
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-725",
+          "varname": "drawer_files_title",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            918,
+            128,
+            146,
+            22
+          ],
+          "text": "Files",
+          "fontsize": 15,
+          "fontface": 1,
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "presentation": 1,
+          "presentation_rect": [
+            918,
+            128,
+            146,
+            22
+          ]
         }
       }
     ],
@@ -41501,6 +41833,30 @@
           "destination": [
             "obj-255",
             44
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-717",
+            0
+          ],
+          "destination": [
+            "obj-718",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-718",
+            0
+          ],
+          "destination": [
+            "obj-28",
+            0
           ]
         }
       }

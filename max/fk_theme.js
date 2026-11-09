@@ -7,13 +7,18 @@ var patch = this.patcher;
 var fullScreen = false;
 var activeWorkspace = 0;
 var driftAdvanced = false;
+var sourceDrawerOpen = false;
+var sourceDrawerHeight = 0;
 var windowLayout = [];
+var frameWidth = 0;
+var frameHeight = 0;
 var fitTask = new Task(fit_full_screen, this);
 var schemes = [
     {
         colors: ["141A23", "202936", "151E2A", "303F51", "F3F7FC", "B6C5D5", "8FB9F0", "365D88"],
         sections: {
-            header: "202B3B", audio: "253345", source: "203244", input: "26384A", input_capture: "33384A",
+            header: "202B3B", audio: "253345", transport: "202E40",
+            source: "203244", source_files: "293448", input: "26384A", input_capture: "33384A",
             patterns: "2C2C42", mixer: "223141", playback: "192635",
             editor_playback: "293A4D", editor_fx: "34364C", editor_mix: "29384B",
             editor_sends: "294152", editor_fade: "2A3345",
@@ -27,7 +32,8 @@ var schemes = [
     {
         colors: ["131E1B", "1E2C27", "13231E", "2D4439", "F2F9F3", "B5CBC0", "99D4AE", "325E4B"],
         sections: {
-            header: "20312A", audio: "29392F", source: "24372C", input: "2C3D32", input_capture: "373D31",
+            header: "20312A", audio: "29392F", transport: "24382F",
+            source: "24372C", source_files: "333C31", input: "2C3D32", input_capture: "373D31",
             patterns: "343A2B", mixer: "24382E", playback: "192923",
             editor_playback: "304135", editor_fx: "3A4031", editor_mix: "2C3C32",
             editor_sends: "274438", editor_fade: "30392D",
@@ -41,7 +47,8 @@ var schemes = [
     {
         colors: ["211915", "30231F", "231914", "46312A", "FCF5EE", "D5BFB1", "F1AB82", "6E4534"],
         sections: {
-            header: "352720", audio: "413027", source: "392922", input: "44322A", input_capture: "4A3334",
+            header: "352720", audio: "413027", transport: "3B2E26",
+            source: "392922", source_files: "3E3033", input: "44322A", input_capture: "4A3334",
             patterns: "422C2E", mixer: "382A24", playback: "2A201D",
             editor_playback: "49352C", editor_fx: "4B3036", editor_mix: "3E3029",
             editor_sends: "4A3C2D", editor_fade: "382824",
@@ -55,6 +62,7 @@ var schemes = [
 ];
 
 function loadbang() {
+    remember_layout();
     patch.getnamed("theme_choice").message("set", 0);
     msg_int(0);
     workspace(0);
@@ -93,21 +101,26 @@ function drift_control_visible(name, visible) {
     if (control && control.valid) control.hidden = visible !== 1;
 }
 
+function source_drawer(value) {
+    if (value !== 0 && value !== 1) return;
+    remember_layout();
+    var toggle = patch.getnamed("source_drawer_toggle");
+    if (toggle && toggle.valid) toggle.message("set", value);
+    if (sourceDrawerOpen === (value === 1)) return;
+    sourceDrawerOpen = value === 1;
+    if (fullScreen) fit_full_screen();
+    else resize_workspace(1, 1);
+}
+
 function full_screen() {
+    remember_layout();
     fullScreen = !fullScreen;
     fitTask.cancel();
     if (fullScreen) {
-        windowLayout = [];
-        remember_rects(patch);
-        ["mix_fx", "recorder", "performance_mix", "performance_sends", "drifting_memory",
-            "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
-            remember_rects(patch.getnamed(name).subpatcher());
-        });
         patch.fullscreen(1);
         fitTask.schedule(160);
     } else {
         resize_workspace(1, 1);
-        windowLayout = [];
         patch.fullscreen(0);
     }
     label_full_screen();
@@ -117,11 +130,38 @@ function exit_full_screen() {
     if (fullScreen) full_screen();
 }
 
-function remember_rects(target) {
+function remember_layout() {
+    if (windowLayout.length) return;
+    var anchor = patch.getnamed("source_drawer_anchor");
+    var drawer = anchor && anchor.valid ? anchor.getboxattr("presentation_rect") : null;
+    if (drawer && drawer.length === 4) {
+        sourceDrawerHeight = drawer[3];
+        anchor.hidden = true;
+    }
+    remember_rects(patch, drawer);
+    ["mix_fx", "recorder", "performance_mix", "performance_sends", "drifting_memory",
+        "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
+        remember_rects(patch.getnamed(name).subpatcher());
+    });
+}
+remember_layout.local = 1;
+
+function remember_rects(target, drawer) {
     target.apply(function (box) {
-        if (!Number(box.getboxattr("presentation"))) return;
+        if (!Number(box.getboxattr("presentation")) || box.varname === "source_drawer_anchor") return;
         var rect = box.getboxattr("presentation_rect");
-        if (rect && rect.length === 4) windowLayout.push({ box: box, rect: rect });
+        if (!rect || rect.length !== 4) return;
+        var isDrawerControl = false;
+        if (drawer && rect[1] >= drawer[1] && rect[1] < drawer[1] + sourceDrawerHeight && box.hidden) {
+            var annotation = box.getboxattr("annotation") || box.getattr("annotation");
+            isDrawerControl = String(annotation) === "source_drawer";
+        }
+        var shiftDown = drawer && !isDrawerControl && rect[1] >= drawer[1] + 2;
+        windowLayout.push({ box: box, rect: rect.slice(), drawer: isDrawerControl, shiftDown: shiftDown });
+        if (target === patch && !isDrawerControl) {
+            frameWidth = Math.max(frameWidth, rect[0] + rect[2] + 8);
+            frameHeight = Math.max(frameHeight, rect[1] + rect[3] + 8);
+        }
     });
 }
 remember_rects.local = 1;
@@ -129,8 +169,9 @@ remember_rects.local = 1;
 function fit_full_screen() {
     if (!fullScreen || !patch.wind) return;
     var size = patch.wind.size;
-    var width = Math.max(0.75, Math.min(1.8, size[0] / 1084));
-    var height = Math.max(0.82, Math.min(1.18, size[1] / 958));
+    if (!size[0] || !size[1]) return;
+    var width = Math.min(1.8, size[0] / frameWidth);
+    var height = Math.min(1.18, size[1] / (frameHeight + (sourceDrawerOpen ? sourceDrawerHeight : 0)));
     resize_workspace(width, height);
     label_full_screen();
     patch.wind.bringtofront();
@@ -138,14 +179,17 @@ function fit_full_screen() {
 fit_full_screen.local = 1;
 
 function resize_workspace(width, height) {
-    var dirty = patch.wind.dirty;
+    var wind = patch.wind;
+    var dirty = wind && wind.dirty;
     windowLayout.forEach(function (item) {
         var box = item.box;
+        if (!box.valid) return;
+        if (item.drawer) box.hidden = !sourceDrawerOpen;
         var rect = item.rect;
         var w = rect[2] * width;
         var h = rect[3] * height;
         var x = rect[0] * width;
-        var y = rect[1] * height;
+        var y = (rect[1] + (item.shiftDown && sourceDrawerOpen ? sourceDrawerHeight : 0)) * height;
         // A jsui draws at its patching size. Center it inside its larger presentation cell.
         if (box.maxclass === "jsui") {
             x += (w - rect[2]) * 0.5;
@@ -161,7 +205,7 @@ function resize_workspace(width, height) {
         }
         box.setboxattr("presentation_rect", [x, y, w, h]);
     });
-    patch.wind.dirty = dirty;
+    if (wind) wind.dirty = dirty;
 }
 resize_workspace.local = 1;
 

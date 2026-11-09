@@ -26,7 +26,7 @@ START_HERE = """FIELD KIT for Max
 3. Click Play all to hear the demo, or Load audio... to choose a sample.
 4. Choose Slate, Moss, or Ember from Theme in the header.
 
-Select your interface in Audio Setup and enable audio. In Source, choose the
+Open Source, Input & Files. Select your interface in Audio Setup and enable audio. In Input, choose the
 left and right channels. For mono, select the same channel twice.
 Input gain adjusts both channels from −60 to +18 dB and starts at 0 dB.
 The two post-gain peak meters show the recording levels with peak hold
@@ -36,7 +36,7 @@ Click Stop source to use the take in all four loops.
 Recording stops automatically after 60 seconds. Click Save source WAV… before
 saving a Set with the take or replacing it with a different source.
 
-Click a loop number or waveform to focus Editing Loop. Drag the waveform to set
+Click a loop number or waveform to focus the editor beside the waveforms. Drag the waveform to set
 the range. Fade preview shows how the outgoing and incoming audio overlap.
 Choose Low-pass, Flat, or High-pass directly under Filter type. Switch between
 Low-pass and High-pass to keep the same strength, or drag Filter sweep to move
@@ -67,7 +67,7 @@ I/O controls beside the delay. Hide advanced brings back Loop sends. The delay
 keeps playing either way. The Main FX shortcut opens the same drawer.
 Hold freezes the current memory. Cut Tail clears it and sets capture to Off while
 the dry mix keeps playing. Release Hold and arm a bank to capture again.
-Mix recording includes Drifting Memory. Click Record mix… below Master to save
+Mix recording includes Drifting Memory. Click Record mix… beside Main FX to save
 the final stereo output to a WAV, and Stop mix when you finish.
 The L and R master meters show each output channel. A red CLIP light identifies
 the channel that hit the output ceiling. Lower Master if either light comes on.
@@ -87,14 +87,14 @@ Beats/bar once, then choose a scene and how many bars to hold it in each step.
 Start plays the first available scene. Next bar advances at the next bar line.
 Repeat starts the list again after the last step. Stop holds the current scene.
 Stop all stops the sequencer and the loops. The tempo counts scene bars.
-The scene strip beside the workspace tabs shows the current scene, next playable
+The scene strip between Transport and Master shows the current scene, next playable
 scene, and bar count. Use Start, Stop, or Next bar while you stay in Mix.
 Switch between Mix, Scenes, Modulation, and Visuals in the lower workspace, or choose
 Hide to collapse it. Visuals shows left and right frequency histories and a
 stereo scope of the final mix. Switch Display to Spectrum for live frequency
 curves. Use Full screen to fit the workspace to the
 display. Click Exit full screen or press Escape to return to the window.
-Use Set files… in the header to open or save a Set. Save Set keeps the source
+Open Source, Input & Files and use Set files… to open or save a Set. Save Set keeps the source
 reference, all eight slots, the scene order and tempo, and current settings in
 one file. Open Set restores them with playback stopped. If the source moved,
 choose its new location.
