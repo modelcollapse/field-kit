@@ -5,7 +5,9 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 ## Start here
 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
-- **[Download the standalone macOS app (v0.6.0)](https://github.com/modelcollapse/field-kit/releases/download/v0.6.0/field-kit-macos.zip).** The standalone app is on the previous release. For the current features, use the Max patch above.
+- **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
+
+The v0.7.0 standalone is ad hoc signed and is not notarized by Apple. macOS may block the first launch of a browser download. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445). [See the standalone running the demo with live Spectrum and Stereo X/Y](docs/screenshots/field-kit-standalone.jpg).
 
 [See what's new in v0.7.0](CHANGELOG.md).
 
@@ -65,6 +67,8 @@ Choose **LFO 1–8** from the dropdown and set its rate and shape. Choose a wind
 
 The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Breakpoint** or click **Use curve** to edit that LFO’s custom curve. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO keeps its curve when you switch shapes. The graph on the right shows the live signal when audio is on.
 
+![The modulation patchbay with a sine LFO routed to Loop 1's start and live feedback](docs/screenshots/field-kit-modulation.png)
+
 ## Process and capture
 
 During loop playback, click **Enable FX** to turn on tone, stereo echo, and room reverb. Set an effect's **Mix %** to zero to remove it from the mix. Tone is neutral at zero, and echo time ranges from 45 to 850 ms.
@@ -81,6 +85,8 @@ Click **Record**, drag across the FX pad, and release. **Play** loops the gestur
 
 **Drifting Memory…** opens the original 1.8 engine at the end of Main FX. Click **Enable effect**, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. Use **Mix** to blend it into the main signal. **Off** stops capture and lets the tail play. Sets and patterns save the effect settings. Captured memory is for the current session.
 
+![Drifting Memory with Granular Delay active and signal on the input, memory, and output meters](docs/screenshots/field-kit-drifting-memory.png)
+
 With audio enabled, click **Record mix…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. The recorder writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click **Stop mix** when the take is finished.
 
 ## Build and test
@@ -90,6 +96,8 @@ From a source checkout, open [Field Kit.maxpat](max/Field%20Kit.maxpat) in Max 9
 Run `python3 scripts/build.py` to regenerate the patch, subpatchers, and demo. Run `python3 scripts/package_max_download.py build/field-kit-max.zip` to package the editable download.
 
 To build the standalone app, run `python3 scripts/prepare_max_project.py max build/standalone`. Open the generated **Field Kit.maxproj** in Max and choose **File → Build Collective / Application… → Application**. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
+
+See the [release checklist](docs/releasing.md) for building, testing, and publishing both downloads and their screenshots.
 
 Run the playback startup, input recording, pattern bank, curve editing, and Set writer tests with Node.js.
 
