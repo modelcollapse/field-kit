@@ -3,16 +3,19 @@
 import json
 from pathlib import Path
 
+from build_drift_modulation import DRIFT_MOD_TARGETS
+
 OUT = Path(__file__).resolve().parents[1] / "max"
 BOXES = []
 LINES = []
-DESTINATIONS = ("Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan")
+DESTINATIONS = ("Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan",
+                "Echo send", "Room send")
 SHAPES = ("Sine", "Triangle", "Saw", "Square", "S&H", "Breakpoint")
 # Match the defaults used by the router when resetting or loading patterns.
 RATES = (0.12, 0.31, 0.73, 0.18, 0.43, 0.67, 1.1, 1.7)
 DEFAULT_SHAPES = (0, 1, 2, 0, 1, 0, 1, 0)
 LFO_COUNT = len(RATES)
-MOD_CHANNELS = 4 * len(DESTINATIONS) + 8
+MOD_CHANNELS = 4 * len(DESTINATIONS) + 8 + len(DRIFT_MOD_TARGETS)
 
 
 def box(maxclass, rect, numinlets=1, numoutlets=0, **attrs):
@@ -162,7 +165,7 @@ def build():
     lfo = menu("fk_mod_lfo", (f"LFO {i + 1}" for i in range(LFO_COUNT)), 0, 3,
                hint="Choose which LFO to edit. All eight run independently.")
     window = menu("fk_mod_window", [*(f"Window {i}" for i in range(1, 5)), "Global"], 7, 2,
-                  hint="Choose a loop window or route to shared effects, master or input gain.")
+                  hint="Choose a loop window or route to Main FX, Drifting Memory, master or input gain.")
     target = menu("fk_mod_target", DESTINATIONS, 9, 3)
     depth = control("live.dial", 12, 2, 2, 2, numoutlets=2, outlettype=["float", "float"],
                     appearance=3, showname=0, shownumber=1,

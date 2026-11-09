@@ -11,7 +11,7 @@ The v0.7.0 standalone is ad hoc signed and is not notarized by Apple. macOS may 
 
 [See what's new in v0.7.0](CHANGELOG.md).
 
-The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Open **Source, Input & Files** to load a sample, select audio devices, record a source, or open or save a Set. **Enable audio** starts the engine without starting playback.
+The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Open **Source, Input & Files** and choose **Load audio…** to load a sample and start its four loops as soon as the file is ready. The same drawer holds audio setup, source recording, and Set files. **Enable audio** starts the engine without starting playback.
 
 Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header. Each theme uses related background shades to separate source setup, the mixer, loop controls, effects, and recording.
 
@@ -69,7 +69,9 @@ Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**
 
 ## Patch modulation
 
-Choose **LFO 1–8** from the dropdown and set its rate and shape. Choose a window, or select **Global** for master level, input gain, tone, echo, and room controls. Pick a destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the destination receives.
+Choose **LFO 1–8** from the dropdown and set its rate and shape. Choose a loop to modulate its range, speed, direction, crossfade, drive, filter, level, pan, or Echo and Room sends. Choose **Global** for master level, input gain, Main FX, and Drifting Memory. Pick a destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the destination receives while audio is on.
+
+In **Loop sends** mode, the per-loop send routes control which loops feed Echo and Room. In Drifting Memory, the HPF and LPF routes take effect in **Sweep**, and the timing routes take effect in **Rhythmic**. Older Sets and pattern banks keep their existing LFO assignments when opened.
 
 The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Breakpoint** or click **Use curve** to edit that LFO’s custom curve. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO keeps its curve when you switch shapes. The graph on the right shows the live signal when audio is on.
 
@@ -83,7 +85,7 @@ During loop playback, click **Enable FX** to turn on tone, stereo echo, and room
 
 Open **FX pad…** and use the **X** and **Y** menus to pair Tone tilt, Echo mix, or Room mix. X starts on Echo mix and Y starts on Room mix. Picking the other axis’s effect swaps the pair. Drag right or up to increase the assigned value. Tone tilt moves from dark through neutral to bright. The pad and dials stay in sync.
 
-Click **Record**, drag across the FX pad, and release. **Play** loops the gesture using the effect pair you recorded. **Stop** holds the current values and **Clear** erases the gesture. Turn on **Enable FX** to hear it. Gestures in both pads stay available while the patch is open. **Stop all**, resetting, or recalling a pattern stops gesture playback; Sets and patterns save control values but do not store gestures.
+Click **Record**, drag across the FX pad, and release. **Play** loops the gesture using the effect pair you recorded. **Stop** holds the current values and **Clear** erases the gesture. Turn on **Enable FX** in the pad or the Main FX header to hear it. Both buttons control the same Tone, Echo, and Room switch. Gestures in both pads stay available while the patch is open. **Stop all**, resetting, or recalling a pattern stops gesture playback; Sets and patterns save control values but do not store gestures.
 
 | Stereo field | FX pad |
 | --- | --- |

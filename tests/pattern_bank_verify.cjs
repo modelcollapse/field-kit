@@ -52,12 +52,22 @@ const defaultShapes = [0, 1, 2, 0, 1, 0, 1, 0];
 const legacyCurves = [[0, 1, 0.6, -0.8, 1, 1], [], [0, -0.5, 1, 0.5]];
 const lastCurve = [0, -0.25, 0.7, 0.75, 1, -0.25];
 const initialCurves = [...legacyCurves, ...Array(4).fill(defaultCurve), lastCurve];
+const loopTargetCount = 11;
+const globalTargetCount = 22;
+const loopRoute = (window, lfo, destination) => ((window - 1) * 8 + lfo - 1) * loopTargetCount + destination - 1;
+const globalRoute = (lfo, destination) => (lfo - 1) * globalTargetCount + destination - 1;
+const secondLfoStart = loopRoute(1, 2, 1);
+const fourthLoopLevel = loopRoute(4, 3, 8);
+const lastLegacyLoopRoute = loopRoute(4, 8, 9);
+const lastLegacyGlobalRoute = globalRoute(8, 8);
+const roomSendRoute = loopRoute(2, 6, 11);
+const lastDriftRoute = globalRoute(8, 22);
 const modState = {
     DEFAULT_RATES: defaultRates,
     DEFAULT_SHAPES: defaultShapes,
     DEFAULT_CURVE: defaultCurve,
-    gains: Array(288).fill(0),
-    globalGains: Array(64).fill(0),
+    gains: Array(4 * 8 * loopTargetCount).fill(0),
+    globalGains: Array(8 * globalTargetCount).fill(0),
     curves: structuredClone(initialCurves),
     rates: [0.1, 0.5, 15, 0.2, 0.3, 0.4, 0.5, 19],
     shapes: [5, 0, 5, 0, 0, 0, 0, 5],
@@ -65,10 +75,12 @@ const modState = {
     selected: 3,
     targetIndex: 7,
 };
-modState.gains[9] = 25;
-modState.gains[241] = -100;
-modState.gains[287] = 42;
-modState.globalGains[63] = -35;
+modState.gains[secondLfoStart] = 25;
+modState.gains[fourthLoopLevel] = -100;
+modState.gains[lastLegacyLoopRoute] = 42;
+modState.gains[roomSendRoute] = -20;
+modState.globalGains[lastLegacyGlobalRoute] = -35;
+modState.globalGains[lastDriftRoute] = 60;
 
 const router = {
     js: modState,
@@ -82,8 +94,8 @@ const router = {
         case 'select_destination': modState.targetIndex = args[0]; break;
         case 'depth': {
             const [scope, lfo, destination, depth] = args;
-            if (scope === 5) modState.globalGains[(lfo - 1) * 8 + destination - 1] = depth;
-            else modState.gains[((scope - 1) * 8 + lfo - 1) * 9 + destination - 1] = depth;
+            if (scope === 5) modState.globalGains[globalRoute(lfo, destination)] = depth;
+            else modState.gains[loopRoute(scope, lfo, destination)] = depth;
             break;
         }
         case 'bang': break;
@@ -228,16 +240,20 @@ assert.equal(bank.slots[1].pitchScale, 5);
 assert.deepEqual(bank.slots[1].mixerMutes, [0, 1, 0, 1]);
 assert.equal(bank.slots[1].mixerSolos, undefined);
 assert.deepEqual(bank.slots[1].curves, initialCurves);
-assert.equal(bank.slots[1].globalGains[63], -35);
+assert.equal(bank.slots[1].gains[roomSendRoute], -20);
+assert.equal(bank.slots[1].globalGains[lastLegacyGlobalRoute], -35);
+assert.equal(bank.slots[1].globalGains[lastDriftRoute], 60);
 assert.deepEqual(bank.slots[1].selection, { window: 3, lfo: 7, target: 7 });
 
 sourceState.positions[1][0] = 26;
 modState.curves[0][1] = 0;
 modState.gains[0] = 100;
-modState.gains[241] = 25;
-modState.gains[287] = 0;
+modState.gains[fourthLoopLevel] = 25;
+modState.gains[lastLegacyLoopRoute] = 0;
+modState.gains[roomSendRoute] = 0;
 modState.globalGains[0] = 10;
-modState.globalGains[63] = 0;
+modState.globalGains[lastLegacyGlobalRoute] = 0;
+modState.globalGains[lastDriftRoute] = 0;
 modState.rates[7] = 5;
 modState.shapes[7] = 1;
 modState.currentLfo = 0;
@@ -261,10 +277,12 @@ assert.equal(sourceState.normalPlaying, false);
 assert.equal(sourceState.path, '/test/audio.wav');
 assert.deepEqual(modState.curves, initialCurves);
 assert.equal(modState.gains[0], 0);
-assert.equal(modState.gains[241], -100);
-assert.equal(modState.gains[287], 42);
+assert.equal(modState.gains[fourthLoopLevel], -100);
+assert.equal(modState.gains[lastLegacyLoopRoute], 42);
+assert.equal(modState.gains[roomSendRoute], -20);
 assert.equal(modState.globalGains[0], 0);
-assert.equal(modState.globalGains[63], -35);
+assert.equal(modState.globalGains[lastLegacyGlobalRoute], -35);
+assert.equal(modState.globalGains[lastDriftRoute], 60);
 assert.equal(modState.rates[7], 19);
 assert.equal(modState.shapes[7], 5);
 assert.equal(modState.currentLfo, 7);
@@ -373,13 +391,15 @@ assert.equal(controls.rate_2.value, 1);
 assert.deepEqual(mixerState.mutes, [0, 0, 0, 0]);
 host.slot(2);
 assert.equal(controls.rate_2.value, 0.5);
-assert.equal(modState.gains[241], -100);
-assert.equal(modState.gains[287], 42);
+assert.equal(modState.gains[fourthLoopLevel], -100);
+assert.equal(modState.gains[lastLegacyLoopRoute], 42);
 assert.deepEqual(modState.curves, initialCurves);
 assert.equal(controls.pitch_scale.value, 5);
 assert.deepEqual(mixerState.mutes, [0, 1, 0, 1]);
 
-const oldV2Pattern = { ...bank.slots[1] };
+const oldLoopGains = bank.slots[1].gains.filter((_, index) => index % loopTargetCount < 9);
+const oldGlobalGains = bank.slots[1].globalGains.filter((_, index) => index % globalTargetCount < 8);
+const oldV2Pattern = { ...bank.slots[1], gains: oldLoopGains };
 delete oldV2Pattern.pitchScale;
 delete oldV2Pattern.mixerMutes;
 delete oldV2Pattern.globalGains;
@@ -389,6 +409,7 @@ delete oldV2Pattern.effects.fx_mode;
 oldV2Pattern.windows = oldV2Pattern.windows.map(({ echo_send, room_send, ...window }) => window);
 const oldV2Slots = bank.slots.slice();
 oldV2Slots[1] = oldV2Pattern;
+oldV2Slots[2] = { ...oldV2Pattern, globalGains: oldGlobalGains };
 files.set('/test/old-v2.json', JSON.stringify({ ...bank, slots: oldV2Slots }));
 host.read_bank('/test/old-v2.json');
 assert.match(controls.pattern_status.value, /Bank loaded/);
@@ -400,7 +421,14 @@ assert.equal(controls.room_send_2.value, 0);
 assert.equal(controls['drifting.drift_enabled'].value, 0);
 assert.equal(controls['drifting.drift_mix'].value, 35);
 assert.deepEqual(mixerState.mutes, [0, 0, 0, 0]);
+assert.equal(modState.gains[secondLfoStart], 25);
+assert.equal(modState.gains[fourthLoopLevel], -100);
+assert.equal(modState.gains[lastLegacyLoopRoute], 42);
+assert.equal(modState.gains[roomSendRoute], 0);
 assert(modState.globalGains.every(value => value === 0));
+host.slot(3);
+assert.equal(modState.globalGains[lastLegacyGlobalRoute], -35);
+assert.equal(modState.globalGains[lastDriftRoute], 0);
 
 // These are version 1 indices for W1 LFO 2 Start, W2 LFO 1 Speed,
 // W3 LFO 2 Level, and W4 LFO 3 Level.
@@ -412,6 +440,7 @@ legacyGains[106] = -100;
 const legacyPattern = {
     ...oldV2Pattern,
     gains: legacyGains,
+    globalGains: [...Array(23).fill(0), 47],
     rates: [0.1, 0.5, 15],
     shapes: [5, 0, 5],
     curves: legacyCurves,
@@ -437,16 +466,20 @@ assert.equal(modState.targetIndex, 7);
 assert.deepEqual(modState.rates, [0.1, 0.5, 15, ...defaultRates.slice(3)]);
 assert.deepEqual(modState.shapes, [5, 0, 5, ...defaultShapes.slice(3)]);
 assert.deepEqual(modState.curves, [...legacyCurves, ...Array(5).fill(defaultCurve)]);
-const migratedGains = Array(288).fill(0);
-migratedGains[9] = 25;
-migratedGains[74] = 31;
-migratedGains[160] = -18;
-migratedGains[241] = -100;
+const migratedGains = Array(4 * 8 * loopTargetCount).fill(0);
+migratedGains[secondLfoStart] = 25;
+migratedGains[loopRoute(2, 1, 3)] = 31;
+migratedGains[loopRoute(3, 2, 8)] = -18;
+migratedGains[fourthLoopLevel] = -100;
 assert.deepEqual(modState.gains, migratedGains);
+const migratedGlobals = Array(8 * globalTargetCount).fill(0);
+migratedGlobals[globalRoute(3, 8)] = 47;
+assert.deepEqual(modState.globalGains, migratedGlobals);
 host.write_bank('/test/migrated.json');
 const migratedBank = JSON.parse(files.get('/test/migrated.json'));
 assert.equal(migratedBank.version, 2);
 assert.deepEqual(migratedBank.slots[7].gains, migratedGains);
+assert.deepEqual(migratedBank.slots[7].globalGains, migratedGlobals);
 
 const denseCurve = [];
 for (let point = 0; point <= 1024; point++) {
@@ -463,12 +496,13 @@ assert.match(controls.pattern_status.value, /Bank loaded/);
 host.slot(8);
 assert.deepEqual(modState.curves[7], denseCurve);
 
-console.log('PASS pattern store, cancel, overwrite, visible slots, pitch snap, mixer mutes, and v1/v2 bank round-trip');
+console.log('PASS pattern store, pitch snap, mixer mutes, and route migration for v1 and v2 banks');
 
 host.read_bank('/test/bank.json');
 modState.selected = 4;
-modState.targetIndex = 7;
-modState.globalGains[63] = -75;
+modState.targetIndex = 21;
+modState.globalGains[lastDriftRoute] = -75;
+modState.gains[roomSendRoute] = -22;
 sourceState.path = '/test/sets/Écho.wav';
 controls.pan_1.value = -62;
 host.slot(1, 1);
@@ -485,8 +519,9 @@ assert.equal(set.source.relative, 'Écho.wav');
 assert.equal(set.slots[0].windows[0].pan, -62);
 assert.equal(set.current.windows[0].pan, 37);
 assert.deepEqual(set.sequence, programmedSequence);
-assert.equal(set.current.globalGains[63], -75);
-assert.equal(set.current.selection.globalTarget, 7);
+assert.equal(set.current.gains[roomSendRoute], -22);
+assert.equal(set.current.globalGains[lastDriftRoute], -75);
+assert.equal(set.current.selection.globalTarget, 21);
 files.set(destination, files.get(stage));
 host.set_written(1, stage);
 assert.equal(controls.pattern_status.value, 'Pattern 1 stored.');
@@ -544,6 +579,9 @@ assert.equal(controls.pattern_3.text, '3');
 assert.equal(controls.pan_1.value, 37);
 assert.equal(controls.pattern_status.value, 'Click to recall. Shift-click to store.');
 assert.equal(controls.set_status.value, 'Set opened · First.json');
+assert.equal(modState.gains[roomSendRoute], -22);
+assert.equal(modState.globalGains[lastDriftRoute], -75);
+assert.equal(modState.targetIndex, 21);
 host.slot(1);
 assert.equal(controls.pan_1.value, -62);
 assert.equal(controls.set_status.value, 'Set opened · First.json');
@@ -566,6 +604,11 @@ assert.equal(controls.pan_1.value, 37);
 assert.deepEqual(sequenceState.data, programmedSequence);
 assert.equal(sequenceState.running, false);
 const { sequence: ignoredSequence, ...olderSet } = set;
+olderSet.current = { ...olderSet.current, gains: oldLoopGains, globalGains: oldGlobalGains,
+                     selection: { window: 0, lfo: 7, target: 0, globalTarget: 7 } };
+olderSet.slots = olderSet.slots.slice();
+olderSet.slots[0] = { ...olderSet.slots[0], gains: oldLoopGains, globalGains: oldGlobalGains,
+                      selection: { window: 0, lfo: 7, target: 0, globalTarget: 7 } };
 files.set('/test/sets/Older.json', JSON.stringify(olderSet));
 files.set('/test/sets/Écho.wav', 'sample');
 const validatedSequences = sequenceState.validations.length;
@@ -576,6 +619,21 @@ host.set_source_loaded(1);
 assert.equal(sequenceState.restores.at(-1).data, undefined);
 assert.deepEqual(sequenceState.data, blankSequence);
 assert.equal(sequenceState.running, false);
+assert.equal(modState.gains[fourthLoopLevel], -100);
+assert.equal(modState.gains[lastLegacyLoopRoute], 42);
+assert.equal(modState.gains[roomSendRoute], 0);
+assert.equal(modState.globalGains[lastLegacyGlobalRoute], -35);
+assert.equal(modState.globalGains[lastDriftRoute], 0);
+assert.equal(modState.targetIndex, 7);
+modState.gains[fourthLoopLevel] = 0;
+modState.gains[roomSendRoute] = 19;
+modState.globalGains[lastLegacyGlobalRoute] = 0;
+modState.globalGains[lastDriftRoute] = 15;
+host.slot(1);
+assert.equal(modState.gains[fourthLoopLevel], -100);
+assert.equal(modState.gains[roomSendRoute], 0);
+assert.equal(modState.globalGains[lastLegacyGlobalRoute], -35);
+assert.equal(modState.globalGains[lastDriftRoute], 0);
 recorderState.state = 'recording';
 host.open_set();
 assert.match(controls.set_status.value, /Stop recording/);

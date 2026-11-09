@@ -240,6 +240,14 @@ def effects_pad(p, enabled, tone, echo, room):
     panel.cord(pad, menu_feedback)
     panel.cord(menu_feedback, destination, outlet=2)
 
+    close = panel.add("textbutton", [426, 434, 68, 22], view=[350, 13, 66, 25],
+                      outs=3, types=["bang", "", "int"], mode=0, outputmode=1,
+                      varname="fx_pad_close", text="Close", texton="Close")
+    close_message = panel.add("message", [426, 478, 62, 22], ins=2, outs=1, text="wclose")
+    this_window = panel.obj("thispatcher", 426, 516, 84, ins=1, outs=2)
+    panel.cord(close, close_message)
+    panel.cord(close_message, this_window)
+
     choices = ["Tone tilt", ",", "Echo mix", ",", "Room mix"]
     for axis, (label, view) in enumerate((("x", [50, 49, 152, 24]), ("y", [244, 49, 172, 24]))):
         x = 165 + axis * 128
@@ -270,11 +278,12 @@ def effects_pad(p, enabled, tone, echo, room):
     p.cord(window, subpatch)
     p.cord(motion, subpatch)
 
-    edit = p.obj("route tone echo space", 0, 520, 144, outs=4, types=["", "", "", ""])
+    edit = p.obj("route tone echo space fx_enabled", 0, 520, 204, outs=5, types=[""] * 5)
     state = p.obj("pak 0 20 18", 164, 424, 82, ins=3, types=["list"])
     state_message = p.obj("prepend source", 164, 456, 105, ins=2)
     bypass_message = p.obj("prepend enabled", 294, 456, 114, ins=2)
     p.cord(subpatch, edit)
+    p.cord(edit, enabled, outlet=3)
     for index, dial in enumerate((tone, echo, room)):
         p.cord(edit, dial, outlet=index)
         p.cord(dial, state, inlet=index)

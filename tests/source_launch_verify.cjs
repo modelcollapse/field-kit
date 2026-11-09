@@ -136,21 +136,50 @@ assert(sent('run_4', 0));
 assert(!sent('buffer', 'replace', '/fixture/Stereo Test.wav'));
 runTask('read_source');
 assert(sent('buffer', 'replace', '/fixture/Stereo Test.wav'));
+assert(!sent('run_1', 1));
 frames = 192000;
 channels = 1;
 host.source_loaded(48000);
 assert(sent('source_label', 'set', 'Stereo Test.wav   ·   4.00 s   ·   mono'));
 assert(sent('normal_right_channel', 1));
 assert.deepEqual(regions.at(-1), [3, 3000, 4000]);
-host.edit_play(1, 1);
+for (let voice = 1; voice <= 4; voice++) assert(sent(`run_${voice}`, 1));
+trace.length = 0;
 host.dsp_enabled(0);
 assert(sent('run_1', 0));
 
+trace.length = 0;
 host.open_source('/fixture/missing.wav');
 runTask('read_source');
-runTask('read_timeout');
+assert.deepEqual(trace.filter(([name]) => name === 'buffer'), [
+    ['buffer', 'sizeinsamps', 1], ['buffer', 'replace', '/fixture/missing.wav'],
+]);
+frames = 1;
+host.source_loaded(48000);
 assert(sent('source_label', 'set', 'No source'));
 assert(sent('wave_4', 'set'));
+assert(!sent('dac', 'start'));
+
+trace.length = 0;
+host.open_source('/fixture/Stopped During Load.wav');
+runTask('read_source');
+host.stop_all();
+frames = 192000;
+host.source_loaded(48000);
+assert.equal(host.get_set_source().path, '/fixture/Stopped During Load.wav');
+assert(!sent('dac', 'start'));
+
+trace.length = 0;
+host.open_source('/fixture/Start With Audio Off.wav');
+runTask('read_source');
+assert(!sent('dac', 'start'));
+host.source_loaded(48000);
+assert(sent('dac', 'start'));
+assert(!sent('run_1', 1));
+settleAudio();
+for (let voice = 1; voice <= 4; voice++) assert(sent(`run_${voice}`, 1));
+host.set_audio(0);
+
 trace.length = 0;
 host.load_demo();
 host.edit_play(2, 1);
@@ -386,4 +415,4 @@ filterEditorShows(55, 2);
 host.inspector_edit('filter', 0);
 filterEditorShows(0, 1);
 
-console.log('PASS normal transport, staged Set source commit/rollback, descriptor tracking, concurrent loads, and filter selection');
+console.log('PASS file load autoplay, normal transport, staged Set source commit/rollback, concurrent loads, and filter selection');

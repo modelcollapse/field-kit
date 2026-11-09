@@ -23,7 +23,7 @@ START_HERE = """FIELD KIT for Max
 
 1. Extract the ZIP and open the Field Kit folder.
 2. Double-click Open FIELD KIT.maxpat. This download requires Max 9.
-3. Click Play all to hear the demo, or Load audio... to choose a sample.
+3. Click Play all to hear the demo. To play a new sample, open Source, Input & Files and choose Load audio… The four loops start as soon as the file is ready.
 4. Choose Slate, Moss, or Ember from Theme in the header.
 
 Open Source, Input & Files. Select your interface in Audio Setup and enable audio. In Input, choose the
@@ -53,7 +53,7 @@ and Room sends in the Mix workspace. The four rows edit each loop; Return level
 edits the same Echo and Room mix controls as the Main FX dials.
 Open FX pad and choose Tone tilt, Echo mix, or Room mix for each axis.
 X starts on Echo mix and Y starts on Room mix. Drag right or up to increase the value.
-Tone tilt goes from dark through neutral to bright. Enable FX to hear the result.
+Tone tilt goes from dark through neutral to bright. Click Enable FX in the pad or the Main FX header to hear the result.
 Click Record, drag and release, then click Play to loop the recorded effect pair.
 Stop holds the current values. Clear erases the gesture. Both pads keep gestures
 while the patch is open. Stop all and recalling a pattern stop the gestures.
@@ -72,8 +72,11 @@ the final stereo output to a WAV, and Stop mix when you finish.
 The L and R master meters show each output channel. A red CLIP light identifies
 the channel that hit the output ceiling. Lower Master if either light comes on.
 
-In the modulation patchbay, choose a window for loop controls or Global for Master,
-Input gain, Tone, Echo, and Room. Any LFO can route to any destination.
+In the modulation patchbay, choose a loop for its playback, mixer, filter, Drive,
+Echo send, and Room send controls. Choose Global for Master, Input gain, Main FX,
+and Drifting Memory. Any of the eight LFOs can route to any of the 66 destinations.
+Drifting Memory cutoff routes apply in Sweep; timing routes apply in Rhythmic.
+Applied value shows what the destination receives while audio is on.
 The lower left graph shows the selected LFO shape. Choose Breakpoint or click Use curve
 to edit that LFO's own curve. The lower right graph shows the live signal while audio is on.
 

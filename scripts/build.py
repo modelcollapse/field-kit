@@ -9,6 +9,7 @@ import wave
 from pathlib import Path
 
 from build_drift_advanced import layout_drift_advanced
+from build_drift_modulation import DRIFT_MOD_TARGETS, append_drift_modulation
 from build_fx import DIALS as FX_DIALS
 from build_master_meter import append_master_meter
 from build_performance_layout import PERFORMANCE_WINDOW_HEIGHT, layout_performance
@@ -48,7 +49,9 @@ INSPECTOR_DIALS = {
 LOOP_SENDS = ("echo_send", "room_send")
 WINDOW_MOD_CHANNELS = 4 * len(CELLS)
 FX_MOD_CHANNELS = len(FX_DIALS)
-MOD_CHANNELS = WINDOW_MOD_CHANNELS + 2 + FX_MOD_CHANNELS
+SEND_MOD_START = WINDOW_MOD_CHANNELS + 2 + FX_MOD_CHANNELS
+DRIFT_MOD_START = SEND_MOD_START + 4 * len(LOOP_SENDS)
+MOD_CHANNELS = DRIFT_MOD_START + len(DRIFT_MOD_TARGETS)
 
 MARGIN = 16
 TRACK = 48
@@ -656,11 +659,18 @@ def stereo_field(p):
     canvas_rect = [12, 12, 480, 346]
     field.add("canvas", "jsui", canvas_rect, view=canvas_rect,
               filename="fk_stereo_field.js", border=0, parameter_enable=0, types=[""])
-    help_rect = [12, 368, 480, 22]
+    help_rect = [12, 368, 392, 22]
     field.add("help", "comment", help_rect, outs=0, view=help_rect, fontsize=12,
               text="Select a loop, then drag its dot. X = pan. Y = level.")
     field.connect("input", 0, "canvas")
     field.connect("canvas", 0, "output")
+    field.add("stereo_field_close", "textbutton", [310, 396, 78, 22],
+              view=[414, 366, 78, 23], outs=3, types=["bang", "", "int"],
+              mode=0, outputmode=1, text="Close", texton="Close")
+    field.add("stereo_field_close_message", "message", [310, 428, 62, 22], ins=2, text="wclose")
+    field.obj("stereo_field_thispatcher", "thispatcher", 310, 460, outs=2)
+    field.connect("stereo_field_close", 0, "stereo_field_close_message")
+    field.connect("stereo_field_close_message", 0, "stereo_field_thispatcher")
 
     p.add("stereo_field_open_message", "message", [3040, 1880, 52, 22], ins=2, text="open")
     p.obj("stereo_field_window", "pcontrol", 3040, 1910)
@@ -760,11 +770,20 @@ def loop_send_gains(p, voice, y):
               **parameter(f"Loop {voice} {key.replace('_', ' ')}", 0, 0, 100, unit_style=5))
         p.obj(name + "_percent", "* 0.01", x, y + 28, ins=2)
         p.obj(name + "_ramp", "pack 0. 20.", x, y + 56, ins=2)
-        p.obj(name + "_gain", "line~ 0.", x, y + 84, ins=2, outs=2, types=["signal", "bang"])
+        p.obj(name + "_base_gain", "line~ 0.", x, y + 84, ins=2, outs=2, types=["signal", "bang"])
         p.obj(name + "_sync", f"prepend inspector_sync {voice} {key}", x, y + 114, ins=2)
+        p.obj(name + "_mod", "slide~ 240 240", x + 660, y + 28, ins=3, types=["signal"])
+        p.obj(name + "_sum", "+~", x + 660, y + 56, ins=2, types=["signal"])
+        p.obj(name + "_gain", "clip~ 0. 1.", x + 660, y + 84, ins=3, types=["signal"])
+        route = SEND_MOD_START + (voice - 1) * len(LOOP_SENDS) + index
+        p.connect("mod_signals", route, name + "_mod")
+        p.connect(name + "_base_gain", 0, name + "_sum")
+        p.connect(name + "_mod", 0, name + "_sum", 1)
+        p.connect(name + "_sum", 0, name + "_gain")
+        p.connect(name + "_gain", 0, "watch_target", route + 1)
         p.connect(name, 0, name + "_percent")
         p.connect(name + "_percent", 0, name + "_ramp")
-        p.connect(name + "_ramp", 0, name + "_gain")
+        p.connect(name + "_ramp", 0, name + "_base_gain")
         p.connect(name, 0, name + "_sync")
         p.connect(name + "_sync", 0, "source_control")
         mirror = name + "_performance_sync"
@@ -778,9 +797,11 @@ def drifting_memory(p):
     panel = json.loads((ROOT / "fk_drifting_delay.maxpat").read_text(encoding="utf-8"))["patcher"]
     append_drifting_taps(panel)
     layout_drift_advanced(panel, parameter)
+    append_drift_modulation(panel)
     view = [MARGIN + PERFORMANCE_RIGHT_OFFSET, MODULATION_TOP, PERFORMANCE_RIGHT_WIDTH, PERFORMANCE_HEIGHT]
-    p.add("drifting_memory", "bpatcher", [1410, 1840, 142, 22], view=view, ins=3, outs=6,
-          types=["signal"] * 4 + ["", ""], patcher=panel, embed=1, hidden=1,
+    mod_count = len(DRIFT_MOD_TARGETS)
+    p.add("drifting_memory", "bpatcher", [1410, 1840, 142, 22], view=view, ins=3 + mod_count, outs=6 + mod_count,
+          types=["signal"] * 4 + ["", ""] + ["signal"] * mod_count, patcher=panel, embed=1, hidden=1,
           border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0, lockeddragscroll=0,
           clickthrough=0, bgmode=0)
     p.add("drifting_memory_show", "message", [1410, 1760, 108, 22], ins=2, text="drift_advanced 1")
@@ -1110,6 +1131,10 @@ def build():
         index = WINDOW_MOD_CHANNELS + channel
         p.connect("mod_signals", index, "mix_fx", channel)
         p.connect("mix_fx", channel, "watch_target", index + 1)
+    for slot in range(len(DRIFT_MOD_TARGETS)):
+        index = DRIFT_MOD_START + slot
+        p.connect("mod_signals", index, "drifting_memory", 3 + slot)
+        p.connect("drifting_memory", 6 + slot, "watch_target", index + 1)
     layout_performance(p, parameter)
     p.save()
 

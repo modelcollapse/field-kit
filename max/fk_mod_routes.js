@@ -9,8 +9,20 @@ var DEFAULT_SHAPES = [0, 1, 2, 0, 1, 0, 1, 0];
 var SHAPE_LABELS = ["Sine", "Triangle", "Saw", "Square", "S&H  ·  example", "Breakpoint curve"];
 var BREAKPOINT = 5;
 var LFOS = DEFAULT_RATES.length;
-var TARGETS = ["Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan"];
-var GLOBAL_TARGETS = ["Master", "Input gain", "Tone tilt", "Echo mix", "Echo time", "Echo feedback", "Room mix", "Room decay"];
+var TARGETS = ["Start", "End", "Speed", "Direction", "Crossfade", "Drive", "Filter", "Level", "Pan", "Echo send", "Room send"];
+var GLOBAL_TARGETS = [
+    "Master", "Input gain", "Tone tilt", "Echo mix", "Echo time", "Echo feedback", "Room mix", "Room decay",
+    "Drift mix", "Drift feedback", "Drift blur", "Drift amount", "Drift drive", "Drift dynamics",
+    "Drift input trim", "Drift output trim", "Drift width", "Drift pitch", "Drift HPF Hz", "Drift LPF Hz",
+    "Drift BPM", "Drift beats/bar"
+];
+var DRIFT_UNITS = ["%", "%", "%", "%", "%", "%", " dB", " dB", "%", " st", " Hz", " Hz", " BPM", " beats"];
+var VOICE_TARGETS = 9;
+var MAIN_TARGETS = 8;
+var SEND_TARGETS = TARGETS.length - VOICE_TARGETS;
+var MAIN_START = WINDOWS * VOICE_TARGETS;
+var SEND_START = MAIN_START + MAIN_TARGETS;
+var DRIFT_START = SEND_START + WINDOWS * SEND_TARGETS;
 var DIRECTIONS = ["Forward", "Reverse", "Ping-pong"];
 var TABLE_SIZE = 1025;
 var CURVE_FADE_MS = 24;
@@ -76,7 +88,11 @@ function routeGains(windowIndex) {
 routeGains.local = 1;
 
 function channel(windowIndex, destination) {
-    return windowIndex * TARGETS.length + destination;
+    if (windowIndex === WINDOWS) {
+        return destination < MAIN_TARGETS ? MAIN_START + destination : DRIFT_START + destination - MAIN_TARGETS;
+    }
+    if (destination < VOICE_TARGETS) return windowIndex * VOICE_TARGETS + destination;
+    return SEND_START + windowIndex * SEND_TARGETS + destination - VOICE_TARGETS;
 }
 channel.local = 1;
 
@@ -457,7 +473,11 @@ function effective(value) {
         return;
     }
     var display;
-    if (selected === WINDOWS && targetIndex < 2) {
+    if (selected === WINDOWS && targetIndex >= MAIN_TARGETS) {
+        var unit = DRIFT_UNITS[targetIndex - MAIN_TARGETS];
+        var number = unit === "%" ? value * 100 : value;
+        display = number.toFixed(unit === " Hz" ? 0 : unit === " beats" ? 2 : 1) + unit;
+    } else if (selected === WINDOWS && targetIndex < 2) {
         display = value.toFixed(1) + " dB";
     } else if (selected === WINDOWS && targetIndex === 4) {
         display = value.toFixed(1) + " ms";

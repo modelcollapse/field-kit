@@ -19,6 +19,7 @@ var targets = [
 ];
 var axes = [1, 2];
 var fxOn = false;
+var enableButton = [238, 13, 104, 25];
 var dragging = false;
 var publishing = false;
 var armed = false;
@@ -160,8 +161,11 @@ function paint() {
     mgraphics.set_font_size(19);
     label("Effects pad", 24, 33, colors.ink);
     mgraphics.set_font_size(12);
-    var status = fxOn ? "FX ACTIVE" : "FX BYPASSED";
-    label(status, grid.right - mgraphics.text_measure(status)[0], 32, fxOn ? colors.accent : colors.muted);
+    var fxLabel = fxOn ? "FX on" : "Enable FX";
+    rectangle(enableButton[0], enableButton[1], enableButton[2], enableButton[3],
+              fxOn ? colors.accent : colors.grid);
+    label(fxLabel, enableButton[0] + (enableButton[2] - mgraphics.text_measure(fxLabel)[0]) / 2,
+          enableButton[1] + 17, fxOn ? colors.inset : colors.ink);
     label("X", 24, 66, colors.accent);
     label("Y", 218, 66, colors.accent);
     paintMotionControls(grid);
@@ -187,7 +191,7 @@ function paint() {
     label("X · " + xTarget.name + "  " + formatValue(xTarget, xTarget.value), 24, grid.height - 34, colors.ink);
     label("Y · " + yTarget.name + "  " + formatValue(yTarget, yTarget.value), 218, grid.height - 34, colors.ink);
     var caption = fxOn ? "Drag to blend the assigned effects. The dials follow."
-                      : "Enable FX in Mix effects to hear these settings.";
+                      : "Turn on FX above to hear the assigned effects.";
     if (recording) caption = "Release to save motion.";
     else if (armed) caption = "Drag the pad to record motion.";
     else if (clip) {
@@ -323,6 +327,11 @@ function motionFrame() {
 
 function onclick(x, y) {
     var grid = bounds();
+    if (x >= enableButton[0] && x < enableButton[0] + enableButton[2] &&
+        y >= enableButton[1] && y < enableButton[1] + enableButton[3]) {
+        outlet(0, "fx_enabled", fxOn ? 0 : 1);
+        return;
+    }
     if (y >= grid.buttonTop && y < grid.buttonTop + grid.buttonHeight && x >= grid.buttonLeft) {
         var offset = x - grid.buttonLeft;
         var control = motionControls()[Math.floor(offset / grid.buttonPitch)];

@@ -6259,8 +6259,8 @@
           "id": "obj-156",
           "varname": "drifting_memory",
           "maxclass": "bpatcher",
-          "numinlets": 3,
-          "numoutlets": 6,
+          "numinlets": 17,
+          "numoutlets": 20,
           "patching_rect": [
             1410,
             1840,
@@ -7552,17 +7552,31 @@
                 "box": {
                   "id": "obj-33",
                   "maxclass": "newobj",
-                  "numinlets": 2,
-                  "numoutlets": 4,
+                  "numinlets": 16,
+                  "numoutlets": 18,
                   "patching_rect": [
                     182,
                     242,
-                    157,
+                    970,
                     23
                   ],
                   "text": "gen~",
                   "varname": "engine",
                   "outlettype": [
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
+                    "signal",
                     "signal",
                     "signal",
                     "signal",
@@ -7574,7 +7588,7 @@
                     "rect": [
                       0,
                       0,
-                      740,
+                      1040,
                       560
                     ],
                     "boxes": [
@@ -7582,9 +7596,23 @@
                         "box": {
                           "id": "code",
                           "maxclass": "codebox",
-                          "numinlets": 2,
-                          "numoutlets": 4,
+                          "numinlets": 16,
+                          "numoutlets": 18,
                           "outlettype": [
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
                             "",
                             "",
                             "",
@@ -7593,10 +7621,10 @@
                           "patching_rect": [
                             24,
                             64,
-                            675,
+                            970,
                             425
                           ],
-                          "code": "// Explicitly wrap the two interpolation neighbors at the musical loop edge.\n// Generation tags make Clear immediate without clearing millions of samples.\nreadRhythm(memory, phase, length, epoch, lane) {\n    position = wrap(phase, 0, length);\n    leftIndex = floor(position);\n    rightIndex = wrap(leftIndex + 1, 0, length);\n    fraction = position - leftIndex;\n    left = peek(memory, leftIndex, 2) == epoch ? peek(memory, leftIndex, lane) : 0;\n    right = peek(memory, rightIndex, 2) == epoch ? peek(memory, rightIndex, lane) : 0;\n    return left + fraction * (right - left);\n}\n\n// Map each logical slice to a different stored slice. A short edge fade\n// makes the reordered boundaries work in either playback direction.\nreadRhythmFx(memory, phase, length, epoch, lane, cuts, rotation, stride, edgeFrames) {\n    readPhase = phase;\n    edgeGain = 1;\n    if (cuts > 1) {\n        sliceLength = length / cuts;\n        position = wrap(phase, 0, length);\n        slice = min(cuts - 1, floor(position / sliceLength));\n        within = position - slice * sliceLength;\n        fromSlice = wrap(slice * stride + rotation, 0, cuts);\n        readPhase = fromSlice * sliceLength + within;\n        fadeLength = max(0.001, min(edgeFrames, 0.20 * sliceLength));\n        edge = clamp(min(within, sliceLength - within) / fadeLength, 0, 1);\n        edgeGain = edge * edge * (3 - 2 * edge);\n    }\n    return edgeGain * readRhythm(memory, readPhase, length, epoch, lane);\n}\n\n// The lifted write cursor visits a contiguous interval after Clear, even\n// when it reverses. Gate both ends of every interpolated read against it.\nreadWritten(memory, address, firstWritten, writtenSpan, lane) {\n    length = dim(memory);\n    index = wrap(address, 0, length);\n    distance = wrap(floor(index) - firstWritten, 0, length);\n    nextDistance = wrap(distance + 1, 0, length);\n    ready = distance <= writtenSpan && (index == floor(index) || nextDistance <= writtenSpan);\n    return ready ? peek(memory, index, lane, interp=\"linear\", boundmode=\"wrap\") : 0;\n}\n\n// At a flip, the old tap first retraces the just-heard tape. The turning\n// head then follows the old recording just ahead of the writer, so an\n// unheard recent take is replayed before its cells are overwritten.\n// Once a full delay has passed, hand off to newly written material.\nreadTransport(memory, head, direction, travel, distance, baseDelay, handoff, firstWritten, writtenSpan, lane) {\n    afterTurn = clamp((travel - baseDelay - 2) / handoff, 0, 1);\n    normal = readWritten(memory, head - direction * distance, firstWritten, writtenSpan, lane);\n    signal = normal;\n    if (afterTurn < 1) {\n        offset = distance - baseDelay;\n        oldAddress = head + direction * clamp(baseDelay - offset, 1, dim(memory) - 2);\n        turnAddress = head + direction * clamp(1 - offset, 1, dim(memory) - 2);\n        oldSide = readWritten(memory, oldAddress, firstWritten, writtenSpan, lane);\n        turnSide = readWritten(memory, turnAddress, firstWritten, writtenSpan, lane);\n        turnFade = clamp(travel / handoff, 0, 1);\n        inherited = oldSide + turnFade * (turnSide - oldSide);\n        signal = inherited + afterTurn * (normal - inherited);\n    }\n    return signal;\n}\n\n// Program and speed codes are integers. A half-step bias prevents\n// reciprocal rounding at the exact boundaries in Max 9.1.5.\n// 24 seconds per lane at 192 kHz. All twelve programs share these lanes.\nData tape(4608000, 4);\n// Separate stereo loop and per-frame generation tag. A long loop exceeding\n// this allocation reduces stored sample density but keeps its beat period.\nData rhythmTape(4608000, 3);\nData rhythmVerbTape(16384, 4);\nParam tempo(120, min=20, max=400);\nParam beats_per_bar(4, min=0.5, max=32);\nParam rhythm_free(0, min=0, max=1);\nParam rhythm_style(0, min=0, max=6);\nParam mode(0, min=0, max=4);\nParam size(0, min=0, max=2);\nParam record(0, min=0, max=3);\nParam reverse(0);\nParam half_speed(0);\nParam pitch(0, min=-12, max=0);\nParam erase(0);\nParam clear(0, min=0, max=1000000);\nParam hold(0, min=0, max=1);\nParam panic(0, min=0, max=1000000);\nParam width(1, min=0, max=2);\nParam feedback(0.82, min=0, max=1.1);\nParam blur(0.32);\nParam drift(0.45);\nParam mix(1);\nParam drive(0);\nParam dynamics(0, min=-1, max=1);\nParam hpf(0, min=0, max=4);\nParam lpf(0, min=0, max=4);\nParam hpf_hz(65, min=20, max=2000);\nParam lpf_hz(5600, min=200, max=20000);\nParam input_db(0, min=-24, max=12);\nParam output_db(0, min=-24, max=6);\nParam mono_input(0);\nParam input_gate(1, min=0, max=2);\nHistory monoAmount(0);\nHistory gateEnvelope(0);\nHistory gateGain(0);\n\nHistory writeHead(0);\nHistory rhythmFade(0);\nHistory rhythmFrames(0);\nHistory rhythmFirstPeriod(0);\nHistory rhythmCursor(0);\nHistory rhythmRightCursor(0);\nHistory rhythmLastStyle(0);\nHistory rhythmTakeFree(0);\nHistory rhythmStyleFade(0);\nHistory rhythmRightLastSample(0);\nHistory rhythmRightFadeFrom(0);\nHistory rhythmEpoch(1);\nHistory rhythmRecordingFirst(0);\nHistory rhythmGrainPhase(0);\nHistory rhythmFxCycle(0);\nHistory rhythmOctaveState(1);\nHistory rhythmVerbHead(0);\nHistory rhythmVerbWritten(0);\nHistory rhythmVerbTailFrames(0);\nHistory rhythmVerbPanic(0);\nHistory rhythmVerbControl(0);\nHistory rhythmVerbToneStateA(0);\nHistory rhythmVerbToneStateB(0);\nHistory rhythmVerbToneStateC(0);\nHistory rhythmVerbToneStateD(0);\nHistory wetHighL(0);\nHistory wetHighR(0);\nHistory wetLowL(0);\nHistory wetLowR(0);\nHistory firstWritten(0);\nHistory lastWritten(-1);\nHistory transportDirection(1);\nHistory directionFrames(4608000);\nHistory clearSeen(0);\nHistory fadeLeft(0);\nHistory holdState(0);\nHistory panicSeen(0);\nHistory panicClearing(0);\nHistory panicNeedsOff(0);\nHistory widthState(1);\nHistory pitchRatioState(1);\nHistory sourceConfig(0);\nHistory targetConfig(0);\nHistory changePhase(1);\nHistory captureA(0);\nHistory captureB(0);\nHistory feedbackState(0.82);\nHistory blurState(0.32);\nHistory driftState(0.45);\nHistory mixState(0.55);\nHistory driveState(0);\nHistory dynamicsState(0);\nHistory eraseState(0);\nHistory inputGain(1);\nHistory outputGain(1);\nHistory highState(0);\nHistory highMix(0);\nHistory lowState(0);\nHistory lowMix(0);\nHistory inputEnvelope(0);\nHistory combinedEnvelope(0);\nHistory panPhaseA(0.13);\nHistory panPhaseB(0.47);\nHistory wanderPhaseA(0.18);\nHistory wanderPhaseB(0.64);\nHistory grainClock(0);\nHistory captureClock(0);\nHistory wasRecording(0);\nHistory chaosClockA(0.37);\nHistory chaosClockB(0.73);\nHistory chaosA(0.371);\nHistory chaosB(0.617);\nHistory wanderA(0.371);\nHistory wanderB(0.617);\nHistory toneHighA(0);\nHistory toneLowA(0);\nHistory toneHighB(0);\nHistory toneLowB(0);\nHistory toneHighC(0);\nHistory toneLowC(0);\nHistory toneHighD(0);\nHistory toneLowD(0);\n\ntwoPi = 6.283185307179586;\ncapacity = dim(tape);\nfadeFrames = max(2, round(samplerate * 0.025));\n// Panic uses the same wet fade and buffer invalidation as Clear All.\npanicPressed = panic != panicSeen;\npanicClearActive = panicPressed || panicClearing;\nnewClear = ((clear != clearSeen) || panicPressed) && (fadeLeft == 0);\ncleared = fadeLeft == 1;\nremaining = newClear ? fadeFrames : max(0, fadeLeft - 1);\nwetFade = remaining > 0 ? remaining / fadeFrames : 1;\nwrittenSpan = cleared ? -1 : min(lastWritten - firstWritten, capacity - 1);\nwriteIndex = wrap(writeHead, 0, capacity);\ndirection = reverse >= 0.5 ? -1 : 1;\nturned = direction != transportDirection;\ntravel = turned ? 0 : directionFrames;\nhandoff = max(2, round(0.04 * samplerate));\n\n// Crossfade discrete programs and half-speed reads. A quick series of changes\n// settles on the most recent selection after the current fade completes.\nrhythmSelected = round(clamp(mode, 0, 4)) == 4;\nrhythmFadeStep = 1.0 / (0.12 * samplerate);\nrhythmNextFade = rhythmSelected ? min(1, rhythmFade + rhythmFadeStep) : max(0, rhythmFade - rhythmFadeStep);\nrhythmBlend = rhythmNextFade * rhythmNextFade * (3 - 2 * rhythmNextFade);\nambientRuns = !rhythmSelected || rhythmNextFade < 1;\nrhythmRuns = rhythmSelected || rhythmFade > 0;\nrequested = rhythmSelected ? targetConfig : 3 * round(clamp(mode, 0, 3)) + round(clamp(size, 0, 2))\n          + 12 * (half_speed >= 0.5);\nstartChange = (changePhase >= 1) && (requested != targetConfig);\noldConfig = startChange ? targetConfig : sourceConfig;\nnewConfig = startChange ? requested : targetConfig;\nprogress = startChange ? 0 : min(1, changePhase + 1.0 / (0.12 * samplerate));\namount = progress * progress * (3 - 2 * progress);\noldProgram = oldConfig - 12 * floor((oldConfig + 0.5) / 12.0);\nnewProgram = newConfig - 12 * floor((newConfig + 0.5) / 12.0);\noldMode = floor((oldProgram + 0.5) / 3.0);\nnewMode = floor((newProgram + 0.5) / 3.0);\n\n// Prime lengths at 48 kHz, scaled to the host's sample rate.\ndriftPan = clamp(driftState, 0, 1);\nholdOn = hold >= 0.5;\nholdStep = 1 / (0.025 * samplerate);\nholdMix = holdOn ? min(1, holdState + holdStep) : max(0, holdState - holdStep);\n// At Hold or unity, the wet readers still wander, but integer feedback\n// taps avoid accumulating interpolation loss in the circulating copy.\ntapFeedback = feedbackState + holdMix * (1 - feedbackState);\nfeedbackMotion = clamp((0.9995 - tapFeedback) * 50, 0, 1);\nchaosTickA = chaosClockA + (0.19 + 0.12 * wanderB) / samplerate;\nchaosTickB = chaosClockB + (0.31 + 0.10 * wanderA) / samplerate;\nchaosNextA = chaosTickA >= 1 ? 3.91 * chaosA * (1 - chaosA) : chaosA;\nchaosNextB = chaosTickB >= 1 ? 3.97 * chaosB * (1 - chaosB) : chaosB;\nchaosSlew = 1 - exp(-1 / (0.77 * samplerate));\nslowA = wanderA + chaosSlew * (chaosNextA - wanderA);\nslowB = wanderB + chaosSlew * (chaosNextB - wanderB);\noffsetA = 0.58 * sin(twoPi * panPhaseA) + 0.42 * (2 * slowA - 1);\noffsetB = 0.58 * sin(twoPi * panPhaseB) + 0.42 * (2 * slowB - 1);\noffsetC = 0.61 * sin(twoPi * (panPhaseA + 0.29)) - 0.39 * (2 * slowB - 1);\noffsetD = 0.61 * sin(twoPi * (panPhaseB + 0.41)) - 0.39 * (2 * slowA - 1);\noldSize = oldProgram - 3 * oldMode;\noldPrimesA = 0; oldPrimesB = 0; oldPrimesC = 0; oldPrimesD = 0;\nif (oldMode == 0) {\n    oldPrimesA = oldSize == 0 ? 110879.0 : oldSize == 1 ? 425813.0 : 1000171.0;\n    oldPrimesB = oldSize == 0 ? 129119.0 : oldSize == 1 ? 486583.0 : 1095313.0;\n    oldPrimesC = oldSize == 0 ? 91253.0 : oldSize == 1 ? 350443.0 : 823153.0;\n    oldPrimesD = oldSize == 0 ? 99809.0 : oldSize == 1 ? 376127.0 : 846673.0;\n} else if (oldMode == 1) {\n    oldPrimesA = oldSize == 0 ? 99793.0 : oldSize == 1 ? 339289.0 : 459047.0;\n    oldPrimesB = oldSize == 0 ? 110927.0 : oldSize == 1 ? 377147.0 : 510271.0;\n    oldPrimesC = oldSize == 0 ? 124459.0 : oldSize == 1 ? 423179.0 : 572521.0;\n    oldPrimesD = oldSize == 0 ? 140593.0 : oldSize == 1 ? 478001.0 : 646721.0;\n} else if (oldMode == 2) {\n    oldPrimesA = oldSize == 0 ? 15217.0 : oldSize == 1 ? 27847.0 : 47629.0;\n    oldPrimesB = oldSize == 0 ? 22409.0 : oldSize == 1 ? 41023.0 : 70163.0;\n    oldPrimesC = oldSize == 0 ? 29423.0 : oldSize == 1 ? 53849.0 : 92107.0;\n    oldPrimesD = oldSize == 0 ? 37781.0 : oldSize == 1 ? 69127.0 : 118247.0;\n} else {\n    oldPrimesA = oldSize == 0 ? 20201.0 : oldSize == 1 ? 47903.0 : 107309.0;\n    oldPrimesB = oldSize == 0 ? 31337.0 : oldSize == 1 ? 74287.0 : 166429.0;\n    oldPrimesC = oldSize == 0 ? 42293.0 : oldSize == 1 ? 100213.0 : 224563.0;\n    oldPrimesD = oldSize == 0 ? 52951.0 : oldSize == 1 ? 125471.0 : 281131.0;\n}\noldDriftDepth = oldMode < 2 ? (0.0122 * driftPan) : oldMode == 2 ? 0.0034 : 0.0010;\noldA = round(samplerate * (oldPrimesA / 48000.0));\noldATap = clamp(oldA + samplerate * oldDriftDepth * offsetA, 2, capacity - 2);\noldB = round(samplerate * (oldPrimesB / 48000.0));\noldBTap = clamp(oldB + samplerate * oldDriftDepth * offsetB, 2, capacity - 2);\noldC = round(samplerate * (oldPrimesC / 48000.0));\noldCTap = clamp(oldC + samplerate * oldDriftDepth * offsetC, 2, capacity - 2);\noldD = round(samplerate * (oldPrimesD / 48000.0));\noldDTap = clamp(oldD + samplerate * oldDriftDepth * offsetD, 2, capacity - 2);\n\nnewSize = newProgram - 3 * newMode;\nnewPrimesA = 0; newPrimesB = 0; newPrimesC = 0; newPrimesD = 0;\nif (newMode == 0) {\n    newPrimesA = newSize == 0 ? 110879.0 : newSize == 1 ? 425813.0 : 1000171.0;\n    newPrimesB = newSize == 0 ? 129119.0 : newSize == 1 ? 486583.0 : 1095313.0;\n    newPrimesC = newSize == 0 ? 91253.0 : newSize == 1 ? 350443.0 : 823153.0;\n    newPrimesD = newSize == 0 ? 99809.0 : newSize == 1 ? 376127.0 : 846673.0;\n} else if (newMode == 1) {\n    newPrimesA = newSize == 0 ? 99793.0 : newSize == 1 ? 339289.0 : 459047.0;\n    newPrimesB = newSize == 0 ? 110927.0 : newSize == 1 ? 377147.0 : 510271.0;\n    newPrimesC = newSize == 0 ? 124459.0 : newSize == 1 ? 423179.0 : 572521.0;\n    newPrimesD = newSize == 0 ? 140593.0 : newSize == 1 ? 478001.0 : 646721.0;\n} else if (newMode == 2) {\n    newPrimesA = newSize == 0 ? 15217.0 : newSize == 1 ? 27847.0 : 47629.0;\n    newPrimesB = newSize == 0 ? 22409.0 : newSize == 1 ? 41023.0 : 70163.0;\n    newPrimesC = newSize == 0 ? 29423.0 : newSize == 1 ? 53849.0 : 92107.0;\n    newPrimesD = newSize == 0 ? 37781.0 : newSize == 1 ? 69127.0 : 118247.0;\n} else {\n    newPrimesA = newSize == 0 ? 20201.0 : newSize == 1 ? 47903.0 : 107309.0;\n    newPrimesB = newSize == 0 ? 31337.0 : newSize == 1 ? 74287.0 : 166429.0;\n    newPrimesC = newSize == 0 ? 42293.0 : newSize == 1 ? 100213.0 : 224563.0;\n    newPrimesD = newSize == 0 ? 52951.0 : newSize == 1 ? 125471.0 : 281131.0;\n}\nnewDriftDepth = newMode < 2 ? (0.0122 * driftPan) : newMode == 2 ? 0.0034 : 0.0010;\nnewA = round(samplerate * (newPrimesA / 48000.0));\nnewATap = clamp(newA + samplerate * newDriftDepth * offsetA, 2, capacity - 2);\nnewB = round(samplerate * (newPrimesB / 48000.0));\nnewBTap = clamp(newB + samplerate * newDriftDepth * offsetB, 2, capacity - 2);\nnewC = round(samplerate * (newPrimesC / 48000.0));\nnewCTap = clamp(newC + samplerate * newDriftDepth * offsetC, 2, capacity - 2);\nnewD = round(samplerate * (newPrimesD / 48000.0));\nnewDTap = clamp(newD + samplerate * newDriftDepth * offsetD, 2, capacity - 2);\n\n// Fixed feedback taps retain the original linear-interpolated reads.\noldFeedbackA = oldA + feedbackMotion * (oldATap - oldA);\noldTapA = readTransport(tape, writeHead, direction, travel, oldFeedbackA, oldA, handoff, firstWritten, writtenSpan, 0);\nnewFeedbackA = newA + feedbackMotion * (newATap - newA);\nnewTapA = readTransport(tape, writeHead, direction, travel, newFeedbackA, newA, handoff, firstWritten, writtenSpan, 0);\nreturnA = ((oldTapA) + (amount) * ((newTapA) - (oldTapA)));\noldFeedbackB = oldB + feedbackMotion * (oldBTap - oldB);\noldTapB = readTransport(tape, writeHead, direction, travel, oldFeedbackB, oldB, handoff, firstWritten, writtenSpan, 1);\nnewFeedbackB = newB + feedbackMotion * (newBTap - newB);\nnewTapB = readTransport(tape, writeHead, direction, travel, newFeedbackB, newB, handoff, firstWritten, writtenSpan, 1);\nreturnB = ((oldTapB) + (amount) * ((newTapB) - (oldTapB)));\noldFeedbackC = oldC + feedbackMotion * (oldCTap - oldC);\noldTapC = readTransport(tape, writeHead, direction, travel, oldFeedbackC, oldC, handoff, firstWritten, writtenSpan, 2);\nnewFeedbackC = newC + feedbackMotion * (newCTap - newC);\nnewTapC = readTransport(tape, writeHead, direction, travel, newFeedbackC, newC, handoff, firstWritten, writtenSpan, 2);\nreturnC = ((oldTapC) + (amount) * ((newTapC) - (oldTapC)));\noldFeedbackD = oldD + feedbackMotion * (oldDTap - oldD);\noldTapD = readTransport(tape, writeHead, direction, travel, oldFeedbackD, oldD, handoff, firstWritten, writtenSpan, 3);\nnewFeedbackD = newD + feedbackMotion * (newDTap - newD);\nnewTapD = readTransport(tape, writeHead, direction, travel, newFeedbackD, newD, handoff, firstWritten, writtenSpan, 3);\nreturnD = ((oldTapD) + (amount) * ((newTapD) - (oldTapD)));\n\ncontrol = 1 - exp(-1 / (0.020 * samplerate));\n// Wet read speed only. Snap the vanishing slew remainder so 0 st\n// returns to the exact, direct 1x delay path.\npitchTarget = pow(2, clamp(pitch, -12, 0) / 12);\npitchSmoothed = pitchRatioState + control * (pitchTarget - pitchRatioState);\npitchRatio = (pitchTarget == 1 && pitchSmoothed > 0.99999) ? 1 : pitchSmoothed;\npitchRatioState = pitchRatio;\ngroup = round(clamp(record, 0, 3));\nrecording = group != 0;\n// Record Off acknowledges Panic, including if both arrive in one block.\n// The current clear must finish before any newly armed recording can write.\nwaitingForOff = (panicPressed || panicNeedsOff) && recording;\npanicBlocking = panicClearActive || waitingForOff;\ncaptureRunning = recording && !holdOn && !panicBlocking;\nclockStart = cleared || (recording && !wasRecording) ? 0 : captureClock;\nrecordSeconds = clockStart + (captureRunning ? 1.0 / samplerate : 0);\nout3 = recordSeconds;\ncaptureClock = recordSeconds;\nwasRecording = recording;\nrecA = panicBlocking ? 0 : captureA + control * ((group == 1 || group == 3) - captureA);\nrecB = panicBlocking ? 0 : captureB + control * ((group == 2 || group == 3) - captureB);\ninjectA = recA * (1 - holdMix);\ninjectB = recB * (1 - holdMix);\n// Feedback is linear below and at unity, with linked build above it.\nregen = feedbackState + control * (clamp(feedback, 0, 1.10) - feedbackState);\neffectiveRegen = regen + holdMix * (1 - regen);\ncrossfeed = ((blurState) + (control) * ((clamp(blur, 0, 1)) - (blurState)));\nmotion = ((driftState) + (control) * ((clamp(drift, 0, 1)) - (driftState)));\nblend = ((mixState) + (control) * ((clamp(mix, 0, 1)) - (mixState)));\nsaturation = ((driveState) + (control) * ((clamp(drive, 0, 1)) - (driveState)));\ncharacter = ((dynamicsState) + (control) * ((clamp(dynamics, -1, 1)) - (dynamicsState)));\neraseSmoothed = eraseState + control * ((erase >= 0.5) - eraseState);\nerasing = panicBlocking ? 0 : eraseSmoothed * (1 - holdMix);\ngainIn = ((inputGain) + (control) * ((pow(10, clamp(input_db, -24, 12) * 0.05)) - (inputGain)));\ngainOut = ((outputGain) + (control) * ((pow(10, clamp(output_db, -24, 6) * 0.05)) - (outputGain)));\n\n// Sum input to both banks when Mono is enabled; leave the wet image stereo.\nsourceL = clamp(fixnan(in1), -8, 8);\nsourceR = clamp(fixnan(in2), -8, 8);\nmonoSignal = 0.5 * (sourceL + sourceR);\nmonoBlend = monoAmount + control * ((mono_input >= 0.5) - monoAmount);\nmonoAmount = monoBlend;\nrawL = (sourceL + monoBlend * (monoSignal - sourceL)) * gainIn;\nrawR = (sourceR + monoBlend * (monoSignal - sourceR)) * gainIn;\n\n// A linked input gate keeps low-level noise out of memory. The dry stays open.\ncleanL = dcblock(rawL);\ncleanR = dcblock(rawR);\ngateMode = round(clamp(input_gate, 0, 2));\ngateThreshold = gateMode == 2 ? 0.0001 : 0.001;\ngatePeak = max(abs(cleanL), abs(cleanR));\ngateRelease = 1 - exp(-1 / (0.075 * samplerate));\ndetectorGain = max(gatePeak, gateEnvelope + gateRelease * (gatePeak - gateEnvelope));\ngateEnvelope = detectorGain;\ngateTarget = gateMode == 0 ? 1 : clamp(2 * detectorGain / gateThreshold - 1, 0, 1);\ngateSlew = gateTarget > gateGain ? 1 - exp(-1 / (0.0005 * samplerate)) : gateRelease;\ngateOpen = gateGain + gateSlew * (gateTarget - gateGain);\ngateGain = gateOpen;\ninputL = cleanL * gateOpen;\ninputR = cleanR * gateOpen;\n// Lower the saturation knee with Drive and preserve unity small-signal gain.\ndriveKnee = 0.82 - 0.58 * saturation;\ninjectedL = ((inputL) + (saturation) * ((driveKnee * tanh(inputL / driveKnee)) - (inputL)));\ninjectedR = ((inputR) + (saturation) * ((driveKnee * tanh(inputR / driveKnee)) - (inputR)));\nattack = 1 - exp(-1 / (0.008 * samplerate));\nrelease = 1 - exp(-1 / (0.350 * samplerate));\ninputDetect = max(abs(inputL) * injectA, abs(inputR) * injectB);\nenv = ((inputEnvelope) + (inputDetect > inputEnvelope ? attack : release) * ((inputDetect) - (inputEnvelope)));\nsuppress = max(-character, 0) * clamp(4 * env, 0, 1) * (1 - holdMix);\nmemoryGain = (1 - 0.97 * suppress) * (1 - erasing);\n\n// The tone controls filter only the circulating signal. Each Off\n// position crossfades back to a true bypass.\n// Tab positions Off and 1–3 retain their old meaning. Sweep uses\n// the smoothed cutoff coefficients below, with host-rate headroom.\nhpSetting = round(clamp(hpf, 0, 4));\nlpSetting = round(clamp(lpf, 0, 4));\nhighOverride = hpSetting == 4;\nlowOverride = lpSetting == 4;\nhighPresetCut = hpSetting < 2 ? 65 : hpSetting == 2 ? 180 : 420;\nlowPresetCut = lpSetting < 2 ? 5600 : lpSetting == 2 ? 2800 : 1100;\nhighCut = highOverride ? min(samplerate * 0.45, clamp(hpf_hz, 20, 2000)) : highPresetCut;\nlowCut = lowOverride ? min(samplerate * 0.45, clamp(lpf_hz, 200, 20000)) : lowPresetCut;\nhighCoefficient = ((highState) + (control) * ((1 - exp(-twoPi * highCut / samplerate)) - (highState)));\nhighAmount = ((highMix) + (control) * ((hpSetting != 0) - (highMix)));\nlowCoefficient = lowState + control * ((1 - exp(-twoPi * lowCut / samplerate)) - lowState);\nlowAmount = lowMix + control * ((lpSetting != 0) - lowMix);\nloopHighAmount = highAmount * (1 - holdMix);\nloopLowAmount = lowAmount * (1 - holdMix);\n// Keep each lane’s filter history explicit for older Gen compilers.\nnextToneHighA = cleared ? 0 : ((toneHighA) + (highCoefficient) * ((returnA) - (toneHighA)));\nhighPassedA = returnA - nextToneHighA * loopHighAmount;\nnextToneLowA = cleared ? 0 : toneLowA + lowCoefficient * (highPassedA - toneLowA);\ntoneA = cleared ? 0 : highPassedA + loopLowAmount * (nextToneLowA - highPassedA);\ntoneHighA = nextToneHighA;\ntoneLowA = nextToneLowA;\nnextToneHighB = cleared ? 0 : ((toneHighB) + (highCoefficient) * ((returnB) - (toneHighB)));\nhighPassedB = returnB - nextToneHighB * loopHighAmount;\nnextToneLowB = cleared ? 0 : toneLowB + lowCoefficient * (highPassedB - toneLowB);\ntoneB = cleared ? 0 : highPassedB + loopLowAmount * (nextToneLowB - highPassedB);\ntoneHighB = nextToneHighB;\ntoneLowB = nextToneLowB;\nnextToneHighC = cleared ? 0 : ((toneHighC) + (highCoefficient) * ((returnC) - (toneHighC)));\nhighPassedC = returnC - nextToneHighC * loopHighAmount;\nnextToneLowC = cleared ? 0 : toneLowC + lowCoefficient * (highPassedC - toneLowC);\ntoneC = cleared ? 0 : highPassedC + loopLowAmount * (nextToneLowC - highPassedC);\ntoneHighC = nextToneHighC;\ntoneLowC = nextToneLowC;\nnextToneHighD = cleared ? 0 : ((toneHighD) + (highCoefficient) * ((returnD) - (toneHighD)));\nhighPassedD = returnD - nextToneHighD * loopHighAmount;\nnextToneLowD = cleared ? 0 : toneLowD + lowCoefficient * (highPassedD - toneLowD);\ntoneD = cleared ? 0 : highPassedD + loopLowAmount * (nextToneLowD - highPassedD);\ntoneHighD = nextToneHighD;\ntoneLowD = nextToneLowD;\n\n// Pair rotation is orthogonal. Four uses a second orthogonal rotation\n// between pairs. Reverb substitutes a normalized four-line Hadamard.\nfourWeight = ((oldMode == 1) + (amount) * ((newMode == 1) - (oldMode == 1)));\nreverbWeight = ((oldMode == 2) + (amount) * ((newMode == 2) - (oldMode == 2)));\ndelayWeight = ((oldMode < 2) + (amount) * ((newMode < 2) - (oldMode < 2)));\nangle = crossfeed * delayWeight * 1.047197551196598;\nself = cos(angle);\ncross = sin(angle);\npairA = self * toneA + cross * toneB;\npairB = self * toneB - cross * toneA;\npairC = self * toneC + cross * toneD;\npairD = self * toneD - cross * toneC;\npairAngle = angle * fourWeight * 0.65;\npairSelf = cos(pairAngle);\npairCross = sin(pairAngle);\nnetworkA = ((pairSelf * pairA + pairCross * pairC) + (reverbWeight) * (((toneA + toneB + toneC + toneD) * 0.5) - (pairSelf * pairA + pairCross * pairC)));\nnetworkB = ((pairSelf * pairB + pairCross * pairD) + (reverbWeight) * (((toneA - toneB + toneC - toneD) * 0.5) - (pairSelf * pairB + pairCross * pairD)));\nnetworkC = ((pairSelf * pairC - pairCross * pairA) + (reverbWeight) * (((toneA + toneB - toneC - toneD) * 0.5) - (pairSelf * pairC - pairCross * pairA)));\nnetworkD = ((pairSelf * pairD - pairCross * pairB) + (reverbWeight) * (((toneA - toneB - toneC + toneD) * 0.5) - (pairSelf * pairD - pairCross * pairB)));\n\n// Erase follows the fixed feedback position in either direction.\nif (ambientRuns && !rhythmSelected && erasing > 0.0001) {\n    keep = 1 - erasing;\n    eraseBehindA = travel >= newA + 2 + 0.5 * handoff;\n    eraseTurnHeadA = travel >= 0.5 * handoff && !eraseBehindA;\n    eraseDistanceA = eraseTurnHeadA ? max(1, 1 - (newATap - newA)) : eraseBehindA ? newATap : max(1, 2 * newA - newATap);\n    eraseA = wrap(writeHead + (eraseBehindA ? -direction : direction) * round(eraseDistanceA), 0, capacity);\n    erasedSampleA = keep * peek(tape, eraseA, 0);\n    poke(tape, erasedSampleA, eraseA, 0);\n    eraseBehindB = travel >= newB + 2 + 0.5 * handoff;\n    eraseTurnHeadB = travel >= 0.5 * handoff && !eraseBehindB;\n    eraseDistanceB = eraseTurnHeadB ? max(1, 1 - (newBTap - newB)) : eraseBehindB ? newBTap : max(1, 2 * newB - newBTap);\n    eraseB = wrap(writeHead + (eraseBehindB ? -direction : direction) * round(eraseDistanceB), 0, capacity);\n    erasedSampleB = keep * peek(tape, eraseB, 1);\n    poke(tape, erasedSampleB, eraseB, 1);\n    eraseBehindC = travel >= newC + 2 + 0.5 * handoff;\n    eraseTurnHeadC = travel >= 0.5 * handoff && !eraseBehindC;\n    eraseDistanceC = eraseTurnHeadC ? max(1, 1 - (newCTap - newC)) : eraseBehindC ? newCTap : max(1, 2 * newC - newCTap);\n    eraseC = wrap(writeHead + (eraseBehindC ? -direction : direction) * round(eraseDistanceC), 0, capacity);\n    erasedSampleC = keep * peek(tape, eraseC, 2);\n    poke(tape, erasedSampleC, eraseC, 2);\n    eraseBehindD = travel >= newD + 2 + 0.5 * handoff;\n    eraseTurnHeadD = travel >= 0.5 * handoff && !eraseBehindD;\n    eraseDistanceD = eraseTurnHeadD ? max(1, 1 - (newDTap - newD)) : eraseBehindD ? newDTap : max(1, 2 * newD - newDTap);\n    eraseD = wrap(writeHead + (eraseBehindD ? -direction : direction) * round(eraseDistanceD), 0, capacity);\n    erasedSampleD = keep * peek(tape, eraseD, 3);\n    poke(tape, erasedSampleD, eraseD, 3);\n}\n// The feedback-only vector has a smooth equilibrium at norm 0.62\n// above unity. A single gain preserves each lane's relative level,\n// and leaves headroom below the tape write limiter for new input.\nfeedbackPower = networkA * networkA + networkB * networkB\n              + networkC * networkC + networkD * networkD;\nbuildExcess = max(0, effectiveRegen - 1);\nregenGain = effectiveRegen * memoryGain / (1 + buildExcess * feedbackPower / (0.62 * 0.62));\nwriteARaw = clamp(fixnan(0.67 * (rhythmSelected ? 0 : injectA) * injectedL + regenGain * networkA), -16, 16);\nwriteAMag = abs(writeARaw);\nwriteAKnee = max(0, writeAMag - 0.75);\nwriteA = sign(writeARaw) * (min(writeAMag, 0.75) + 0.21 * tanh(writeAKnee / 0.21));\nif (ambientRuns) {\n    poke(tape, writeA, writeIndex, 0);\n}\nwriteBRaw = clamp(fixnan(0.67 * (rhythmSelected ? 0 : injectB) * injectedR + regenGain * networkB), -16, 16);\nwriteBMag = abs(writeBRaw);\nwriteBKnee = max(0, writeBMag - 0.75);\nwriteB = sign(writeBRaw) * (min(writeBMag, 0.75) + 0.21 * tanh(writeBKnee / 0.21));\nif (ambientRuns) {\n    poke(tape, writeB, writeIndex, 1);\n}\nwriteCRaw = clamp(fixnan(0.52 * (rhythmSelected ? 0 : injectA) * injectedL + regenGain * networkC), -16, 16);\nwriteCMag = abs(writeCRaw);\nwriteCKnee = max(0, writeCMag - 0.75);\nwriteC = sign(writeCRaw) * (min(writeCMag, 0.75) + 0.21 * tanh(writeCKnee / 0.21));\nif (ambientRuns) {\n    poke(tape, writeC, writeIndex, 2);\n}\nwriteDRaw = clamp(fixnan(0.52 * (rhythmSelected ? 0 : injectB) * injectedR + regenGain * networkD), -16, 16);\nwriteDMag = abs(writeDRaw);\nwriteDKnee = max(0, writeDMag - 0.75);\nwriteD = sign(writeDRaw) * (min(writeDMag, 0.75) + 0.21 * tanh(writeDKnee / 0.21));\nif (ambientRuns) {\n    poke(tape, writeD, writeIndex, 3);\n}\n\n// Render the old and new wet read heads for each lane.\n\noldWetASpeedCode = floor((oldConfig + 0.5) / 12.0);\noldWetAProgram = oldConfig - 12 * oldWetASpeedCode;\noldWetAFamily = floor((oldWetAProgram + 0.5) / 3.0);\noldWetASizeCode = oldWetAProgram - 3 * oldWetAFamily;\noldWetAForwardRate = pitchRatio * (oldWetASpeedCode == 0 || oldWetAFamily >= 2 ? 1 : 0.5);\noldWetAReverseMix = direction < 0 ? clamp((travel - oldA - 2 - handoff) / handoff, 0, 1) : 0;\noldWetARate = oldWetAReverseMix > 0 ? -oldWetAForwardRate : oldWetAForwardRate;\noldWetAGranular = oldWetAFamily == 3;\noldWetALength = dim(tape);\noldWetA = 0;\nif (!oldWetAGranular && oldWetARate == 1) {\n    oldWetA = readTransport(tape, writeHead, direction, travel, oldATap, oldA, handoff, firstWritten, writtenSpan, 0);\n} else {\n    oldWetAWindow = oldWetAGranular ? (oldWetASizeCode == 0 ? 0.087 : oldWetASizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    oldWetAWindow = (oldWetAReverseMix > 0 ? clamp(0.30 * oldA / samplerate, 0.35, 1.25) : oldWetAWindow) * (1 + 0.113 * 0);\n    oldWetAFrames = oldWetAWindow * samplerate;\n    oldWetAPositionA = grainClock / oldWetAWindow + 0 * 0.217;\n    oldWetAPositionB = oldWetAPositionA + 0.5;\n    oldWetAGrainA = floor(oldWetAPositionA);\n    oldWetAGrainB = floor(oldWetAPositionB);\n    oldWetAPhaseA = oldWetAPositionA - oldWetAGrainA;\n    oldWetAPhaseB = oldWetAPositionB - oldWetAGrainB;\n    // Indexed scatter lets matching oldWetAProgram readers agree at oldWetAA handoff.\n    oldWetASeedA = (oldWetAGrainA + 1 + 142 * 0) * 12.9898;\n    oldWetASeedB = (oldWetAGrainB + 72 + 142 * 0) * 12.9898;\n    oldWetAScatterDepth = oldWetAGranular * crossfeed * oldWetAFrames * 0.71;\n    oldWetADriftDepth = oldWetAGranular * motion * oldWetAFrames * 0.69;\n    oldWetAFrequency = 0.397 + 0.087 * 0;\n    oldWetAScatterA = (2 * wrap(sin(oldWetASeedA) * 43758.5453, 0, 1) - 1) * oldWetAScatterDepth;\n    oldWetAScatterB = (2 * wrap(sin(oldWetASeedB) * 43758.5453, 0, 1) - 1) * oldWetAScatterDepth;\n    oldWetADriftA = (0.63 * sin(oldWetAGrainA * oldWetAWindow * oldWetAFrequency + 2 * 0) + 0.37 * (2 * slowA - 1)) * oldWetADriftDepth;\n    oldWetADriftB = (0.63 * sin(oldWetAGrainB * oldWetAWindow * oldWetAFrequency + 2 * 0 + 1) + 0.37 * (2 * slowB - 1)) * oldWetADriftDepth;\n    oldWetASpacing = oldWetAGranular * oldWetAFrames * 0.71;\n    oldWetAShift = (1 - oldWetARate) * oldWetAFrames;\n    oldWetADistanceA = clamp(oldATap + oldWetAShift * (oldWetAPhaseA - 0.5) + oldWetAScatterA + oldWetADriftA - oldWetASpacing, 2, oldWetALength - 2);\n    oldWetADistanceB = clamp(oldATap + oldWetAShift * (oldWetAPhaseB - 0.5) + oldWetAScatterB + oldWetADriftB + oldWetASpacing, 2, oldWetALength - 2);\n    oldWetAA = readTransport(tape, writeHead, direction, travel, oldWetADistanceA, oldA, handoff, firstWritten, writtenSpan, 0);\n    oldWetAB = readTransport(tape, writeHead, direction, travel, oldWetADistanceB, oldA, handoff, firstWritten, writtenSpan, 0);\n    oldWetAWeightA = 0.5 - 0.5 * cos(6.283185307179586 * oldWetAPhaseA);\n    oldWetA = oldWetAA * oldWetAWeightA + oldWetAB * (1 - oldWetAWeightA);\n    if (oldWetAReverseMix > 0 && oldWetAReverseMix < 1) {\n        oldWetADirect = readTransport(tape, writeHead, direction, travel, oldATap, oldA, handoff, firstWritten, writtenSpan, 0);\n        oldWetA = oldWetADirect + oldWetAReverseMix * (oldWetA - oldWetADirect);\n    }\n}\n\nnewWetASpeedCode = floor((newConfig + 0.5) / 12.0);\nnewWetAProgram = newConfig - 12 * newWetASpeedCode;\nnewWetAFamily = floor((newWetAProgram + 0.5) / 3.0);\nnewWetASizeCode = newWetAProgram - 3 * newWetAFamily;\nnewWetAForwardRate = pitchRatio * (newWetASpeedCode == 0 || newWetAFamily >= 2 ? 1 : 0.5);\nnewWetAReverseMix = direction < 0 ? clamp((travel - newA - 2 - handoff) / handoff, 0, 1) : 0;\nnewWetARate = newWetAReverseMix > 0 ? -newWetAForwardRate : newWetAForwardRate;\nnewWetAGranular = newWetAFamily == 3;\nnewWetALength = dim(tape);\nnewWetA = 0;\nif (!newWetAGranular && newWetARate == 1) {\n    newWetA = readTransport(tape, writeHead, direction, travel, newATap, newA, handoff, firstWritten, writtenSpan, 0);\n} else {\n    newWetAWindow = newWetAGranular ? (newWetASizeCode == 0 ? 0.087 : newWetASizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    newWetAWindow = (newWetAReverseMix > 0 ? clamp(0.30 * newA / samplerate, 0.35, 1.25) : newWetAWindow) * (1 + 0.113 * 0);\n    newWetAFrames = newWetAWindow * samplerate;\n    newWetAPositionA = grainClock / newWetAWindow + 0 * 0.217;\n    newWetAPositionB = newWetAPositionA + 0.5;\n    newWetAGrainA = floor(newWetAPositionA);\n    newWetAGrainB = floor(newWetAPositionB);\n    newWetAPhaseA = newWetAPositionA - newWetAGrainA;\n    newWetAPhaseB = newWetAPositionB - newWetAGrainB;\n    // Indexed scatter lets matching newWetAProgram readers agree at newWetAA handoff.\n    newWetASeedA = (newWetAGrainA + 1 + 142 * 0) * 12.9898;\n    newWetASeedB = (newWetAGrainB + 72 + 142 * 0) * 12.9898;\n    newWetAScatterDepth = newWetAGranular * crossfeed * newWetAFrames * 0.71;\n    newWetADriftDepth = newWetAGranular * motion * newWetAFrames * 0.69;\n    newWetAFrequency = 0.397 + 0.087 * 0;\n    newWetAScatterA = (2 * wrap(sin(newWetASeedA) * 43758.5453, 0, 1) - 1) * newWetAScatterDepth;\n    newWetAScatterB = (2 * wrap(sin(newWetASeedB) * 43758.5453, 0, 1) - 1) * newWetAScatterDepth;\n    newWetADriftA = (0.63 * sin(newWetAGrainA * newWetAWindow * newWetAFrequency + 2 * 0) + 0.37 * (2 * slowA - 1)) * newWetADriftDepth;\n    newWetADriftB = (0.63 * sin(newWetAGrainB * newWetAWindow * newWetAFrequency + 2 * 0 + 1) + 0.37 * (2 * slowB - 1)) * newWetADriftDepth;\n    newWetASpacing = newWetAGranular * newWetAFrames * 0.71;\n    newWetAShift = (1 - newWetARate) * newWetAFrames;\n    newWetADistanceA = clamp(newATap + newWetAShift * (newWetAPhaseA - 0.5) + newWetAScatterA + newWetADriftA - newWetASpacing, 2, newWetALength - 2);\n    newWetADistanceB = clamp(newATap + newWetAShift * (newWetAPhaseB - 0.5) + newWetAScatterB + newWetADriftB + newWetASpacing, 2, newWetALength - 2);\n    newWetAA = readTransport(tape, writeHead, direction, travel, newWetADistanceA, newA, handoff, firstWritten, writtenSpan, 0);\n    newWetAB = readTransport(tape, writeHead, direction, travel, newWetADistanceB, newA, handoff, firstWritten, writtenSpan, 0);\n    newWetAWeightA = 0.5 - 0.5 * cos(6.283185307179586 * newWetAPhaseA);\n    newWetA = newWetAA * newWetAWeightA + newWetAB * (1 - newWetAWeightA);\n    if (newWetAReverseMix > 0 && newWetAReverseMix < 1) {\n        newWetADirect = readTransport(tape, writeHead, direction, travel, newATap, newA, handoff, firstWritten, writtenSpan, 0);\n        newWetA = newWetADirect + newWetAReverseMix * (newWetA - newWetADirect);\n    }\n}\n\nplayA = ((oldWetA) + (amount) * ((newWetA) - (oldWetA)));\n\noldWetBSpeedCode = floor((oldConfig + 0.5) / 12.0);\noldWetBProgram = oldConfig - 12 * oldWetBSpeedCode;\noldWetBFamily = floor((oldWetBProgram + 0.5) / 3.0);\noldWetBSizeCode = oldWetBProgram - 3 * oldWetBFamily;\noldWetBForwardRate = pitchRatio * (oldWetBSpeedCode == 0 || oldWetBFamily >= 2 ? 1 : 0.5);\noldWetBReverseMix = direction < 0 ? clamp((travel - oldB - 2 - handoff) / handoff, 0, 1) : 0;\noldWetBRate = oldWetBReverseMix > 0 ? -oldWetBForwardRate : oldWetBForwardRate;\noldWetBGranular = oldWetBFamily == 3;\noldWetBLength = dim(tape);\noldWetB = 0;\nif (!oldWetBGranular && oldWetBRate == 1) {\n    oldWetB = readTransport(tape, writeHead, direction, travel, oldBTap, oldB, handoff, firstWritten, writtenSpan, 1);\n} else {\n    oldWetBWindow = oldWetBGranular ? (oldWetBSizeCode == 0 ? 0.087 : oldWetBSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    oldWetBWindow = (oldWetBReverseMix > 0 ? clamp(0.30 * oldB / samplerate, 0.35, 1.25) : oldWetBWindow) * (1 + 0.113 * 1);\n    oldWetBFrames = oldWetBWindow * samplerate;\n    oldWetBPositionA = grainClock / oldWetBWindow + 1 * 0.217;\n    oldWetBPositionB = oldWetBPositionA + 0.5;\n    oldWetBGrainA = floor(oldWetBPositionA);\n    oldWetBGrainB = floor(oldWetBPositionB);\n    oldWetBPhaseA = oldWetBPositionA - oldWetBGrainA;\n    oldWetBPhaseB = oldWetBPositionB - oldWetBGrainB;\n    // Indexed scatter lets matching oldWetBProgram readers agree at oldWetBA handoff.\n    oldWetBSeedA = (oldWetBGrainA + 1 + 142 * 1) * 12.9898;\n    oldWetBSeedB = (oldWetBGrainB + 72 + 142 * 1) * 12.9898;\n    oldWetBScatterDepth = oldWetBGranular * crossfeed * oldWetBFrames * 0.71;\n    oldWetBDriftDepth = oldWetBGranular * motion * oldWetBFrames * 0.69;\n    oldWetBFrequency = 0.397 + 0.087 * 1;\n    oldWetBScatterA = (2 * wrap(sin(oldWetBSeedA) * 43758.5453, 0, 1) - 1) * oldWetBScatterDepth;\n    oldWetBScatterB = (2 * wrap(sin(oldWetBSeedB) * 43758.5453, 0, 1) - 1) * oldWetBScatterDepth;\n    oldWetBDriftA = (0.63 * sin(oldWetBGrainA * oldWetBWindow * oldWetBFrequency + 2 * 1) + 0.37 * (2 * slowA - 1)) * oldWetBDriftDepth;\n    oldWetBDriftB = (0.63 * sin(oldWetBGrainB * oldWetBWindow * oldWetBFrequency + 2 * 1 + 1) + 0.37 * (2 * slowB - 1)) * oldWetBDriftDepth;\n    oldWetBSpacing = oldWetBGranular * oldWetBFrames * 0.71;\n    oldWetBShift = (1 - oldWetBRate) * oldWetBFrames;\n    oldWetBDistanceA = clamp(oldBTap + oldWetBShift * (oldWetBPhaseA - 0.5) + oldWetBScatterA + oldWetBDriftA - oldWetBSpacing, 2, oldWetBLength - 2);\n    oldWetBDistanceB = clamp(oldBTap + oldWetBShift * (oldWetBPhaseB - 0.5) + oldWetBScatterB + oldWetBDriftB + oldWetBSpacing, 2, oldWetBLength - 2);\n    oldWetBA = readTransport(tape, writeHead, direction, travel, oldWetBDistanceA, oldB, handoff, firstWritten, writtenSpan, 1);\n    oldWetBB = readTransport(tape, writeHead, direction, travel, oldWetBDistanceB, oldB, handoff, firstWritten, writtenSpan, 1);\n    oldWetBWeightA = 0.5 - 0.5 * cos(6.283185307179586 * oldWetBPhaseA);\n    oldWetB = oldWetBA * oldWetBWeightA + oldWetBB * (1 - oldWetBWeightA);\n    if (oldWetBReverseMix > 0 && oldWetBReverseMix < 1) {\n        oldWetBDirect = readTransport(tape, writeHead, direction, travel, oldBTap, oldB, handoff, firstWritten, writtenSpan, 1);\n        oldWetB = oldWetBDirect + oldWetBReverseMix * (oldWetB - oldWetBDirect);\n    }\n}\n\nnewWetBSpeedCode = floor((newConfig + 0.5) / 12.0);\nnewWetBProgram = newConfig - 12 * newWetBSpeedCode;\nnewWetBFamily = floor((newWetBProgram + 0.5) / 3.0);\nnewWetBSizeCode = newWetBProgram - 3 * newWetBFamily;\nnewWetBForwardRate = pitchRatio * (newWetBSpeedCode == 0 || newWetBFamily >= 2 ? 1 : 0.5);\nnewWetBReverseMix = direction < 0 ? clamp((travel - newB - 2 - handoff) / handoff, 0, 1) : 0;\nnewWetBRate = newWetBReverseMix > 0 ? -newWetBForwardRate : newWetBForwardRate;\nnewWetBGranular = newWetBFamily == 3;\nnewWetBLength = dim(tape);\nnewWetB = 0;\nif (!newWetBGranular && newWetBRate == 1) {\n    newWetB = readTransport(tape, writeHead, direction, travel, newBTap, newB, handoff, firstWritten, writtenSpan, 1);\n} else {\n    newWetBWindow = newWetBGranular ? (newWetBSizeCode == 0 ? 0.087 : newWetBSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    newWetBWindow = (newWetBReverseMix > 0 ? clamp(0.30 * newB / samplerate, 0.35, 1.25) : newWetBWindow) * (1 + 0.113 * 1);\n    newWetBFrames = newWetBWindow * samplerate;\n    newWetBPositionA = grainClock / newWetBWindow + 1 * 0.217;\n    newWetBPositionB = newWetBPositionA + 0.5;\n    newWetBGrainA = floor(newWetBPositionA);\n    newWetBGrainB = floor(newWetBPositionB);\n    newWetBPhaseA = newWetBPositionA - newWetBGrainA;\n    newWetBPhaseB = newWetBPositionB - newWetBGrainB;\n    // Indexed scatter lets matching newWetBProgram readers agree at newWetBA handoff.\n    newWetBSeedA = (newWetBGrainA + 1 + 142 * 1) * 12.9898;\n    newWetBSeedB = (newWetBGrainB + 72 + 142 * 1) * 12.9898;\n    newWetBScatterDepth = newWetBGranular * crossfeed * newWetBFrames * 0.71;\n    newWetBDriftDepth = newWetBGranular * motion * newWetBFrames * 0.69;\n    newWetBFrequency = 0.397 + 0.087 * 1;\n    newWetBScatterA = (2 * wrap(sin(newWetBSeedA) * 43758.5453, 0, 1) - 1) * newWetBScatterDepth;\n    newWetBScatterB = (2 * wrap(sin(newWetBSeedB) * 43758.5453, 0, 1) - 1) * newWetBScatterDepth;\n    newWetBDriftA = (0.63 * sin(newWetBGrainA * newWetBWindow * newWetBFrequency + 2 * 1) + 0.37 * (2 * slowA - 1)) * newWetBDriftDepth;\n    newWetBDriftB = (0.63 * sin(newWetBGrainB * newWetBWindow * newWetBFrequency + 2 * 1 + 1) + 0.37 * (2 * slowB - 1)) * newWetBDriftDepth;\n    newWetBSpacing = newWetBGranular * newWetBFrames * 0.71;\n    newWetBShift = (1 - newWetBRate) * newWetBFrames;\n    newWetBDistanceA = clamp(newBTap + newWetBShift * (newWetBPhaseA - 0.5) + newWetBScatterA + newWetBDriftA - newWetBSpacing, 2, newWetBLength - 2);\n    newWetBDistanceB = clamp(newBTap + newWetBShift * (newWetBPhaseB - 0.5) + newWetBScatterB + newWetBDriftB + newWetBSpacing, 2, newWetBLength - 2);\n    newWetBA = readTransport(tape, writeHead, direction, travel, newWetBDistanceA, newB, handoff, firstWritten, writtenSpan, 1);\n    newWetBB = readTransport(tape, writeHead, direction, travel, newWetBDistanceB, newB, handoff, firstWritten, writtenSpan, 1);\n    newWetBWeightA = 0.5 - 0.5 * cos(6.283185307179586 * newWetBPhaseA);\n    newWetB = newWetBA * newWetBWeightA + newWetBB * (1 - newWetBWeightA);\n    if (newWetBReverseMix > 0 && newWetBReverseMix < 1) {\n        newWetBDirect = readTransport(tape, writeHead, direction, travel, newBTap, newB, handoff, firstWritten, writtenSpan, 1);\n        newWetB = newWetBDirect + newWetBReverseMix * (newWetB - newWetBDirect);\n    }\n}\n\nplayB = ((oldWetB) + (amount) * ((newWetB) - (oldWetB)));\n\noldWetCSpeedCode = floor((oldConfig + 0.5) / 12.0);\noldWetCProgram = oldConfig - 12 * oldWetCSpeedCode;\noldWetCFamily = floor((oldWetCProgram + 0.5) / 3.0);\noldWetCSizeCode = oldWetCProgram - 3 * oldWetCFamily;\noldWetCForwardRate = pitchRatio * (oldWetCSpeedCode == 0 || oldWetCFamily >= 2 ? 1 : 0.5);\noldWetCReverseMix = direction < 0 ? clamp((travel - oldC - 2 - handoff) / handoff, 0, 1) : 0;\noldWetCRate = oldWetCReverseMix > 0 ? -oldWetCForwardRate : oldWetCForwardRate;\noldWetCGranular = oldWetCFamily == 3;\noldWetCLength = dim(tape);\noldWetC = 0;\nif (!oldWetCGranular && oldWetCRate == 1) {\n    oldWetC = readTransport(tape, writeHead, direction, travel, oldCTap, oldC, handoff, firstWritten, writtenSpan, 2);\n} else {\n    oldWetCWindow = oldWetCGranular ? (oldWetCSizeCode == 0 ? 0.087 : oldWetCSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    oldWetCWindow = (oldWetCReverseMix > 0 ? clamp(0.30 * oldC / samplerate, 0.35, 1.25) : oldWetCWindow) * (1 + 0.113 * 2);\n    oldWetCFrames = oldWetCWindow * samplerate;\n    oldWetCPositionA = grainClock / oldWetCWindow + 2 * 0.217;\n    oldWetCPositionB = oldWetCPositionA + 0.5;\n    oldWetCGrainA = floor(oldWetCPositionA);\n    oldWetCGrainB = floor(oldWetCPositionB);\n    oldWetCPhaseA = oldWetCPositionA - oldWetCGrainA;\n    oldWetCPhaseB = oldWetCPositionB - oldWetCGrainB;\n    // Indexed scatter lets matching oldWetCProgram readers agree at oldWetCA handoff.\n    oldWetCSeedA = (oldWetCGrainA + 1 + 142 * 2) * 12.9898;\n    oldWetCSeedB = (oldWetCGrainB + 72 + 142 * 2) * 12.9898;\n    oldWetCScatterDepth = oldWetCGranular * crossfeed * oldWetCFrames * 0.71;\n    oldWetCDriftDepth = oldWetCGranular * motion * oldWetCFrames * 0.69;\n    oldWetCFrequency = 0.397 + 0.087 * 2;\n    oldWetCScatterA = (2 * wrap(sin(oldWetCSeedA) * 43758.5453, 0, 1) - 1) * oldWetCScatterDepth;\n    oldWetCScatterB = (2 * wrap(sin(oldWetCSeedB) * 43758.5453, 0, 1) - 1) * oldWetCScatterDepth;\n    oldWetCDriftA = (0.63 * sin(oldWetCGrainA * oldWetCWindow * oldWetCFrequency + 2 * 2) + 0.37 * (2 * slowA - 1)) * oldWetCDriftDepth;\n    oldWetCDriftB = (0.63 * sin(oldWetCGrainB * oldWetCWindow * oldWetCFrequency + 2 * 2 + 1) + 0.37 * (2 * slowB - 1)) * oldWetCDriftDepth;\n    oldWetCSpacing = oldWetCGranular * oldWetCFrames * 0.71;\n    oldWetCShift = (1 - oldWetCRate) * oldWetCFrames;\n    oldWetCDistanceA = clamp(oldCTap + oldWetCShift * (oldWetCPhaseA - 0.5) + oldWetCScatterA + oldWetCDriftA - oldWetCSpacing, 2, oldWetCLength - 2);\n    oldWetCDistanceB = clamp(oldCTap + oldWetCShift * (oldWetCPhaseB - 0.5) + oldWetCScatterB + oldWetCDriftB + oldWetCSpacing, 2, oldWetCLength - 2);\n    oldWetCA = readTransport(tape, writeHead, direction, travel, oldWetCDistanceA, oldC, handoff, firstWritten, writtenSpan, 2);\n    oldWetCB = readTransport(tape, writeHead, direction, travel, oldWetCDistanceB, oldC, handoff, firstWritten, writtenSpan, 2);\n    oldWetCWeightA = 0.5 - 0.5 * cos(6.283185307179586 * oldWetCPhaseA);\n    oldWetC = oldWetCA * oldWetCWeightA + oldWetCB * (1 - oldWetCWeightA);\n    if (oldWetCReverseMix > 0 && oldWetCReverseMix < 1) {\n        oldWetCDirect = readTransport(tape, writeHead, direction, travel, oldCTap, oldC, handoff, firstWritten, writtenSpan, 2);\n        oldWetC = oldWetCDirect + oldWetCReverseMix * (oldWetC - oldWetCDirect);\n    }\n}\n\nnewWetCSpeedCode = floor((newConfig + 0.5) / 12.0);\nnewWetCProgram = newConfig - 12 * newWetCSpeedCode;\nnewWetCFamily = floor((newWetCProgram + 0.5) / 3.0);\nnewWetCSizeCode = newWetCProgram - 3 * newWetCFamily;\nnewWetCForwardRate = pitchRatio * (newWetCSpeedCode == 0 || newWetCFamily >= 2 ? 1 : 0.5);\nnewWetCReverseMix = direction < 0 ? clamp((travel - newC - 2 - handoff) / handoff, 0, 1) : 0;\nnewWetCRate = newWetCReverseMix > 0 ? -newWetCForwardRate : newWetCForwardRate;\nnewWetCGranular = newWetCFamily == 3;\nnewWetCLength = dim(tape);\nnewWetC = 0;\nif (!newWetCGranular && newWetCRate == 1) {\n    newWetC = readTransport(tape, writeHead, direction, travel, newCTap, newC, handoff, firstWritten, writtenSpan, 2);\n} else {\n    newWetCWindow = newWetCGranular ? (newWetCSizeCode == 0 ? 0.087 : newWetCSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    newWetCWindow = (newWetCReverseMix > 0 ? clamp(0.30 * newC / samplerate, 0.35, 1.25) : newWetCWindow) * (1 + 0.113 * 2);\n    newWetCFrames = newWetCWindow * samplerate;\n    newWetCPositionA = grainClock / newWetCWindow + 2 * 0.217;\n    newWetCPositionB = newWetCPositionA + 0.5;\n    newWetCGrainA = floor(newWetCPositionA);\n    newWetCGrainB = floor(newWetCPositionB);\n    newWetCPhaseA = newWetCPositionA - newWetCGrainA;\n    newWetCPhaseB = newWetCPositionB - newWetCGrainB;\n    // Indexed scatter lets matching newWetCProgram readers agree at newWetCA handoff.\n    newWetCSeedA = (newWetCGrainA + 1 + 142 * 2) * 12.9898;\n    newWetCSeedB = (newWetCGrainB + 72 + 142 * 2) * 12.9898;\n    newWetCScatterDepth = newWetCGranular * crossfeed * newWetCFrames * 0.71;\n    newWetCDriftDepth = newWetCGranular * motion * newWetCFrames * 0.69;\n    newWetCFrequency = 0.397 + 0.087 * 2;\n    newWetCScatterA = (2 * wrap(sin(newWetCSeedA) * 43758.5453, 0, 1) - 1) * newWetCScatterDepth;\n    newWetCScatterB = (2 * wrap(sin(newWetCSeedB) * 43758.5453, 0, 1) - 1) * newWetCScatterDepth;\n    newWetCDriftA = (0.63 * sin(newWetCGrainA * newWetCWindow * newWetCFrequency + 2 * 2) + 0.37 * (2 * slowA - 1)) * newWetCDriftDepth;\n    newWetCDriftB = (0.63 * sin(newWetCGrainB * newWetCWindow * newWetCFrequency + 2 * 2 + 1) + 0.37 * (2 * slowB - 1)) * newWetCDriftDepth;\n    newWetCSpacing = newWetCGranular * newWetCFrames * 0.71;\n    newWetCShift = (1 - newWetCRate) * newWetCFrames;\n    newWetCDistanceA = clamp(newCTap + newWetCShift * (newWetCPhaseA - 0.5) + newWetCScatterA + newWetCDriftA - newWetCSpacing, 2, newWetCLength - 2);\n    newWetCDistanceB = clamp(newCTap + newWetCShift * (newWetCPhaseB - 0.5) + newWetCScatterB + newWetCDriftB + newWetCSpacing, 2, newWetCLength - 2);\n    newWetCA = readTransport(tape, writeHead, direction, travel, newWetCDistanceA, newC, handoff, firstWritten, writtenSpan, 2);\n    newWetCB = readTransport(tape, writeHead, direction, travel, newWetCDistanceB, newC, handoff, firstWritten, writtenSpan, 2);\n    newWetCWeightA = 0.5 - 0.5 * cos(6.283185307179586 * newWetCPhaseA);\n    newWetC = newWetCA * newWetCWeightA + newWetCB * (1 - newWetCWeightA);\n    if (newWetCReverseMix > 0 && newWetCReverseMix < 1) {\n        newWetCDirect = readTransport(tape, writeHead, direction, travel, newCTap, newC, handoff, firstWritten, writtenSpan, 2);\n        newWetC = newWetCDirect + newWetCReverseMix * (newWetC - newWetCDirect);\n    }\n}\n\nplayC = ((oldWetC) + (amount) * ((newWetC) - (oldWetC)));\n\noldWetDSpeedCode = floor((oldConfig + 0.5) / 12.0);\noldWetDProgram = oldConfig - 12 * oldWetDSpeedCode;\noldWetDFamily = floor((oldWetDProgram + 0.5) / 3.0);\noldWetDSizeCode = oldWetDProgram - 3 * oldWetDFamily;\noldWetDForwardRate = pitchRatio * (oldWetDSpeedCode == 0 || oldWetDFamily >= 2 ? 1 : 0.5);\noldWetDReverseMix = direction < 0 ? clamp((travel - oldD - 2 - handoff) / handoff, 0, 1) : 0;\noldWetDRate = oldWetDReverseMix > 0 ? -oldWetDForwardRate : oldWetDForwardRate;\noldWetDGranular = oldWetDFamily == 3;\noldWetDLength = dim(tape);\noldWetD = 0;\nif (!oldWetDGranular && oldWetDRate == 1) {\n    oldWetD = readTransport(tape, writeHead, direction, travel, oldDTap, oldD, handoff, firstWritten, writtenSpan, 3);\n} else {\n    oldWetDWindow = oldWetDGranular ? (oldWetDSizeCode == 0 ? 0.087 : oldWetDSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    oldWetDWindow = (oldWetDReverseMix > 0 ? clamp(0.30 * oldD / samplerate, 0.35, 1.25) : oldWetDWindow) * (1 + 0.113 * 3);\n    oldWetDFrames = oldWetDWindow * samplerate;\n    oldWetDPositionA = grainClock / oldWetDWindow + 3 * 0.217;\n    oldWetDPositionB = oldWetDPositionA + 0.5;\n    oldWetDGrainA = floor(oldWetDPositionA);\n    oldWetDGrainB = floor(oldWetDPositionB);\n    oldWetDPhaseA = oldWetDPositionA - oldWetDGrainA;\n    oldWetDPhaseB = oldWetDPositionB - oldWetDGrainB;\n    // Indexed scatter lets matching oldWetDProgram readers agree at oldWetDA handoff.\n    oldWetDSeedA = (oldWetDGrainA + 1 + 142 * 3) * 12.9898;\n    oldWetDSeedB = (oldWetDGrainB + 72 + 142 * 3) * 12.9898;\n    oldWetDScatterDepth = oldWetDGranular * crossfeed * oldWetDFrames * 0.71;\n    oldWetDDriftDepth = oldWetDGranular * motion * oldWetDFrames * 0.69;\n    oldWetDFrequency = 0.397 + 0.087 * 3;\n    oldWetDScatterA = (2 * wrap(sin(oldWetDSeedA) * 43758.5453, 0, 1) - 1) * oldWetDScatterDepth;\n    oldWetDScatterB = (2 * wrap(sin(oldWetDSeedB) * 43758.5453, 0, 1) - 1) * oldWetDScatterDepth;\n    oldWetDDriftA = (0.63 * sin(oldWetDGrainA * oldWetDWindow * oldWetDFrequency + 2 * 3) + 0.37 * (2 * slowA - 1)) * oldWetDDriftDepth;\n    oldWetDDriftB = (0.63 * sin(oldWetDGrainB * oldWetDWindow * oldWetDFrequency + 2 * 3 + 1) + 0.37 * (2 * slowB - 1)) * oldWetDDriftDepth;\n    oldWetDSpacing = oldWetDGranular * oldWetDFrames * 0.71;\n    oldWetDShift = (1 - oldWetDRate) * oldWetDFrames;\n    oldWetDDistanceA = clamp(oldDTap + oldWetDShift * (oldWetDPhaseA - 0.5) + oldWetDScatterA + oldWetDDriftA - oldWetDSpacing, 2, oldWetDLength - 2);\n    oldWetDDistanceB = clamp(oldDTap + oldWetDShift * (oldWetDPhaseB - 0.5) + oldWetDScatterB + oldWetDDriftB + oldWetDSpacing, 2, oldWetDLength - 2);\n    oldWetDA = readTransport(tape, writeHead, direction, travel, oldWetDDistanceA, oldD, handoff, firstWritten, writtenSpan, 3);\n    oldWetDB = readTransport(tape, writeHead, direction, travel, oldWetDDistanceB, oldD, handoff, firstWritten, writtenSpan, 3);\n    oldWetDWeightA = 0.5 - 0.5 * cos(6.283185307179586 * oldWetDPhaseA);\n    oldWetD = oldWetDA * oldWetDWeightA + oldWetDB * (1 - oldWetDWeightA);\n    if (oldWetDReverseMix > 0 && oldWetDReverseMix < 1) {\n        oldWetDDirect = readTransport(tape, writeHead, direction, travel, oldDTap, oldD, handoff, firstWritten, writtenSpan, 3);\n        oldWetD = oldWetDDirect + oldWetDReverseMix * (oldWetD - oldWetDDirect);\n    }\n}\n\nnewWetDSpeedCode = floor((newConfig + 0.5) / 12.0);\nnewWetDProgram = newConfig - 12 * newWetDSpeedCode;\nnewWetDFamily = floor((newWetDProgram + 0.5) / 3.0);\nnewWetDSizeCode = newWetDProgram - 3 * newWetDFamily;\nnewWetDForwardRate = pitchRatio * (newWetDSpeedCode == 0 || newWetDFamily >= 2 ? 1 : 0.5);\nnewWetDReverseMix = direction < 0 ? clamp((travel - newD - 2 - handoff) / handoff, 0, 1) : 0;\nnewWetDRate = newWetDReverseMix > 0 ? -newWetDForwardRate : newWetDForwardRate;\nnewWetDGranular = newWetDFamily == 3;\nnewWetDLength = dim(tape);\nnewWetD = 0;\nif (!newWetDGranular && newWetDRate == 1) {\n    newWetD = readTransport(tape, writeHead, direction, travel, newDTap, newD, handoff, firstWritten, writtenSpan, 3);\n} else {\n    newWetDWindow = newWetDGranular ? (newWetDSizeCode == 0 ? 0.087 : newWetDSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    newWetDWindow = (newWetDReverseMix > 0 ? clamp(0.30 * newD / samplerate, 0.35, 1.25) : newWetDWindow) * (1 + 0.113 * 3);\n    newWetDFrames = newWetDWindow * samplerate;\n    newWetDPositionA = grainClock / newWetDWindow + 3 * 0.217;\n    newWetDPositionB = newWetDPositionA + 0.5;\n    newWetDGrainA = floor(newWetDPositionA);\n    newWetDGrainB = floor(newWetDPositionB);\n    newWetDPhaseA = newWetDPositionA - newWetDGrainA;\n    newWetDPhaseB = newWetDPositionB - newWetDGrainB;\n    // Indexed scatter lets matching newWetDProgram readers agree at newWetDA handoff.\n    newWetDSeedA = (newWetDGrainA + 1 + 142 * 3) * 12.9898;\n    newWetDSeedB = (newWetDGrainB + 72 + 142 * 3) * 12.9898;\n    newWetDScatterDepth = newWetDGranular * crossfeed * newWetDFrames * 0.71;\n    newWetDDriftDepth = newWetDGranular * motion * newWetDFrames * 0.69;\n    newWetDFrequency = 0.397 + 0.087 * 3;\n    newWetDScatterA = (2 * wrap(sin(newWetDSeedA) * 43758.5453, 0, 1) - 1) * newWetDScatterDepth;\n    newWetDScatterB = (2 * wrap(sin(newWetDSeedB) * 43758.5453, 0, 1) - 1) * newWetDScatterDepth;\n    newWetDDriftA = (0.63 * sin(newWetDGrainA * newWetDWindow * newWetDFrequency + 2 * 3) + 0.37 * (2 * slowA - 1)) * newWetDDriftDepth;\n    newWetDDriftB = (0.63 * sin(newWetDGrainB * newWetDWindow * newWetDFrequency + 2 * 3 + 1) + 0.37 * (2 * slowB - 1)) * newWetDDriftDepth;\n    newWetDSpacing = newWetDGranular * newWetDFrames * 0.71;\n    newWetDShift = (1 - newWetDRate) * newWetDFrames;\n    newWetDDistanceA = clamp(newDTap + newWetDShift * (newWetDPhaseA - 0.5) + newWetDScatterA + newWetDDriftA - newWetDSpacing, 2, newWetDLength - 2);\n    newWetDDistanceB = clamp(newDTap + newWetDShift * (newWetDPhaseB - 0.5) + newWetDScatterB + newWetDDriftB + newWetDSpacing, 2, newWetDLength - 2);\n    newWetDA = readTransport(tape, writeHead, direction, travel, newWetDDistanceA, newD, handoff, firstWritten, writtenSpan, 3);\n    newWetDB = readTransport(tape, writeHead, direction, travel, newWetDDistanceB, newD, handoff, firstWritten, writtenSpan, 3);\n    newWetDWeightA = 0.5 - 0.5 * cos(6.283185307179586 * newWetDPhaseA);\n    newWetD = newWetDA * newWetDWeightA + newWetDB * (1 - newWetDWeightA);\n    if (newWetDReverseMix > 0 && newWetDReverseMix < 1) {\n        newWetDDirect = readTransport(tape, writeHead, direction, travel, newDTap, newD, handoff, firstWritten, writtenSpan, 3);\n        newWetD = newWetDDirect + newWetDReverseMix * (newWetD - newWetDDirect);\n    }\n}\n\nplayD = ((oldWetD) + (amount) * ((newWetD) - (oldWetD)));\n\noldAux = oldMode == 0 ? 0 : oldMode == 3 ? (oldProgram == 11 ? 0.66 : 0) : 1;\nnewAux = newMode == 0 ? 0 : newMode == 3 ? (newProgram == 11 ? 0.66 : 0) : 1;\naux = ((oldAux) + (amount) * ((newAux) - (oldAux)));\norbitA = sin(twoPi * panPhaseA);\norbitB = sin(twoPi * panPhaseB);\npanA = -0.56 + 0.72 * motion * delayWeight * orbitA;\npanB = 0.56 + 0.72 * motion * delayWeight * orbitB;\npanC = (1 - ((oldMode == 3) + (amount) * ((newMode == 3) - (oldMode == 3)))) * (-0.24 - 0.53 * motion * delayWeight * orbitB);\npanD = (1 - ((oldMode == 3) + (amount) * ((newMode == 3) - (oldMode == 3)))) * (0.24 - 0.53 * motion * delayWeight * orbitA);\nwetNorm = 1 / sqrt(2 + 2 * aux * aux);\nwetL = wetNorm * (playA * sqrt((1 - clamp(panA, -1, 1)) * 0.5) + playB * sqrt((1 - clamp(panB, -1, 1)) * 0.5)\n      + aux * (playC * sqrt((1 - clamp(panC, -1, 1)) * 0.5) + playD * sqrt((1 - clamp(panD, -1, 1)) * 0.5)));\nwetR = wetNorm * (playA * sqrt((1 + clamp(panA, -1, 1)) * 0.5) + playB * sqrt((1 + clamp(panB, -1, 1)) * 0.5)\n      + aux * (playC * sqrt((1 + clamp(panC, -1, 1)) * 0.5) + playD * sqrt((1 + clamp(panD, -1, 1)) * 0.5)));\n\n// Rhythmic phase is measured in stored frames. Its step follows the host\n// tempo and time signature; a new take starts on the Record press.\nrhythmSize = round(clamp(size, 0, 2));\nrhythmBars = rhythmSize == 0 ? 1 : rhythmSize == 1 ? 2 : 4;\nrhythmPeriod = max(2, round(samplerate * 60.0 * rhythmBars * clamp(beats_per_bar, 0.5, 32) / clamp(tempo, 20, 400)));\nrhythmStyle = round(clamp(rhythm_style, 0, 6));\nrhythmCurrentEpoch = rhythmEpoch + cleared;\nrhythmCapacity = dim(rhythmTape);\nrhythmStart = rhythmSelected && captureRunning && (rhythmFrames < 2 || cleared);\nrhythmFreeForTake = rhythmStart ? rhythm_free >= 0.5 : cleared ? 0 : rhythmTakeFree;\nrhythmFinishEarly = rhythmSelected && rhythmRecordingFirst && !panicBlocking && !cleared\n                 && (rhythmFreeForTake ? !recording : !captureRunning);\nrhythmSealFree = rhythmFreeForTake && rhythmFinishEarly;\nrhythmCapturedLength = clamp(round(rhythmCursor), 2, rhythmCapacity);\nrhythmLength = rhythmStart ? (rhythmFreeForTake ? rhythmCapacity : min(rhythmPeriod, rhythmCapacity))\n             : cleared ? 0 : rhythmSealFree ? rhythmCapturedLength : rhythmFrames;\nrhythmCapturePeriod = rhythmStart ? (rhythmFreeForTake ? rhythmCapacity : rhythmPeriod)\n                    : cleared ? 0 : rhythmSealFree ? rhythmCapturedLength : rhythmFirstPeriod;\nrhythmIsPriming = (rhythmStart || (rhythmRecordingFirst && !rhythmFinishEarly)) && (!cleared || rhythmStart);\nrhythmPlayPeriod = rhythmIsPriming || rhythmFreeForTake ? rhythmCapturePeriod : rhythmPeriod;\nrhythmStep = rhythmLength / max(2, rhythmPlayPeriod);\n// Longer Octaves grains reduce tuning sidebands; preserve the normal Pitch window.\nrhythmGrainWindowLimit = rhythmStyle == 6 ? 0.36 : 0.14;\nrhythmGrainSeconds = min(rhythmGrainWindowLimit, 0.33 * max(2, rhythmPlayPeriod) / samplerate);\nrhythmDirection = reverse >= 0.5 && !rhythmIsPriming ? -1 : 1;\nrhythmPosition = rhythmStart || cleared ? 0 : rhythmFinishEarly ? (rhythmDirection < 0 ? max(0, ceil(rhythmCursor) - 1) : 0) : rhythmCursor;\nrhythmNextPosition = rhythmPosition + rhythmDirection * rhythmStep;\nrhythmCanAdvance = rhythmRuns && (!rhythmFreeForTake || !rhythmIsPriming || (rhythmSelected && captureRunning));\n\n// During the initial take both channels capture at full length. The\n// established right head then scans its shorter span at the same speed.\nrhythmPoly = rhythmStyle == 1 || rhythmStyle == 2;\nrhythmWasPoly = rhythmLastStyle == 1 || rhythmLastStyle == 2;\nrhythmRightRatio = rhythmStyle == 1 ? 0.875 : rhythmStyle == 2 ? 0.75 : 1;\nrhythmRightLength = rhythmPoly && !rhythmIsPriming\n                  ? min(rhythmLength, max(2, round(rhythmLength * rhythmRightRatio))) : rhythmLength;\nrhythmRightPosition = rhythmIsPriming || !rhythmPoly || rhythmStart || cleared ? rhythmPosition\n                    : rhythmFinishEarly ? (rhythmDirection < 0 ? rhythmRightLength - 1 : 0)\n                    : rhythmWasPoly ? wrap(rhythmRightCursor, 0, max(2, rhythmRightLength))\n                    : wrap(rhythmPosition, 0, max(2, rhythmRightLength));\nrhythmRightNextPosition = rhythmRightPosition + rhythmDirection * rhythmStep;\nrhythmPolySwitch = rhythmStyle != rhythmLastStyle && (rhythmPoly || rhythmWasPoly)\n                && !rhythmIsPriming && !rhythmFinishEarly && !cleared;\nrhythmPolyFade = cleared ? 0 : rhythmPolySwitch ? 1 : max(0, rhythmStyleFade - 1.0 / (0.012 * samplerate));\nrhythmFadeFrom = rhythmPolySwitch ? rhythmRightLastSample : rhythmRightFadeFrom;\n// The stored loop and host-facing phase stay unchanged across these styles.\nrhythmCuts = rhythmStyle == 3 ? 8 : rhythmStyle == 4 ? 6 : rhythmStyle == 5 ? 5 : 1;\nrhythmSliceCycle = (rhythmStart || cleared) ? 0 : rhythmFxCycle;\nrhythmSliceRotate = 1 + wrap(3 * rhythmSliceCycle + rhythmStyle, 0, max(1, rhythmCuts - 1));\nrhythmSliceStride = rhythmCuts == 8 ? 1 + 2 * wrap(rhythmSliceCycle + 3, 0, 4)\n                  : rhythmCuts == 6 ? 1 + 4 * wrap(rhythmSliceCycle, 0, 2)\n                  : 1 + wrap(rhythmSliceCycle + 1, 0, 4);\nrhythmSliceEdge = max(1, 0.006 * samplerate * rhythmStep);\nrhythmCycleEdge = rhythmCanAdvance && !rhythmIsPriming && rhythmLength >= 2\n               && (rhythmNextPosition >= rhythmLength || rhythmNextPosition < 0);\nrhythmFxCycle = wrap(rhythmSliceCycle + rhythmCycleEdge, 0, 4096);\n\n// In Octaves, Drift selects down / original / up. The regular Pitch\n// control multiplies the read ratio without changing the loop clock.\nrhythmOctaveTarget = rhythmStyle != 6 ? 1 : drift < 0.333333 ? 0.5 : drift > 0.666667 ? 2 : 1;\nrhythmOctaveSlew = rhythmOctaveState + control * (rhythmOctaveTarget - rhythmOctaveState);\nrhythmOctaveRatio = abs(rhythmOctaveSlew - rhythmOctaveTarget) < 0.00001 ? rhythmOctaveTarget : rhythmOctaveSlew;\nrhythmOctaveState = rhythmOctaveRatio;\n\nrhythmWetL = 0;\nrhythmWetR = 0;\nif (rhythmRuns && rhythmLength >= 2) {\n    if (!rhythmIsPriming) {\n        // Rhythmic effect hook.\n        rhythmWetL = readRhythmFx(rhythmTape, rhythmPosition, rhythmLength, rhythmCurrentEpoch, 0, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n        rhythmWetR = readRhythmFx(rhythmTape, rhythmRightPosition, rhythmRightLength, rhythmCurrentEpoch, 1, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n        // Shift only the wet reader. The tape, overdub and beat clock stay in sync.\n        rhythmPitch = pitchRatio * rhythmOctaveRatio;\n        if (abs(1 - rhythmPitch) > 0.0001) {\n            rhythmGrainWindow = rhythmGrainSeconds * samplerate * rhythmStep;\n            rhythmGrainA = rhythmGrainPhase;\n            rhythmGrainB = wrap(rhythmGrainA + 0.5, 0, 1);\n            rhythmGrainScale = rhythmDirection * (1 - rhythmPitch) * rhythmGrainWindow;\n            rhythmPitchPositionA = rhythmPosition - rhythmGrainScale * (rhythmGrainA - 0.5);\n            rhythmPitchPositionB = rhythmPosition - rhythmGrainScale * (rhythmGrainB - 0.5);\n            rhythmPitchLA = readRhythmFx(rhythmTape, rhythmPitchPositionA, rhythmLength, rhythmCurrentEpoch, 0, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n            rhythmPitchLB = readRhythmFx(rhythmTape, rhythmPitchPositionB, rhythmLength, rhythmCurrentEpoch, 0, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n            rhythmPitchRightA = rhythmRightPosition - rhythmGrainScale * (rhythmGrainA - 0.5);\n            rhythmPitchRightB = rhythmRightPosition - rhythmGrainScale * (rhythmGrainB - 0.5);\n            rhythmPitchRA = readRhythmFx(rhythmTape, rhythmPitchRightA, rhythmRightLength, rhythmCurrentEpoch, 1, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n            rhythmPitchRB = readRhythmFx(rhythmTape, rhythmPitchRightB, rhythmRightLength, rhythmCurrentEpoch, 1, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n            rhythmGrainWeight = 0.5 - 0.5 * cos(twoPi * rhythmGrainA);\n            rhythmPitchMix = clamp(abs(1 - rhythmPitch) * 80, 0, 1);\n            rhythmShiftL = rhythmPitchLA * rhythmGrainWeight + rhythmPitchLB * (1 - rhythmGrainWeight);\n            rhythmShiftR = rhythmPitchRA * rhythmGrainWeight + rhythmPitchRB * (1 - rhythmGrainWeight);\n            rhythmWetL = rhythmWetL + rhythmPitchMix * (rhythmShiftL - rhythmWetL);\n            rhythmWetR = rhythmWetR + rhythmPitchMix * (rhythmShiftR - rhythmWetR);\n        }\n        rhythmWetR = rhythmWetR + rhythmPolyFade * (rhythmFadeFrom - rhythmWetR);\n    }\n    rhythmErase = rhythmSelected && !holdOn && erasing > 0.0001;\n    if (rhythmSelected && (captureRunning || rhythmErase)) {\n        // One update per cell at the native tempo. At different playback rates\n        // fill crossed cells, bounded for unusually large tempo or meter changes.\n        rhythmWriteFrom = rhythmDirection > 0 ? floor(rhythmPosition) : ceil(rhythmPosition);\n        rhythmWriteTo = rhythmDirection > 0 ? floor(rhythmNextPosition) : ceil(rhythmNextPosition);\n        rhythmWriteRightFrom = rhythmDirection > 0 ? floor(rhythmRightPosition) : ceil(rhythmRightPosition);\n        rhythmWriteRightTo = rhythmDirection > 0 ? floor(rhythmRightNextPosition) : ceil(rhythmRightNextPosition);\n        rhythmCrossedL = abs(rhythmWriteTo - rhythmWriteFrom);\n        rhythmCrossedR = abs(rhythmWriteRightTo - rhythmWriteRightFrom);\n        rhythmWritesL = min(16, rhythmCrossedL);\n        rhythmWritesR = min(16, rhythmCrossedR);\n        rhythmWrites = max(rhythmWritesL, rhythmWritesR);\n        rhythmArmL = captureRunning && (group == 1 || group == 3);\n        rhythmArmR = captureRunning && (group == 2 || group == 3);\n        for (rhythmFrame = 0; rhythmFrame < rhythmWrites; rhythmFrame += 1) {\n            // The independently clocked heads can address different cells.\n            // A new epoch tag also initializes the unaddressed companion lane.\n            rhythmOffsetL = floor(rhythmFrame * rhythmCrossedL / max(1, rhythmWritesL));\n            rhythmOffsetR = floor(rhythmFrame * rhythmCrossedR / max(1, rhythmWritesR));\n            rhythmCellL = wrap(rhythmWriteFrom + rhythmDirection * rhythmOffsetL, 0, rhythmLength);\n            rhythmCellR = wrap(rhythmWriteRightFrom + rhythmDirection * rhythmOffsetR, 0, rhythmRightLength);\n            rhythmValidL = peek(rhythmTape, rhythmCellL, 2) == rhythmCurrentEpoch;\n            rhythmValidR = peek(rhythmTape, rhythmCellR, 2) == rhythmCurrentEpoch;\n            rhythmPrevL = rhythmValidL ? peek(rhythmTape, rhythmCellL, 0) : 0;\n            rhythmPrevR = rhythmValidR ? peek(rhythmTape, rhythmCellR, 1) : 0;\n            rhythmPower = rhythmPrevL * rhythmPrevL + rhythmPrevR * rhythmPrevR;\n            rhythmBuild = max(0, effectiveRegen - 1);\n            rhythmRetention = effectiveRegen * (1 - 0.97 * suppress) / (1 + rhythmBuild * rhythmPower / (0.62 * 0.62));\n            rhythmWriteL = rhythmArmL ? rhythmRetention * rhythmPrevL + 0.67 * injectA * injectedL : rhythmPrevL;\n            rhythmWriteR = rhythmArmR ? rhythmRetention * rhythmPrevR + 0.67 * injectB * injectedR : rhythmPrevR;\n            rhythmKeep = rhythmErase ? 1 - erasing : 1;\n            rhythmTouchL = rhythmFrame < rhythmWritesL && (rhythmArmL || rhythmErase);\n            rhythmTouchR = rhythmFrame < rhythmWritesR && (rhythmArmR || rhythmErase);\n            rhythmRawL = rhythmTouchL ? clamp(fixnan(rhythmWriteL * rhythmKeep), -16, 16) : rhythmPrevL;\n            rhythmRawR = rhythmTouchR ? clamp(fixnan(rhythmWriteR * rhythmKeep), -16, 16) : rhythmPrevR;\n            rhythmPeak = max(rhythmTouchL ? abs(rhythmRawL) : 0, rhythmTouchR ? abs(rhythmRawR) : 0);\n            rhythmSafePeak = min(rhythmPeak, 0.54) + 0.06 * tanh(max(0, rhythmPeak - 0.54) / 0.06);\n            rhythmGuard = rhythmPeak > 0.54 ? rhythmSafePeak / rhythmPeak : 1;\n            rhythmStoreL = rhythmRawL * rhythmGuard;\n            rhythmStoreR = rhythmRawR * rhythmGuard;\n            if (rhythmTouchL && !rhythmValidL && (!rhythmTouchR || rhythmCellL != rhythmCellR)) {\n                poke(rhythmTape, 0, rhythmCellL, 1);\n            }\n            if (rhythmTouchR && !rhythmValidR && (!rhythmTouchL || rhythmCellL != rhythmCellR)) {\n                poke(rhythmTape, 0, rhythmCellR, 0);\n            }\n            if (rhythmTouchL) {\n                poke(rhythmTape, rhythmStoreL, rhythmCellL, 0);\n                poke(rhythmTape, rhythmCurrentEpoch, rhythmCellL, 2);\n            }\n            if (rhythmTouchR) {\n                poke(rhythmTape, rhythmStoreR, rhythmCellR, 1);\n                poke(rhythmTape, rhythmCurrentEpoch, rhythmCellR, 2);\n            }\n        }\n    }\n}\n\n// Independent short, damped, orthogonal diffusion. Blur also takes a\n// smaller live-input send before recording starts. It never alters the tape.\nrhythmVerbTarget = clamp(blur, 0, 1);\nrhythmVerbSlew = 1.0 / (0.020 * samplerate);\nrhythmVerbAmount = rhythmVerbTarget > rhythmVerbControl\n                 ? min(rhythmVerbTarget, rhythmVerbControl + rhythmVerbSlew)\n                 : max(rhythmVerbTarget, rhythmVerbControl - rhythmVerbSlew);\nrhythmVerbControl = rhythmVerbAmount;\nrhythmVerbMuted = panicPressed || (rhythmVerbPanic && !captureRunning);\nrhythmVerbPanic = rhythmVerbMuted;\nrhythmVerbOpen = rhythmRuns && !rhythmVerbMuted && !panicBlocking && rhythmVerbAmount > 0;\nrhythmVerbTail = cleared ? 0 : rhythmVerbOpen ? round(2 * samplerate) : max(0, rhythmVerbTailFrames - 1);\nrhythmVerbActive = rhythmVerbOpen || rhythmVerbTail > 0;\nrhythmVerbAge = cleared ? 0 : rhythmVerbWritten;\nrhythmVerbOutL = 0;\nrhythmVerbOutR = 0;\nrhythmVerbToneA = 0;\nrhythmVerbToneB = 0;\nrhythmVerbToneC = 0;\nrhythmVerbToneD = 0;\nif (rhythmVerbActive) {\n    rhythmVerbCapacity = dim(rhythmVerbTape);\n    rhythmVerbA = min(rhythmVerbCapacity - 1, max(2, round(1009 * samplerate / 48000)));\n    rhythmVerbB = min(rhythmVerbCapacity - 1, max(2, round(1451 * samplerate / 48000)));\n    rhythmVerbC = min(rhythmVerbCapacity - 1, max(2, round(2063 * samplerate / 48000)));\n    rhythmVerbD = min(rhythmVerbCapacity - 1, max(2, round(2833 * samplerate / 48000)));\n    rhythmVerbReadA = rhythmVerbAge >= rhythmVerbA ? peek(rhythmVerbTape, wrap(rhythmVerbHead - rhythmVerbA, 0, rhythmVerbCapacity), 0) : 0;\n    rhythmVerbReadB = rhythmVerbAge >= rhythmVerbB ? peek(rhythmVerbTape, wrap(rhythmVerbHead - rhythmVerbB, 0, rhythmVerbCapacity), 1) : 0;\n    rhythmVerbReadC = rhythmVerbAge >= rhythmVerbC ? peek(rhythmVerbTape, wrap(rhythmVerbHead - rhythmVerbC, 0, rhythmVerbCapacity), 2) : 0;\n    rhythmVerbReadD = rhythmVerbAge >= rhythmVerbD ? peek(rhythmVerbTape, wrap(rhythmVerbHead - rhythmVerbD, 0, rhythmVerbCapacity), 3) : 0;\n    rhythmVerbDamping = 1 - exp(-twoPi * 4400 / samplerate);\n    rhythmVerbToneA = (cleared ? 0 : rhythmVerbToneStateA) + rhythmVerbDamping * (rhythmVerbReadA - (cleared ? 0 : rhythmVerbToneStateA));\n    rhythmVerbToneB = (cleared ? 0 : rhythmVerbToneStateB) + rhythmVerbDamping * (rhythmVerbReadB - (cleared ? 0 : rhythmVerbToneStateB));\n    rhythmVerbToneC = (cleared ? 0 : rhythmVerbToneStateC) + rhythmVerbDamping * (rhythmVerbReadC - (cleared ? 0 : rhythmVerbToneStateC));\n    rhythmVerbToneD = (cleared ? 0 : rhythmVerbToneStateD) + rhythmVerbDamping * (rhythmVerbReadD - (cleared ? 0 : rhythmVerbToneStateD));\n    rhythmVerbNetworkA = 0.5 * (rhythmVerbToneA + rhythmVerbToneB + rhythmVerbToneC + rhythmVerbToneD);\n    rhythmVerbNetworkB = 0.5 * (rhythmVerbToneA - rhythmVerbToneB + rhythmVerbToneC - rhythmVerbToneD);\n    rhythmVerbNetworkC = 0.5 * (rhythmVerbToneA + rhythmVerbToneB - rhythmVerbToneC - rhythmVerbToneD);\n    rhythmVerbNetworkD = 0.5 * (rhythmVerbToneA - rhythmVerbToneB - rhythmVerbToneC + rhythmVerbToneD);\n    rhythmVerbSend = rhythmVerbOpen && !cleared ? rhythmVerbAmount : 0;\n    rhythmVerbInL = rhythmVerbSend * tanh(0.70 * rhythmWetL + 0.38 * (1 - holdMix) * inputL);\n    rhythmVerbInR = rhythmVerbSend * tanh(0.70 * rhythmWetR + 0.38 * (1 - holdMix) * inputR);\n    poke(rhythmVerbTape, 0.65 * tanh((0.47 * rhythmVerbInL + 0.73 * rhythmVerbNetworkA) / 0.65), rhythmVerbHead, 0);\n    poke(rhythmVerbTape, 0.65 * tanh((0.47 * rhythmVerbInR + 0.73 * rhythmVerbNetworkB) / 0.65), rhythmVerbHead, 1);\n    poke(rhythmVerbTape, 0.65 * tanh((0.33 * rhythmVerbInL + 0.73 * rhythmVerbNetworkC) / 0.65), rhythmVerbHead, 2);\n    poke(rhythmVerbTape, 0.65 * tanh((0.33 * rhythmVerbInR + 0.73 * rhythmVerbNetworkD) / 0.65), rhythmVerbHead, 3);\n    rhythmVerbOutL = 0.53 * (rhythmVerbReadA + rhythmVerbReadC);\n    rhythmVerbOutR = 0.53 * (rhythmVerbReadB + rhythmVerbReadD);\n}\nrhythmVerbHead = rhythmVerbActive ? wrap(rhythmVerbHead + 1, 0, dim(rhythmVerbTape)) : rhythmVerbHead;\nrhythmVerbWritten = rhythmVerbActive ? min(rhythmVerbAge + 1, dim(rhythmVerbTape)) : 0;\nrhythmVerbTailFrames = rhythmVerbTail;\nrhythmVerbToneStateA = rhythmVerbActive ? rhythmVerbToneA : 0;\nrhythmVerbToneStateB = rhythmVerbActive ? rhythmVerbToneB : 0;\nrhythmVerbToneStateC = rhythmVerbActive ? rhythmVerbToneC : 0;\nrhythmVerbToneStateD = rhythmVerbActive ? rhythmVerbToneD : 0;\nrhythmVerbWet = clamp(8 * rhythmVerbAmount, 0, 1);\nrhythmWetL = rhythmWetL + rhythmVerbWet * rhythmVerbOutL;\nrhythmWetR = rhythmWetR + rhythmVerbWet * rhythmVerbOutR;\n\nwetL = wetL + rhythmBlend * (rhythmWetL - wetL);\nwetR = wetR + rhythmBlend * (rhythmWetR - wetR);\n\nrhythmFade = rhythmNextFade;\nrhythmFrames = rhythmLength;\nrhythmFirstPeriod = rhythmCapturePeriod;\nrhythmEpoch = rhythmCurrentEpoch;\nrhythmRecordingFirst = rhythmIsPriming && (rhythmNextPosition < rhythmLength || !rhythmCanAdvance);\nrhythmCursor = rhythmCanAdvance && rhythmLength >= 2 ? wrap(rhythmNextPosition, 0, rhythmLength) : rhythmPosition;\nrhythmRightCursor = rhythmCanAdvance && rhythmRightLength >= 2 ? wrap(rhythmRightNextPosition, 0, rhythmRightLength) : rhythmRightPosition;\nrhythmLastStyle = rhythmStyle;\nrhythmTakeFree = rhythmFreeForTake;\nrhythmStyleFade = rhythmPolyFade;\nrhythmRightLastSample = rhythmWetR;\nrhythmRightFadeFrom = rhythmFadeFrom;\nrhythmGrainPhase = wrap(rhythmGrainPhase + 1.0 / (rhythmGrainSeconds * samplerate), 0, 1);\n// Filter the audible wet signal in every mode, including the first return\n// and Hold. The ambient loop's separate filters still bypass during Hold.\nwetHighNextL = cleared ? 0 : wetHighL + highCoefficient * (wetL - wetHighL);\nwetHighNextR = cleared ? 0 : wetHighR + highCoefficient * (wetR - wetHighR);\nwetBrightL = wetL - highAmount * wetHighNextL;\nwetBrightR = wetR - highAmount * wetHighNextR;\nwetLowNextL = cleared ? 0 : wetLowL + lowCoefficient * (wetBrightL - wetLowL);\nwetLowNextR = cleared ? 0 : wetLowR + lowCoefficient * (wetBrightR - wetLowR);\nwetToneL = wetBrightL + lowAmount * (wetLowNextL - wetBrightL);\nwetToneR = wetBrightR + lowAmount * (wetLowNextR - wetBrightR);\nwetHighL = wetHighNextL;\nwetHighR = wetHighNextR;\nwetLowL = wetLowNextL;\nwetLowR = wetLowNextR;\n\nwetLevel = wetFade * (1 - 0.85 * suppress);\n// Keep the wet output tone controls out of the dry compressor sidechain.\ndetector = max(abs(rawL + wetL * wetLevel), abs(rawR + wetR * wetLevel));\nwetL = wetToneL * wetLevel;\nwetR = wetToneR * wetLevel;\n// A Panic must not jump the gain of a continuing dry signal.\npriorCombined = (cleared && !panicClearActive) ? 0 : combinedEnvelope;\nlinked = ((priorCombined) + (detector > priorCombined ? attack : release) * ((detector) - (priorCombined)));\ncompGain = ((1) + (max(character, 0)) * ((1.12 * pow(max(1, linked / 0.24), -0.55)) - (1)));\n// Width shapes only the stereo wet output. Widening gets gentle\n// energy normalization and unity width preserves the original signal.\nwidthMix = widthState + control * (clamp(width, 0, 2) - widthState);\nwidthGain = 1 / sqrt(max(1, (1 + widthMix * widthMix) * 0.5));\nwidthSide = 0.5 * (wetL - wetR) * (widthMix - 1);\nwetL = (wetL + widthSide) * widthGain;\nwetR = (wetR - widthSide) * widthGain;\nout4 = max(abs(wetL), abs(wetR));\ndryGain = cos(blend * 1.570796326794897);\nwetGain = sin(blend * 1.570796326794897);\nlimitedLRaw = clamp(fixnan(gainOut * compGain * (dryGain * rawL + wetGain * wetL)), -16, 16);\nlimitedLMag = abs(limitedLRaw);\nlimitedLKnee = max(0, limitedLMag - 0.75);\nlimitedL = sign(limitedLRaw) * (min(limitedLMag, 0.75) + 0.21 * tanh(limitedLKnee / 0.21));\nout1 = limitedL;\nlimitedRRaw = clamp(fixnan(gainOut * compGain * (dryGain * rawR + wetGain * wetR)), -16, 16);\nlimitedRMag = abs(limitedRRaw);\nlimitedRKnee = max(0, limitedRMag - 0.75);\nlimitedR = sign(limitedRRaw) * (min(limitedRMag, 0.75) + 0.21 * tanh(limitedRKnee / 0.21));\nout2 = limitedR;\n\nif (cleared || ambientRuns) {\n    firstWritten = writtenSpan < 0 ? writeHead : min(firstWritten, writeHead);\n    lastWritten = writtenSpan < 0 ? writeHead : max(lastWritten, writeHead);\n    if (!ambientRuns) {\n        lastWritten = writeHead - 1;\n    }\n}\nif (ambientRuns) {\n    writeHead = writeHead + direction;\n    transportDirection = direction;\n    directionFrames = min(travel + 1, capacity);\n}\nclearSeen = clear;\nfadeLeft = remaining;\nholdState = holdMix;\npanicSeen = panic;\npanicClearing = panicClearActive && !cleared;\npanicNeedsOff = waitingForOff;\nwidthState = widthMix;\nsourceConfig = progress >= 1 ? newConfig : oldConfig;\ntargetConfig = newConfig;\nchangePhase = progress;\ncaptureA = recA;\ncaptureB = recB;\nfeedbackState = regen;\nblurState = crossfeed;\ndriftState = motion;\nmixState = blend;\ndriveState = saturation;\ndynamicsState = character;\neraseState = eraseSmoothed;\ninputGain = gainIn;\noutputGain = gainOut;\nhighState = highCoefficient;\nhighMix = highAmount;\nlowState = lowCoefficient;\nlowMix = lowAmount;\ninputEnvelope = env;\ncombinedEnvelope = linked;\npanPhaseA = wrap(panPhaseA + (0.032 + 0.009 * sin(twoPi * wanderPhaseA) + 0.012 * (2 * slowA - 1)) / samplerate, 0, 1);\npanPhaseB = wrap(panPhaseB + (0.023 + 0.007 * sin(twoPi * wanderPhaseB) + 0.010 * (2 * slowB - 1)) / samplerate, 0, 1);\nwanderPhaseA = wrap(wanderPhaseA + 1.0 / (97 * samplerate), 0, 1);\nwanderPhaseB = wrap(wanderPhaseB + 1.0 / (137 * samplerate), 0, 1);\nchaosClockA = wrap(chaosTickA, 0, 1);\nchaosClockB = wrap(chaosTickB, 0, 1);\nchaosA = chaosNextA;\nchaosB = chaosNextB;\nwanderA = slowA;\nwanderB = slowB;\ngrainClock = grainClock + 1.0 / samplerate;\n"
+                          "code": "// Explicitly wrap the two interpolation neighbors at the musical loop edge.\n// Generation tags make Clear immediate without clearing millions of samples.\nreadRhythm(memory, phase, length, epoch, lane) {\n    position = wrap(phase, 0, length);\n    leftIndex = floor(position);\n    rightIndex = wrap(leftIndex + 1, 0, length);\n    fraction = position - leftIndex;\n    left = peek(memory, leftIndex, 2) == epoch ? peek(memory, leftIndex, lane) : 0;\n    right = peek(memory, rightIndex, 2) == epoch ? peek(memory, rightIndex, lane) : 0;\n    return left + fraction * (right - left);\n}\n\n// Map each logical slice to a different stored slice. A short edge fade\n// makes the reordered boundaries work in either playback direction.\nreadRhythmFx(memory, phase, length, epoch, lane, cuts, rotation, stride, edgeFrames) {\n    readPhase = phase;\n    edgeGain = 1;\n    if (cuts > 1) {\n        sliceLength = length / cuts;\n        position = wrap(phase, 0, length);\n        slice = min(cuts - 1, floor(position / sliceLength));\n        within = position - slice * sliceLength;\n        fromSlice = wrap(slice * stride + rotation, 0, cuts);\n        readPhase = fromSlice * sliceLength + within;\n        fadeLength = max(0.001, min(edgeFrames, 0.20 * sliceLength));\n        edge = clamp(min(within, sliceLength - within) / fadeLength, 0, 1);\n        edgeGain = edge * edge * (3 - 2 * edge);\n    }\n    return edgeGain * readRhythm(memory, readPhase, length, epoch, lane);\n}\n\n// The lifted write cursor visits a contiguous interval after Clear, even\n// when it reverses. Gate both ends of every interpolated read against it.\nreadWritten(memory, address, firstWritten, writtenSpan, lane) {\n    length = dim(memory);\n    index = wrap(address, 0, length);\n    distance = wrap(floor(index) - firstWritten, 0, length);\n    nextDistance = wrap(distance + 1, 0, length);\n    ready = distance <= writtenSpan && (index == floor(index) || nextDistance <= writtenSpan);\n    return ready ? peek(memory, index, lane, interp=\"linear\", boundmode=\"wrap\") : 0;\n}\n\n// At a flip, the old tap first retraces the just-heard tape. The turning\n// head then follows the old recording just ahead of the writer, so an\n// unheard recent take is replayed before its cells are overwritten.\n// Once a full delay has passed, hand off to newly written material.\nreadTransport(memory, head, direction, travel, distance, baseDelay, handoff, firstWritten, writtenSpan, lane) {\n    afterTurn = clamp((travel - baseDelay - 2) / handoff, 0, 1);\n    normal = readWritten(memory, head - direction * distance, firstWritten, writtenSpan, lane);\n    signal = normal;\n    if (afterTurn < 1) {\n        offset = distance - baseDelay;\n        oldAddress = head + direction * clamp(baseDelay - offset, 1, dim(memory) - 2);\n        turnAddress = head + direction * clamp(1 - offset, 1, dim(memory) - 2);\n        oldSide = readWritten(memory, oldAddress, firstWritten, writtenSpan, lane);\n        turnSide = readWritten(memory, turnAddress, firstWritten, writtenSpan, lane);\n        turnFade = clamp(travel / handoff, 0, 1);\n        inherited = oldSide + turnFade * (turnSide - oldSide);\n        signal = inherited + afterTurn * (normal - inherited);\n    }\n    return signal;\n}\n\n// Program and speed codes are integers. A half-step bias prevents\n// reciprocal rounding at the exact boundaries in Max 9.1.5.\n// 24 seconds per lane at 192 kHz. All twelve programs share these lanes.\nData tape(4608000, 4);\n// Separate stereo loop and per-frame generation tag. A long loop exceeding\n// this allocation reduces stored sample density but keeps its beat period.\nData rhythmTape(4608000, 3);\nData rhythmVerbTape(16384, 4);\nParam tempo(120, min=20, max=400);\nParam beats_per_bar(4, min=0.5, max=32);\nParam rhythm_free(0, min=0, max=1);\nParam rhythm_style(0, min=0, max=6);\nParam mode(0, min=0, max=4);\nParam size(0, min=0, max=2);\nParam record(0, min=0, max=3);\nParam reverse(0);\nParam half_speed(0);\nParam pitch(0, min=-12, max=0);\nParam erase(0);\nParam clear(0, min=0, max=1000000);\nParam hold(0, min=0, max=1);\nParam panic(0, min=0, max=1000000);\nParam width(1, min=0, max=2);\nParam feedback(0.82, min=0, max=1.1);\nParam blur(0.32);\nParam drift(0.45);\nParam mix(1);\nParam return_mix(35, min=0, max=100);\nHistory mod_mix_state(0.35);\nHistory mod_tempo_offset(0);\nHistory mod_beats_per_bar_offset(0);\nParam drive(0);\nParam dynamics(0, min=-1, max=1);\nParam hpf(0, min=0, max=4);\nParam lpf(0, min=0, max=4);\nParam hpf_hz(65, min=20, max=2000);\nParam lpf_hz(5600, min=200, max=20000);\nParam input_db(0, min=-24, max=12);\nParam output_db(0, min=-24, max=6);\nParam mono_input(0);\nParam input_gate(1, min=0, max=2);\nHistory monoAmount(0);\nHistory gateEnvelope(0);\nHistory gateGain(0);\n\nHistory writeHead(0);\nHistory rhythmFade(0);\nHistory rhythmFrames(0);\nHistory rhythmFirstPeriod(0);\nHistory rhythmCursor(0);\nHistory rhythmRightCursor(0);\nHistory rhythmLastStyle(0);\nHistory rhythmTakeFree(0);\nHistory rhythmStyleFade(0);\nHistory rhythmRightLastSample(0);\nHistory rhythmRightFadeFrom(0);\nHistory rhythmEpoch(1);\nHistory rhythmRecordingFirst(0);\nHistory rhythmGrainPhase(0);\nHistory rhythmFxCycle(0);\nHistory rhythmOctaveState(1);\nHistory rhythmVerbHead(0);\nHistory rhythmVerbWritten(0);\nHistory rhythmVerbTailFrames(0);\nHistory rhythmVerbPanic(0);\nHistory rhythmVerbControl(0);\nHistory rhythmVerbToneStateA(0);\nHistory rhythmVerbToneStateB(0);\nHistory rhythmVerbToneStateC(0);\nHistory rhythmVerbToneStateD(0);\nHistory wetHighL(0);\nHistory wetHighR(0);\nHistory wetLowL(0);\nHistory wetLowR(0);\nHistory firstWritten(0);\nHistory lastWritten(-1);\nHistory transportDirection(1);\nHistory directionFrames(4608000);\nHistory clearSeen(0);\nHistory fadeLeft(0);\nHistory holdState(0);\nHistory panicSeen(0);\nHistory panicClearing(0);\nHistory panicNeedsOff(0);\nHistory widthState(1);\nHistory pitchRatioState(1);\nHistory sourceConfig(0);\nHistory targetConfig(0);\nHistory changePhase(1);\nHistory captureA(0);\nHistory captureB(0);\nHistory feedbackState(0.82);\nHistory blurState(0.32);\nHistory driftState(0.45);\nHistory mixState(0.55);\nHistory driveState(0);\nHistory dynamicsState(0);\nHistory eraseState(0);\nHistory inputGain(1);\nHistory outputGain(1);\nHistory highState(0);\nHistory highMix(0);\nHistory lowState(0);\nHistory lowMix(0);\nHistory inputEnvelope(0);\nHistory combinedEnvelope(0);\nHistory panPhaseA(0.13);\nHistory panPhaseB(0.47);\nHistory wanderPhaseA(0.18);\nHistory wanderPhaseB(0.64);\nHistory grainClock(0);\nHistory captureClock(0);\nHistory wasRecording(0);\nHistory chaosClockA(0.37);\nHistory chaosClockB(0.73);\nHistory chaosA(0.371);\nHistory chaosB(0.617);\nHistory wanderA(0.371);\nHistory wanderB(0.617);\nHistory toneHighA(0);\nHistory toneLowA(0);\nHistory toneHighB(0);\nHistory toneLowB(0);\nHistory toneHighC(0);\nHistory toneLowC(0);\nHistory toneHighD(0);\nHistory toneLowD(0);\n\ntwoPi = 6.283185307179586;\ncapacity = dim(tape);\nfadeFrames = max(2, round(samplerate * 0.025));\n// Panic uses the same wet fade and buffer invalidation as Clear All.\npanicPressed = panic != panicSeen;\npanicClearActive = panicPressed || panicClearing;\nnewClear = ((clear != clearSeen) || panicPressed) && (fadeLeft == 0);\ncleared = fadeLeft == 1;\nremaining = newClear ? fadeFrames : max(0, fadeLeft - 1);\nwetFade = remaining > 0 ? remaining / fadeFrames : 1;\nwrittenSpan = cleared ? -1 : min(lastWritten - firstWritten, capacity - 1);\nwriteIndex = wrap(writeHead, 0, capacity);\ndirection = reverse >= 0.5 ? -1 : 1;\nturned = direction != transportDirection;\ntravel = turned ? 0 : directionFrames;\nhandoff = max(2, round(0.04 * samplerate));\n\n// Crossfade discrete programs and half-speed reads. A quick series of changes\n// settles on the most recent selection after the current fade completes.\nrhythmSelected = round(clamp(mode, 0, 4)) == 4;\nrhythmFadeStep = 1.0 / (0.12 * samplerate);\nrhythmNextFade = rhythmSelected ? min(1, rhythmFade + rhythmFadeStep) : max(0, rhythmFade - rhythmFadeStep);\nrhythmBlend = rhythmNextFade * rhythmNextFade * (3 - 2 * rhythmNextFade);\nambientRuns = !rhythmSelected || rhythmNextFade < 1;\nrhythmRuns = rhythmSelected || rhythmFade > 0;\nrequested = rhythmSelected ? targetConfig : 3 * round(clamp(mode, 0, 3)) + round(clamp(size, 0, 2))\n          + 12 * (half_speed >= 0.5);\nstartChange = (changePhase >= 1) && (requested != targetConfig);\noldConfig = startChange ? targetConfig : sourceConfig;\nnewConfig = startChange ? requested : targetConfig;\nprogress = startChange ? 0 : min(1, changePhase + 1.0 / (0.12 * samplerate));\namount = progress * progress * (3 - 2 * progress);\noldProgram = oldConfig - 12 * floor((oldConfig + 0.5) / 12.0);\nnewProgram = newConfig - 12 * floor((newConfig + 0.5) / 12.0);\noldMode = floor((oldProgram + 0.5) / 3.0);\nnewMode = floor((newProgram + 0.5) / 3.0);\n\n// Prime lengths at 48 kHz, scaled to the host's sample rate.\ndriftPan = clamp(driftState, 0, 1);\nholdOn = hold >= 0.5;\nholdStep = 1 / (0.025 * samplerate);\nholdMix = holdOn ? min(1, holdState + holdStep) : max(0, holdState - holdStep);\n// At Hold or unity, the wet readers still wander, but integer feedback\n// taps avoid accumulating interpolation loss in the circulating copy.\ntapFeedback = feedbackState + holdMix * (1 - feedbackState);\nfeedbackMotion = clamp((0.9995 - tapFeedback) * 50, 0, 1);\nchaosTickA = chaosClockA + (0.19 + 0.12 * wanderB) / samplerate;\nchaosTickB = chaosClockB + (0.31 + 0.10 * wanderA) / samplerate;\nchaosNextA = chaosTickA >= 1 ? 3.91 * chaosA * (1 - chaosA) : chaosA;\nchaosNextB = chaosTickB >= 1 ? 3.97 * chaosB * (1 - chaosB) : chaosB;\nchaosSlew = 1 - exp(-1 / (0.77 * samplerate));\nslowA = wanderA + chaosSlew * (chaosNextA - wanderA);\nslowB = wanderB + chaosSlew * (chaosNextB - wanderB);\noffsetA = 0.58 * sin(twoPi * panPhaseA) + 0.42 * (2 * slowA - 1);\noffsetB = 0.58 * sin(twoPi * panPhaseB) + 0.42 * (2 * slowB - 1);\noffsetC = 0.61 * sin(twoPi * (panPhaseA + 0.29)) - 0.39 * (2 * slowB - 1);\noffsetD = 0.61 * sin(twoPi * (panPhaseB + 0.41)) - 0.39 * (2 * slowA - 1);\noldSize = oldProgram - 3 * oldMode;\noldPrimesA = 0; oldPrimesB = 0; oldPrimesC = 0; oldPrimesD = 0;\nif (oldMode == 0) {\n    oldPrimesA = oldSize == 0 ? 110879.0 : oldSize == 1 ? 425813.0 : 1000171.0;\n    oldPrimesB = oldSize == 0 ? 129119.0 : oldSize == 1 ? 486583.0 : 1095313.0;\n    oldPrimesC = oldSize == 0 ? 91253.0 : oldSize == 1 ? 350443.0 : 823153.0;\n    oldPrimesD = oldSize == 0 ? 99809.0 : oldSize == 1 ? 376127.0 : 846673.0;\n} else if (oldMode == 1) {\n    oldPrimesA = oldSize == 0 ? 99793.0 : oldSize == 1 ? 339289.0 : 459047.0;\n    oldPrimesB = oldSize == 0 ? 110927.0 : oldSize == 1 ? 377147.0 : 510271.0;\n    oldPrimesC = oldSize == 0 ? 124459.0 : oldSize == 1 ? 423179.0 : 572521.0;\n    oldPrimesD = oldSize == 0 ? 140593.0 : oldSize == 1 ? 478001.0 : 646721.0;\n} else if (oldMode == 2) {\n    oldPrimesA = oldSize == 0 ? 15217.0 : oldSize == 1 ? 27847.0 : 47629.0;\n    oldPrimesB = oldSize == 0 ? 22409.0 : oldSize == 1 ? 41023.0 : 70163.0;\n    oldPrimesC = oldSize == 0 ? 29423.0 : oldSize == 1 ? 53849.0 : 92107.0;\n    oldPrimesD = oldSize == 0 ? 37781.0 : oldSize == 1 ? 69127.0 : 118247.0;\n} else {\n    oldPrimesA = oldSize == 0 ? 20201.0 : oldSize == 1 ? 47903.0 : 107309.0;\n    oldPrimesB = oldSize == 0 ? 31337.0 : oldSize == 1 ? 74287.0 : 166429.0;\n    oldPrimesC = oldSize == 0 ? 42293.0 : oldSize == 1 ? 100213.0 : 224563.0;\n    oldPrimesD = oldSize == 0 ? 52951.0 : oldSize == 1 ? 125471.0 : 281131.0;\n}\noldDriftDepth = oldMode < 2 ? (0.0122 * driftPan) : oldMode == 2 ? 0.0034 : 0.0010;\noldA = round(samplerate * (oldPrimesA / 48000.0));\noldATap = clamp(oldA + samplerate * oldDriftDepth * offsetA, 2, capacity - 2);\noldB = round(samplerate * (oldPrimesB / 48000.0));\noldBTap = clamp(oldB + samplerate * oldDriftDepth * offsetB, 2, capacity - 2);\noldC = round(samplerate * (oldPrimesC / 48000.0));\noldCTap = clamp(oldC + samplerate * oldDriftDepth * offsetC, 2, capacity - 2);\noldD = round(samplerate * (oldPrimesD / 48000.0));\noldDTap = clamp(oldD + samplerate * oldDriftDepth * offsetD, 2, capacity - 2);\n\nnewSize = newProgram - 3 * newMode;\nnewPrimesA = 0; newPrimesB = 0; newPrimesC = 0; newPrimesD = 0;\nif (newMode == 0) {\n    newPrimesA = newSize == 0 ? 110879.0 : newSize == 1 ? 425813.0 : 1000171.0;\n    newPrimesB = newSize == 0 ? 129119.0 : newSize == 1 ? 486583.0 : 1095313.0;\n    newPrimesC = newSize == 0 ? 91253.0 : newSize == 1 ? 350443.0 : 823153.0;\n    newPrimesD = newSize == 0 ? 99809.0 : newSize == 1 ? 376127.0 : 846673.0;\n} else if (newMode == 1) {\n    newPrimesA = newSize == 0 ? 99793.0 : newSize == 1 ? 339289.0 : 459047.0;\n    newPrimesB = newSize == 0 ? 110927.0 : newSize == 1 ? 377147.0 : 510271.0;\n    newPrimesC = newSize == 0 ? 124459.0 : newSize == 1 ? 423179.0 : 572521.0;\n    newPrimesD = newSize == 0 ? 140593.0 : newSize == 1 ? 478001.0 : 646721.0;\n} else if (newMode == 2) {\n    newPrimesA = newSize == 0 ? 15217.0 : newSize == 1 ? 27847.0 : 47629.0;\n    newPrimesB = newSize == 0 ? 22409.0 : newSize == 1 ? 41023.0 : 70163.0;\n    newPrimesC = newSize == 0 ? 29423.0 : newSize == 1 ? 53849.0 : 92107.0;\n    newPrimesD = newSize == 0 ? 37781.0 : newSize == 1 ? 69127.0 : 118247.0;\n} else {\n    newPrimesA = newSize == 0 ? 20201.0 : newSize == 1 ? 47903.0 : 107309.0;\n    newPrimesB = newSize == 0 ? 31337.0 : newSize == 1 ? 74287.0 : 166429.0;\n    newPrimesC = newSize == 0 ? 42293.0 : newSize == 1 ? 100213.0 : 224563.0;\n    newPrimesD = newSize == 0 ? 52951.0 : newSize == 1 ? 125471.0 : 281131.0;\n}\nnewDriftDepth = newMode < 2 ? (0.0122 * driftPan) : newMode == 2 ? 0.0034 : 0.0010;\nnewA = round(samplerate * (newPrimesA / 48000.0));\nnewATap = clamp(newA + samplerate * newDriftDepth * offsetA, 2, capacity - 2);\nnewB = round(samplerate * (newPrimesB / 48000.0));\nnewBTap = clamp(newB + samplerate * newDriftDepth * offsetB, 2, capacity - 2);\nnewC = round(samplerate * (newPrimesC / 48000.0));\nnewCTap = clamp(newC + samplerate * newDriftDepth * offsetC, 2, capacity - 2);\nnewD = round(samplerate * (newPrimesD / 48000.0));\nnewDTap = clamp(newD + samplerate * newDriftDepth * offsetD, 2, capacity - 2);\n\n// Fixed feedback taps retain the original linear-interpolated reads.\noldFeedbackA = oldA + feedbackMotion * (oldATap - oldA);\noldTapA = readTransport(tape, writeHead, direction, travel, oldFeedbackA, oldA, handoff, firstWritten, writtenSpan, 0);\nnewFeedbackA = newA + feedbackMotion * (newATap - newA);\nnewTapA = readTransport(tape, writeHead, direction, travel, newFeedbackA, newA, handoff, firstWritten, writtenSpan, 0);\nreturnA = ((oldTapA) + (amount) * ((newTapA) - (oldTapA)));\noldFeedbackB = oldB + feedbackMotion * (oldBTap - oldB);\noldTapB = readTransport(tape, writeHead, direction, travel, oldFeedbackB, oldB, handoff, firstWritten, writtenSpan, 1);\nnewFeedbackB = newB + feedbackMotion * (newBTap - newB);\nnewTapB = readTransport(tape, writeHead, direction, travel, newFeedbackB, newB, handoff, firstWritten, writtenSpan, 1);\nreturnB = ((oldTapB) + (amount) * ((newTapB) - (oldTapB)));\noldFeedbackC = oldC + feedbackMotion * (oldCTap - oldC);\noldTapC = readTransport(tape, writeHead, direction, travel, oldFeedbackC, oldC, handoff, firstWritten, writtenSpan, 2);\nnewFeedbackC = newC + feedbackMotion * (newCTap - newC);\nnewTapC = readTransport(tape, writeHead, direction, travel, newFeedbackC, newC, handoff, firstWritten, writtenSpan, 2);\nreturnC = ((oldTapC) + (amount) * ((newTapC) - (oldTapC)));\noldFeedbackD = oldD + feedbackMotion * (oldDTap - oldD);\noldTapD = readTransport(tape, writeHead, direction, travel, oldFeedbackD, oldD, handoff, firstWritten, writtenSpan, 3);\nnewFeedbackD = newD + feedbackMotion * (newDTap - newD);\nnewTapD = readTransport(tape, writeHead, direction, travel, newFeedbackD, newD, handoff, firstWritten, writtenSpan, 3);\nreturnD = ((oldTapD) + (amount) * ((newTapD) - (oldTapD)));\n\ncontrol = 1 - exp(-1 / (0.020 * samplerate));\nmod_return_mix = clamp(return_mix * 0.01 + clamp(fixnan(in3), -1, 1), 0, 1);\nmod_mix_smoothed = mod_mix_state + control * (mod_return_mix - mod_mix_state);\nmod_mix_state = mod_mix_smoothed;\nmod_feedback = clamp(feedback + 0.5 * clamp(fixnan(in4), -1, 1), 0, 1.1);\nmod_blur = clamp(blur + 1 * clamp(fixnan(in5), -1, 1), 0, 1);\nmod_drift = clamp(drift + 1 * clamp(fixnan(in6), -1, 1), 0, 1);\nmod_drive = clamp(drive + 1 * clamp(fixnan(in7), -1, 1), 0, 1);\nmod_dynamics = clamp(dynamics + 1 * clamp(fixnan(in8), -1, 1), -1, 1);\nmod_input_db = clamp(input_db + 12 * clamp(fixnan(in9), -1, 1), -24, 12);\nmod_output_db = clamp(output_db + 12 * clamp(fixnan(in10), -1, 1), -24, 6);\nmod_width = clamp(width + 1 * clamp(fixnan(in11), -1, 1), 0, 2);\nmod_pitch = clamp(pitch + 12 * clamp(fixnan(in12), -1, 1), -12, 0);\nmod_hpf_hz = clamp(hpf_hz * pow(2, 3 * clamp(fixnan(in13), -1, 1)), 20, 2000);\nmod_lpf_hz = clamp(lpf_hz * pow(2, 3 * clamp(fixnan(in14), -1, 1)), 200, 20000);\nmod_tempo_offset_next = mod_tempo_offset + control * (clamp(fixnan(in15), -1, 1) - mod_tempo_offset);\nmod_tempo_offset = mod_tempo_offset_next;\nmod_tempo = clamp(tempo + 60 * mod_tempo_offset_next, 20, 400);\nmod_beats_per_bar_offset_next = mod_beats_per_bar_offset + control * (clamp(fixnan(in16), -1, 1) - mod_beats_per_bar_offset);\nmod_beats_per_bar_offset = mod_beats_per_bar_offset_next;\nmod_beats_per_bar = clamp(beats_per_bar + 3 * mod_beats_per_bar_offset_next, 0.5, 32);\n// Wet read speed only. Snap the vanishing slew remainder so 0 st\n// returns to the exact, direct 1x delay path.\npitchTarget = pow(2, clamp(mod_pitch, -12, 0) / 12);\npitchSmoothed = pitchRatioState + control * (pitchTarget - pitchRatioState);\npitchRatio = (pitchTarget == 1 && pitchSmoothed > 0.99999) ? 1 : pitchSmoothed;\npitchRatioState = pitchRatio;\ngroup = round(clamp(record, 0, 3));\nrecording = group != 0;\n// Record Off acknowledges Panic, including if both arrive in one block.\n// The current clear must finish before any newly armed recording can write.\nwaitingForOff = (panicPressed || panicNeedsOff) && recording;\npanicBlocking = panicClearActive || waitingForOff;\ncaptureRunning = recording && !holdOn && !panicBlocking;\nclockStart = cleared || (recording && !wasRecording) ? 0 : captureClock;\nrecordSeconds = clockStart + (captureRunning ? 1.0 / samplerate : 0);\nout3 = recordSeconds;\ncaptureClock = recordSeconds;\nwasRecording = recording;\nrecA = panicBlocking ? 0 : captureA + control * ((group == 1 || group == 3) - captureA);\nrecB = panicBlocking ? 0 : captureB + control * ((group == 2 || group == 3) - captureB);\ninjectA = recA * (1 - holdMix);\ninjectB = recB * (1 - holdMix);\n// Feedback is linear below and at unity, with linked build above it.\nregen = feedbackState + control * (clamp(mod_feedback, 0, 1.10) - feedbackState);\neffectiveRegen = regen + holdMix * (1 - regen);\ncrossfeed = ((blurState) + (control) * ((clamp(mod_blur, 0, 1)) - (blurState)));\nmotion = ((driftState) + (control) * ((clamp(mod_drift, 0, 1)) - (driftState)));\nblend = ((mixState) + (control) * ((clamp(mix, 0, 1)) - (mixState)));\nsaturation = ((driveState) + (control) * ((clamp(mod_drive, 0, 1)) - (driveState)));\ncharacter = ((dynamicsState) + (control) * ((clamp(mod_dynamics, -1, 1)) - (dynamicsState)));\neraseSmoothed = eraseState + control * ((erase >= 0.5) - eraseState);\nerasing = panicBlocking ? 0 : eraseSmoothed * (1 - holdMix);\ngainIn = ((inputGain) + (control) * ((pow(10, clamp(mod_input_db, -24, 12) * 0.05)) - (inputGain)));\ngainOut = ((outputGain) + (control) * ((pow(10, clamp(mod_output_db, -24, 6) * 0.05)) - (outputGain)));\n\n// Sum input to both banks when Mono is enabled; leave the wet image stereo.\nsourceL = clamp(fixnan(in1), -8, 8);\nsourceR = clamp(fixnan(in2), -8, 8);\nmonoSignal = 0.5 * (sourceL + sourceR);\nmonoBlend = monoAmount + control * ((mono_input >= 0.5) - monoAmount);\nmonoAmount = monoBlend;\nrawL = (sourceL + monoBlend * (monoSignal - sourceL)) * gainIn;\nrawR = (sourceR + monoBlend * (monoSignal - sourceR)) * gainIn;\n\n// A linked input gate keeps low-level noise out of memory. The dry stays open.\ncleanL = dcblock(rawL);\ncleanR = dcblock(rawR);\ngateMode = round(clamp(input_gate, 0, 2));\ngateThreshold = gateMode == 2 ? 0.0001 : 0.001;\ngatePeak = max(abs(cleanL), abs(cleanR));\ngateRelease = 1 - exp(-1 / (0.075 * samplerate));\ndetectorGain = max(gatePeak, gateEnvelope + gateRelease * (gatePeak - gateEnvelope));\ngateEnvelope = detectorGain;\ngateTarget = gateMode == 0 ? 1 : clamp(2 * detectorGain / gateThreshold - 1, 0, 1);\ngateSlew = gateTarget > gateGain ? 1 - exp(-1 / (0.0005 * samplerate)) : gateRelease;\ngateOpen = gateGain + gateSlew * (gateTarget - gateGain);\ngateGain = gateOpen;\ninputL = cleanL * gateOpen;\ninputR = cleanR * gateOpen;\n// Lower the saturation knee with Drive and preserve unity small-signal gain.\ndriveKnee = 0.82 - 0.58 * saturation;\ninjectedL = ((inputL) + (saturation) * ((driveKnee * tanh(inputL / driveKnee)) - (inputL)));\ninjectedR = ((inputR) + (saturation) * ((driveKnee * tanh(inputR / driveKnee)) - (inputR)));\nattack = 1 - exp(-1 / (0.008 * samplerate));\nrelease = 1 - exp(-1 / (0.350 * samplerate));\ninputDetect = max(abs(inputL) * injectA, abs(inputR) * injectB);\nenv = ((inputEnvelope) + (inputDetect > inputEnvelope ? attack : release) * ((inputDetect) - (inputEnvelope)));\nsuppress = max(-character, 0) * clamp(4 * env, 0, 1) * (1 - holdMix);\nmemoryGain = (1 - 0.97 * suppress) * (1 - erasing);\n\n// The tone controls filter only the circulating signal. Each Off\n// position crossfades back to a true bypass.\n// Tab positions Off and 1–3 retain their old meaning. Sweep uses\n// the smoothed cutoff coefficients below, with host-rate headroom.\nhpSetting = round(clamp(hpf, 0, 4));\nlpSetting = round(clamp(lpf, 0, 4));\nhighOverride = hpSetting == 4;\nlowOverride = lpSetting == 4;\nhighPresetCut = hpSetting < 2 ? 65 : hpSetting == 2 ? 180 : 420;\nlowPresetCut = lpSetting < 2 ? 5600 : lpSetting == 2 ? 2800 : 1100;\nhighCut = highOverride ? min(samplerate * 0.45, clamp(mod_hpf_hz, 20, 2000)) : highPresetCut;\nlowCut = lowOverride ? min(samplerate * 0.45, clamp(mod_lpf_hz, 200, 20000)) : lowPresetCut;\nhighCoefficient = ((highState) + (control) * ((1 - exp(-twoPi * highCut / samplerate)) - (highState)));\nhighAmount = ((highMix) + (control) * ((hpSetting != 0) - (highMix)));\nlowCoefficient = lowState + control * ((1 - exp(-twoPi * lowCut / samplerate)) - lowState);\nlowAmount = lowMix + control * ((lpSetting != 0) - lowMix);\nloopHighAmount = highAmount * (1 - holdMix);\nloopLowAmount = lowAmount * (1 - holdMix);\n// Keep each lane’s filter history explicit for older Gen compilers.\nnextToneHighA = cleared ? 0 : ((toneHighA) + (highCoefficient) * ((returnA) - (toneHighA)));\nhighPassedA = returnA - nextToneHighA * loopHighAmount;\nnextToneLowA = cleared ? 0 : toneLowA + lowCoefficient * (highPassedA - toneLowA);\ntoneA = cleared ? 0 : highPassedA + loopLowAmount * (nextToneLowA - highPassedA);\ntoneHighA = nextToneHighA;\ntoneLowA = nextToneLowA;\nnextToneHighB = cleared ? 0 : ((toneHighB) + (highCoefficient) * ((returnB) - (toneHighB)));\nhighPassedB = returnB - nextToneHighB * loopHighAmount;\nnextToneLowB = cleared ? 0 : toneLowB + lowCoefficient * (highPassedB - toneLowB);\ntoneB = cleared ? 0 : highPassedB + loopLowAmount * (nextToneLowB - highPassedB);\ntoneHighB = nextToneHighB;\ntoneLowB = nextToneLowB;\nnextToneHighC = cleared ? 0 : ((toneHighC) + (highCoefficient) * ((returnC) - (toneHighC)));\nhighPassedC = returnC - nextToneHighC * loopHighAmount;\nnextToneLowC = cleared ? 0 : toneLowC + lowCoefficient * (highPassedC - toneLowC);\ntoneC = cleared ? 0 : highPassedC + loopLowAmount * (nextToneLowC - highPassedC);\ntoneHighC = nextToneHighC;\ntoneLowC = nextToneLowC;\nnextToneHighD = cleared ? 0 : ((toneHighD) + (highCoefficient) * ((returnD) - (toneHighD)));\nhighPassedD = returnD - nextToneHighD * loopHighAmount;\nnextToneLowD = cleared ? 0 : toneLowD + lowCoefficient * (highPassedD - toneLowD);\ntoneD = cleared ? 0 : highPassedD + loopLowAmount * (nextToneLowD - highPassedD);\ntoneHighD = nextToneHighD;\ntoneLowD = nextToneLowD;\n\n// Pair rotation is orthogonal. Four uses a second orthogonal rotation\n// between pairs. Reverb substitutes a normalized four-line Hadamard.\nfourWeight = ((oldMode == 1) + (amount) * ((newMode == 1) - (oldMode == 1)));\nreverbWeight = ((oldMode == 2) + (amount) * ((newMode == 2) - (oldMode == 2)));\ndelayWeight = ((oldMode < 2) + (amount) * ((newMode < 2) - (oldMode < 2)));\nangle = crossfeed * delayWeight * 1.047197551196598;\nself = cos(angle);\ncross = sin(angle);\npairA = self * toneA + cross * toneB;\npairB = self * toneB - cross * toneA;\npairC = self * toneC + cross * toneD;\npairD = self * toneD - cross * toneC;\npairAngle = angle * fourWeight * 0.65;\npairSelf = cos(pairAngle);\npairCross = sin(pairAngle);\nnetworkA = ((pairSelf * pairA + pairCross * pairC) + (reverbWeight) * (((toneA + toneB + toneC + toneD) * 0.5) - (pairSelf * pairA + pairCross * pairC)));\nnetworkB = ((pairSelf * pairB + pairCross * pairD) + (reverbWeight) * (((toneA - toneB + toneC - toneD) * 0.5) - (pairSelf * pairB + pairCross * pairD)));\nnetworkC = ((pairSelf * pairC - pairCross * pairA) + (reverbWeight) * (((toneA + toneB - toneC - toneD) * 0.5) - (pairSelf * pairC - pairCross * pairA)));\nnetworkD = ((pairSelf * pairD - pairCross * pairB) + (reverbWeight) * (((toneA - toneB - toneC + toneD) * 0.5) - (pairSelf * pairD - pairCross * pairB)));\n\n// Erase follows the fixed feedback position in either direction.\nif (ambientRuns && !rhythmSelected && erasing > 0.0001) {\n    keep = 1 - erasing;\n    eraseBehindA = travel >= newA + 2 + 0.5 * handoff;\n    eraseTurnHeadA = travel >= 0.5 * handoff && !eraseBehindA;\n    eraseDistanceA = eraseTurnHeadA ? max(1, 1 - (newATap - newA)) : eraseBehindA ? newATap : max(1, 2 * newA - newATap);\n    eraseA = wrap(writeHead + (eraseBehindA ? -direction : direction) * round(eraseDistanceA), 0, capacity);\n    erasedSampleA = keep * peek(tape, eraseA, 0);\n    poke(tape, erasedSampleA, eraseA, 0);\n    eraseBehindB = travel >= newB + 2 + 0.5 * handoff;\n    eraseTurnHeadB = travel >= 0.5 * handoff && !eraseBehindB;\n    eraseDistanceB = eraseTurnHeadB ? max(1, 1 - (newBTap - newB)) : eraseBehindB ? newBTap : max(1, 2 * newB - newBTap);\n    eraseB = wrap(writeHead + (eraseBehindB ? -direction : direction) * round(eraseDistanceB), 0, capacity);\n    erasedSampleB = keep * peek(tape, eraseB, 1);\n    poke(tape, erasedSampleB, eraseB, 1);\n    eraseBehindC = travel >= newC + 2 + 0.5 * handoff;\n    eraseTurnHeadC = travel >= 0.5 * handoff && !eraseBehindC;\n    eraseDistanceC = eraseTurnHeadC ? max(1, 1 - (newCTap - newC)) : eraseBehindC ? newCTap : max(1, 2 * newC - newCTap);\n    eraseC = wrap(writeHead + (eraseBehindC ? -direction : direction) * round(eraseDistanceC), 0, capacity);\n    erasedSampleC = keep * peek(tape, eraseC, 2);\n    poke(tape, erasedSampleC, eraseC, 2);\n    eraseBehindD = travel >= newD + 2 + 0.5 * handoff;\n    eraseTurnHeadD = travel >= 0.5 * handoff && !eraseBehindD;\n    eraseDistanceD = eraseTurnHeadD ? max(1, 1 - (newDTap - newD)) : eraseBehindD ? newDTap : max(1, 2 * newD - newDTap);\n    eraseD = wrap(writeHead + (eraseBehindD ? -direction : direction) * round(eraseDistanceD), 0, capacity);\n    erasedSampleD = keep * peek(tape, eraseD, 3);\n    poke(tape, erasedSampleD, eraseD, 3);\n}\n// The feedback-only vector has a smooth equilibrium at norm 0.62\n// above unity. A single gain preserves each lane's relative level,\n// and leaves headroom below the tape write limiter for new input.\nfeedbackPower = networkA * networkA + networkB * networkB\n              + networkC * networkC + networkD * networkD;\nbuildExcess = max(0, effectiveRegen - 1);\nregenGain = effectiveRegen * memoryGain / (1 + buildExcess * feedbackPower / (0.62 * 0.62));\nwriteARaw = clamp(fixnan(0.67 * (rhythmSelected ? 0 : injectA) * injectedL + regenGain * networkA), -16, 16);\nwriteAMag = abs(writeARaw);\nwriteAKnee = max(0, writeAMag - 0.75);\nwriteA = sign(writeARaw) * (min(writeAMag, 0.75) + 0.21 * tanh(writeAKnee / 0.21));\nif (ambientRuns) {\n    poke(tape, writeA, writeIndex, 0);\n}\nwriteBRaw = clamp(fixnan(0.67 * (rhythmSelected ? 0 : injectB) * injectedR + regenGain * networkB), -16, 16);\nwriteBMag = abs(writeBRaw);\nwriteBKnee = max(0, writeBMag - 0.75);\nwriteB = sign(writeBRaw) * (min(writeBMag, 0.75) + 0.21 * tanh(writeBKnee / 0.21));\nif (ambientRuns) {\n    poke(tape, writeB, writeIndex, 1);\n}\nwriteCRaw = clamp(fixnan(0.52 * (rhythmSelected ? 0 : injectA) * injectedL + regenGain * networkC), -16, 16);\nwriteCMag = abs(writeCRaw);\nwriteCKnee = max(0, writeCMag - 0.75);\nwriteC = sign(writeCRaw) * (min(writeCMag, 0.75) + 0.21 * tanh(writeCKnee / 0.21));\nif (ambientRuns) {\n    poke(tape, writeC, writeIndex, 2);\n}\nwriteDRaw = clamp(fixnan(0.52 * (rhythmSelected ? 0 : injectB) * injectedR + regenGain * networkD), -16, 16);\nwriteDMag = abs(writeDRaw);\nwriteDKnee = max(0, writeDMag - 0.75);\nwriteD = sign(writeDRaw) * (min(writeDMag, 0.75) + 0.21 * tanh(writeDKnee / 0.21));\nif (ambientRuns) {\n    poke(tape, writeD, writeIndex, 3);\n}\n\n// Render the old and new wet read heads for each lane.\n\noldWetASpeedCode = floor((oldConfig + 0.5) / 12.0);\noldWetAProgram = oldConfig - 12 * oldWetASpeedCode;\noldWetAFamily = floor((oldWetAProgram + 0.5) / 3.0);\noldWetASizeCode = oldWetAProgram - 3 * oldWetAFamily;\noldWetAForwardRate = pitchRatio * (oldWetASpeedCode == 0 || oldWetAFamily >= 2 ? 1 : 0.5);\noldWetAReverseMix = direction < 0 ? clamp((travel - oldA - 2 - handoff) / handoff, 0, 1) : 0;\noldWetARate = oldWetAReverseMix > 0 ? -oldWetAForwardRate : oldWetAForwardRate;\noldWetAGranular = oldWetAFamily == 3;\noldWetALength = dim(tape);\noldWetA = 0;\nif (!oldWetAGranular && oldWetARate == 1) {\n    oldWetA = readTransport(tape, writeHead, direction, travel, oldATap, oldA, handoff, firstWritten, writtenSpan, 0);\n} else {\n    oldWetAWindow = oldWetAGranular ? (oldWetASizeCode == 0 ? 0.087 : oldWetASizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    oldWetAWindow = (oldWetAReverseMix > 0 ? clamp(0.30 * oldA / samplerate, 0.35, 1.25) : oldWetAWindow) * (1 + 0.113 * 0);\n    oldWetAFrames = oldWetAWindow * samplerate;\n    oldWetAPositionA = grainClock / oldWetAWindow + 0 * 0.217;\n    oldWetAPositionB = oldWetAPositionA + 0.5;\n    oldWetAGrainA = floor(oldWetAPositionA);\n    oldWetAGrainB = floor(oldWetAPositionB);\n    oldWetAPhaseA = oldWetAPositionA - oldWetAGrainA;\n    oldWetAPhaseB = oldWetAPositionB - oldWetAGrainB;\n    // Indexed scatter lets matching oldWetAProgram readers agree at oldWetAA handoff.\n    oldWetASeedA = (oldWetAGrainA + 1 + 142 * 0) * 12.9898;\n    oldWetASeedB = (oldWetAGrainB + 72 + 142 * 0) * 12.9898;\n    oldWetAScatterDepth = oldWetAGranular * crossfeed * oldWetAFrames * 0.71;\n    oldWetADriftDepth = oldWetAGranular * motion * oldWetAFrames * 0.69;\n    oldWetAFrequency = 0.397 + 0.087 * 0;\n    oldWetAScatterA = (2 * wrap(sin(oldWetASeedA) * 43758.5453, 0, 1) - 1) * oldWetAScatterDepth;\n    oldWetAScatterB = (2 * wrap(sin(oldWetASeedB) * 43758.5453, 0, 1) - 1) * oldWetAScatterDepth;\n    oldWetADriftA = (0.63 * sin(oldWetAGrainA * oldWetAWindow * oldWetAFrequency + 2 * 0) + 0.37 * (2 * slowA - 1)) * oldWetADriftDepth;\n    oldWetADriftB = (0.63 * sin(oldWetAGrainB * oldWetAWindow * oldWetAFrequency + 2 * 0 + 1) + 0.37 * (2 * slowB - 1)) * oldWetADriftDepth;\n    oldWetASpacing = oldWetAGranular * oldWetAFrames * 0.71;\n    oldWetAShift = (1 - oldWetARate) * oldWetAFrames;\n    oldWetADistanceA = clamp(oldATap + oldWetAShift * (oldWetAPhaseA - 0.5) + oldWetAScatterA + oldWetADriftA - oldWetASpacing, 2, oldWetALength - 2);\n    oldWetADistanceB = clamp(oldATap + oldWetAShift * (oldWetAPhaseB - 0.5) + oldWetAScatterB + oldWetADriftB + oldWetASpacing, 2, oldWetALength - 2);\n    oldWetAA = readTransport(tape, writeHead, direction, travel, oldWetADistanceA, oldA, handoff, firstWritten, writtenSpan, 0);\n    oldWetAB = readTransport(tape, writeHead, direction, travel, oldWetADistanceB, oldA, handoff, firstWritten, writtenSpan, 0);\n    oldWetAWeightA = 0.5 - 0.5 * cos(6.283185307179586 * oldWetAPhaseA);\n    oldWetA = oldWetAA * oldWetAWeightA + oldWetAB * (1 - oldWetAWeightA);\n    if (oldWetAReverseMix > 0 && oldWetAReverseMix < 1) {\n        oldWetADirect = readTransport(tape, writeHead, direction, travel, oldATap, oldA, handoff, firstWritten, writtenSpan, 0);\n        oldWetA = oldWetADirect + oldWetAReverseMix * (oldWetA - oldWetADirect);\n    }\n}\n\nnewWetASpeedCode = floor((newConfig + 0.5) / 12.0);\nnewWetAProgram = newConfig - 12 * newWetASpeedCode;\nnewWetAFamily = floor((newWetAProgram + 0.5) / 3.0);\nnewWetASizeCode = newWetAProgram - 3 * newWetAFamily;\nnewWetAForwardRate = pitchRatio * (newWetASpeedCode == 0 || newWetAFamily >= 2 ? 1 : 0.5);\nnewWetAReverseMix = direction < 0 ? clamp((travel - newA - 2 - handoff) / handoff, 0, 1) : 0;\nnewWetARate = newWetAReverseMix > 0 ? -newWetAForwardRate : newWetAForwardRate;\nnewWetAGranular = newWetAFamily == 3;\nnewWetALength = dim(tape);\nnewWetA = 0;\nif (!newWetAGranular && newWetARate == 1) {\n    newWetA = readTransport(tape, writeHead, direction, travel, newATap, newA, handoff, firstWritten, writtenSpan, 0);\n} else {\n    newWetAWindow = newWetAGranular ? (newWetASizeCode == 0 ? 0.087 : newWetASizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    newWetAWindow = (newWetAReverseMix > 0 ? clamp(0.30 * newA / samplerate, 0.35, 1.25) : newWetAWindow) * (1 + 0.113 * 0);\n    newWetAFrames = newWetAWindow * samplerate;\n    newWetAPositionA = grainClock / newWetAWindow + 0 * 0.217;\n    newWetAPositionB = newWetAPositionA + 0.5;\n    newWetAGrainA = floor(newWetAPositionA);\n    newWetAGrainB = floor(newWetAPositionB);\n    newWetAPhaseA = newWetAPositionA - newWetAGrainA;\n    newWetAPhaseB = newWetAPositionB - newWetAGrainB;\n    // Indexed scatter lets matching newWetAProgram readers agree at newWetAA handoff.\n    newWetASeedA = (newWetAGrainA + 1 + 142 * 0) * 12.9898;\n    newWetASeedB = (newWetAGrainB + 72 + 142 * 0) * 12.9898;\n    newWetAScatterDepth = newWetAGranular * crossfeed * newWetAFrames * 0.71;\n    newWetADriftDepth = newWetAGranular * motion * newWetAFrames * 0.69;\n    newWetAFrequency = 0.397 + 0.087 * 0;\n    newWetAScatterA = (2 * wrap(sin(newWetASeedA) * 43758.5453, 0, 1) - 1) * newWetAScatterDepth;\n    newWetAScatterB = (2 * wrap(sin(newWetASeedB) * 43758.5453, 0, 1) - 1) * newWetAScatterDepth;\n    newWetADriftA = (0.63 * sin(newWetAGrainA * newWetAWindow * newWetAFrequency + 2 * 0) + 0.37 * (2 * slowA - 1)) * newWetADriftDepth;\n    newWetADriftB = (0.63 * sin(newWetAGrainB * newWetAWindow * newWetAFrequency + 2 * 0 + 1) + 0.37 * (2 * slowB - 1)) * newWetADriftDepth;\n    newWetASpacing = newWetAGranular * newWetAFrames * 0.71;\n    newWetAShift = (1 - newWetARate) * newWetAFrames;\n    newWetADistanceA = clamp(newATap + newWetAShift * (newWetAPhaseA - 0.5) + newWetAScatterA + newWetADriftA - newWetASpacing, 2, newWetALength - 2);\n    newWetADistanceB = clamp(newATap + newWetAShift * (newWetAPhaseB - 0.5) + newWetAScatterB + newWetADriftB + newWetASpacing, 2, newWetALength - 2);\n    newWetAA = readTransport(tape, writeHead, direction, travel, newWetADistanceA, newA, handoff, firstWritten, writtenSpan, 0);\n    newWetAB = readTransport(tape, writeHead, direction, travel, newWetADistanceB, newA, handoff, firstWritten, writtenSpan, 0);\n    newWetAWeightA = 0.5 - 0.5 * cos(6.283185307179586 * newWetAPhaseA);\n    newWetA = newWetAA * newWetAWeightA + newWetAB * (1 - newWetAWeightA);\n    if (newWetAReverseMix > 0 && newWetAReverseMix < 1) {\n        newWetADirect = readTransport(tape, writeHead, direction, travel, newATap, newA, handoff, firstWritten, writtenSpan, 0);\n        newWetA = newWetADirect + newWetAReverseMix * (newWetA - newWetADirect);\n    }\n}\n\nplayA = ((oldWetA) + (amount) * ((newWetA) - (oldWetA)));\n\noldWetBSpeedCode = floor((oldConfig + 0.5) / 12.0);\noldWetBProgram = oldConfig - 12 * oldWetBSpeedCode;\noldWetBFamily = floor((oldWetBProgram + 0.5) / 3.0);\noldWetBSizeCode = oldWetBProgram - 3 * oldWetBFamily;\noldWetBForwardRate = pitchRatio * (oldWetBSpeedCode == 0 || oldWetBFamily >= 2 ? 1 : 0.5);\noldWetBReverseMix = direction < 0 ? clamp((travel - oldB - 2 - handoff) / handoff, 0, 1) : 0;\noldWetBRate = oldWetBReverseMix > 0 ? -oldWetBForwardRate : oldWetBForwardRate;\noldWetBGranular = oldWetBFamily == 3;\noldWetBLength = dim(tape);\noldWetB = 0;\nif (!oldWetBGranular && oldWetBRate == 1) {\n    oldWetB = readTransport(tape, writeHead, direction, travel, oldBTap, oldB, handoff, firstWritten, writtenSpan, 1);\n} else {\n    oldWetBWindow = oldWetBGranular ? (oldWetBSizeCode == 0 ? 0.087 : oldWetBSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    oldWetBWindow = (oldWetBReverseMix > 0 ? clamp(0.30 * oldB / samplerate, 0.35, 1.25) : oldWetBWindow) * (1 + 0.113 * 1);\n    oldWetBFrames = oldWetBWindow * samplerate;\n    oldWetBPositionA = grainClock / oldWetBWindow + 1 * 0.217;\n    oldWetBPositionB = oldWetBPositionA + 0.5;\n    oldWetBGrainA = floor(oldWetBPositionA);\n    oldWetBGrainB = floor(oldWetBPositionB);\n    oldWetBPhaseA = oldWetBPositionA - oldWetBGrainA;\n    oldWetBPhaseB = oldWetBPositionB - oldWetBGrainB;\n    // Indexed scatter lets matching oldWetBProgram readers agree at oldWetBA handoff.\n    oldWetBSeedA = (oldWetBGrainA + 1 + 142 * 1) * 12.9898;\n    oldWetBSeedB = (oldWetBGrainB + 72 + 142 * 1) * 12.9898;\n    oldWetBScatterDepth = oldWetBGranular * crossfeed * oldWetBFrames * 0.71;\n    oldWetBDriftDepth = oldWetBGranular * motion * oldWetBFrames * 0.69;\n    oldWetBFrequency = 0.397 + 0.087 * 1;\n    oldWetBScatterA = (2 * wrap(sin(oldWetBSeedA) * 43758.5453, 0, 1) - 1) * oldWetBScatterDepth;\n    oldWetBScatterB = (2 * wrap(sin(oldWetBSeedB) * 43758.5453, 0, 1) - 1) * oldWetBScatterDepth;\n    oldWetBDriftA = (0.63 * sin(oldWetBGrainA * oldWetBWindow * oldWetBFrequency + 2 * 1) + 0.37 * (2 * slowA - 1)) * oldWetBDriftDepth;\n    oldWetBDriftB = (0.63 * sin(oldWetBGrainB * oldWetBWindow * oldWetBFrequency + 2 * 1 + 1) + 0.37 * (2 * slowB - 1)) * oldWetBDriftDepth;\n    oldWetBSpacing = oldWetBGranular * oldWetBFrames * 0.71;\n    oldWetBShift = (1 - oldWetBRate) * oldWetBFrames;\n    oldWetBDistanceA = clamp(oldBTap + oldWetBShift * (oldWetBPhaseA - 0.5) + oldWetBScatterA + oldWetBDriftA - oldWetBSpacing, 2, oldWetBLength - 2);\n    oldWetBDistanceB = clamp(oldBTap + oldWetBShift * (oldWetBPhaseB - 0.5) + oldWetBScatterB + oldWetBDriftB + oldWetBSpacing, 2, oldWetBLength - 2);\n    oldWetBA = readTransport(tape, writeHead, direction, travel, oldWetBDistanceA, oldB, handoff, firstWritten, writtenSpan, 1);\n    oldWetBB = readTransport(tape, writeHead, direction, travel, oldWetBDistanceB, oldB, handoff, firstWritten, writtenSpan, 1);\n    oldWetBWeightA = 0.5 - 0.5 * cos(6.283185307179586 * oldWetBPhaseA);\n    oldWetB = oldWetBA * oldWetBWeightA + oldWetBB * (1 - oldWetBWeightA);\n    if (oldWetBReverseMix > 0 && oldWetBReverseMix < 1) {\n        oldWetBDirect = readTransport(tape, writeHead, direction, travel, oldBTap, oldB, handoff, firstWritten, writtenSpan, 1);\n        oldWetB = oldWetBDirect + oldWetBReverseMix * (oldWetB - oldWetBDirect);\n    }\n}\n\nnewWetBSpeedCode = floor((newConfig + 0.5) / 12.0);\nnewWetBProgram = newConfig - 12 * newWetBSpeedCode;\nnewWetBFamily = floor((newWetBProgram + 0.5) / 3.0);\nnewWetBSizeCode = newWetBProgram - 3 * newWetBFamily;\nnewWetBForwardRate = pitchRatio * (newWetBSpeedCode == 0 || newWetBFamily >= 2 ? 1 : 0.5);\nnewWetBReverseMix = direction < 0 ? clamp((travel - newB - 2 - handoff) / handoff, 0, 1) : 0;\nnewWetBRate = newWetBReverseMix > 0 ? -newWetBForwardRate : newWetBForwardRate;\nnewWetBGranular = newWetBFamily == 3;\nnewWetBLength = dim(tape);\nnewWetB = 0;\nif (!newWetBGranular && newWetBRate == 1) {\n    newWetB = readTransport(tape, writeHead, direction, travel, newBTap, newB, handoff, firstWritten, writtenSpan, 1);\n} else {\n    newWetBWindow = newWetBGranular ? (newWetBSizeCode == 0 ? 0.087 : newWetBSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    newWetBWindow = (newWetBReverseMix > 0 ? clamp(0.30 * newB / samplerate, 0.35, 1.25) : newWetBWindow) * (1 + 0.113 * 1);\n    newWetBFrames = newWetBWindow * samplerate;\n    newWetBPositionA = grainClock / newWetBWindow + 1 * 0.217;\n    newWetBPositionB = newWetBPositionA + 0.5;\n    newWetBGrainA = floor(newWetBPositionA);\n    newWetBGrainB = floor(newWetBPositionB);\n    newWetBPhaseA = newWetBPositionA - newWetBGrainA;\n    newWetBPhaseB = newWetBPositionB - newWetBGrainB;\n    // Indexed scatter lets matching newWetBProgram readers agree at newWetBA handoff.\n    newWetBSeedA = (newWetBGrainA + 1 + 142 * 1) * 12.9898;\n    newWetBSeedB = (newWetBGrainB + 72 + 142 * 1) * 12.9898;\n    newWetBScatterDepth = newWetBGranular * crossfeed * newWetBFrames * 0.71;\n    newWetBDriftDepth = newWetBGranular * motion * newWetBFrames * 0.69;\n    newWetBFrequency = 0.397 + 0.087 * 1;\n    newWetBScatterA = (2 * wrap(sin(newWetBSeedA) * 43758.5453, 0, 1) - 1) * newWetBScatterDepth;\n    newWetBScatterB = (2 * wrap(sin(newWetBSeedB) * 43758.5453, 0, 1) - 1) * newWetBScatterDepth;\n    newWetBDriftA = (0.63 * sin(newWetBGrainA * newWetBWindow * newWetBFrequency + 2 * 1) + 0.37 * (2 * slowA - 1)) * newWetBDriftDepth;\n    newWetBDriftB = (0.63 * sin(newWetBGrainB * newWetBWindow * newWetBFrequency + 2 * 1 + 1) + 0.37 * (2 * slowB - 1)) * newWetBDriftDepth;\n    newWetBSpacing = newWetBGranular * newWetBFrames * 0.71;\n    newWetBShift = (1 - newWetBRate) * newWetBFrames;\n    newWetBDistanceA = clamp(newBTap + newWetBShift * (newWetBPhaseA - 0.5) + newWetBScatterA + newWetBDriftA - newWetBSpacing, 2, newWetBLength - 2);\n    newWetBDistanceB = clamp(newBTap + newWetBShift * (newWetBPhaseB - 0.5) + newWetBScatterB + newWetBDriftB + newWetBSpacing, 2, newWetBLength - 2);\n    newWetBA = readTransport(tape, writeHead, direction, travel, newWetBDistanceA, newB, handoff, firstWritten, writtenSpan, 1);\n    newWetBB = readTransport(tape, writeHead, direction, travel, newWetBDistanceB, newB, handoff, firstWritten, writtenSpan, 1);\n    newWetBWeightA = 0.5 - 0.5 * cos(6.283185307179586 * newWetBPhaseA);\n    newWetB = newWetBA * newWetBWeightA + newWetBB * (1 - newWetBWeightA);\n    if (newWetBReverseMix > 0 && newWetBReverseMix < 1) {\n        newWetBDirect = readTransport(tape, writeHead, direction, travel, newBTap, newB, handoff, firstWritten, writtenSpan, 1);\n        newWetB = newWetBDirect + newWetBReverseMix * (newWetB - newWetBDirect);\n    }\n}\n\nplayB = ((oldWetB) + (amount) * ((newWetB) - (oldWetB)));\n\noldWetCSpeedCode = floor((oldConfig + 0.5) / 12.0);\noldWetCProgram = oldConfig - 12 * oldWetCSpeedCode;\noldWetCFamily = floor((oldWetCProgram + 0.5) / 3.0);\noldWetCSizeCode = oldWetCProgram - 3 * oldWetCFamily;\noldWetCForwardRate = pitchRatio * (oldWetCSpeedCode == 0 || oldWetCFamily >= 2 ? 1 : 0.5);\noldWetCReverseMix = direction < 0 ? clamp((travel - oldC - 2 - handoff) / handoff, 0, 1) : 0;\noldWetCRate = oldWetCReverseMix > 0 ? -oldWetCForwardRate : oldWetCForwardRate;\noldWetCGranular = oldWetCFamily == 3;\noldWetCLength = dim(tape);\noldWetC = 0;\nif (!oldWetCGranular && oldWetCRate == 1) {\n    oldWetC = readTransport(tape, writeHead, direction, travel, oldCTap, oldC, handoff, firstWritten, writtenSpan, 2);\n} else {\n    oldWetCWindow = oldWetCGranular ? (oldWetCSizeCode == 0 ? 0.087 : oldWetCSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    oldWetCWindow = (oldWetCReverseMix > 0 ? clamp(0.30 * oldC / samplerate, 0.35, 1.25) : oldWetCWindow) * (1 + 0.113 * 2);\n    oldWetCFrames = oldWetCWindow * samplerate;\n    oldWetCPositionA = grainClock / oldWetCWindow + 2 * 0.217;\n    oldWetCPositionB = oldWetCPositionA + 0.5;\n    oldWetCGrainA = floor(oldWetCPositionA);\n    oldWetCGrainB = floor(oldWetCPositionB);\n    oldWetCPhaseA = oldWetCPositionA - oldWetCGrainA;\n    oldWetCPhaseB = oldWetCPositionB - oldWetCGrainB;\n    // Indexed scatter lets matching oldWetCProgram readers agree at oldWetCA handoff.\n    oldWetCSeedA = (oldWetCGrainA + 1 + 142 * 2) * 12.9898;\n    oldWetCSeedB = (oldWetCGrainB + 72 + 142 * 2) * 12.9898;\n    oldWetCScatterDepth = oldWetCGranular * crossfeed * oldWetCFrames * 0.71;\n    oldWetCDriftDepth = oldWetCGranular * motion * oldWetCFrames * 0.69;\n    oldWetCFrequency = 0.397 + 0.087 * 2;\n    oldWetCScatterA = (2 * wrap(sin(oldWetCSeedA) * 43758.5453, 0, 1) - 1) * oldWetCScatterDepth;\n    oldWetCScatterB = (2 * wrap(sin(oldWetCSeedB) * 43758.5453, 0, 1) - 1) * oldWetCScatterDepth;\n    oldWetCDriftA = (0.63 * sin(oldWetCGrainA * oldWetCWindow * oldWetCFrequency + 2 * 2) + 0.37 * (2 * slowA - 1)) * oldWetCDriftDepth;\n    oldWetCDriftB = (0.63 * sin(oldWetCGrainB * oldWetCWindow * oldWetCFrequency + 2 * 2 + 1) + 0.37 * (2 * slowB - 1)) * oldWetCDriftDepth;\n    oldWetCSpacing = oldWetCGranular * oldWetCFrames * 0.71;\n    oldWetCShift = (1 - oldWetCRate) * oldWetCFrames;\n    oldWetCDistanceA = clamp(oldCTap + oldWetCShift * (oldWetCPhaseA - 0.5) + oldWetCScatterA + oldWetCDriftA - oldWetCSpacing, 2, oldWetCLength - 2);\n    oldWetCDistanceB = clamp(oldCTap + oldWetCShift * (oldWetCPhaseB - 0.5) + oldWetCScatterB + oldWetCDriftB + oldWetCSpacing, 2, oldWetCLength - 2);\n    oldWetCA = readTransport(tape, writeHead, direction, travel, oldWetCDistanceA, oldC, handoff, firstWritten, writtenSpan, 2);\n    oldWetCB = readTransport(tape, writeHead, direction, travel, oldWetCDistanceB, oldC, handoff, firstWritten, writtenSpan, 2);\n    oldWetCWeightA = 0.5 - 0.5 * cos(6.283185307179586 * oldWetCPhaseA);\n    oldWetC = oldWetCA * oldWetCWeightA + oldWetCB * (1 - oldWetCWeightA);\n    if (oldWetCReverseMix > 0 && oldWetCReverseMix < 1) {\n        oldWetCDirect = readTransport(tape, writeHead, direction, travel, oldCTap, oldC, handoff, firstWritten, writtenSpan, 2);\n        oldWetC = oldWetCDirect + oldWetCReverseMix * (oldWetC - oldWetCDirect);\n    }\n}\n\nnewWetCSpeedCode = floor((newConfig + 0.5) / 12.0);\nnewWetCProgram = newConfig - 12 * newWetCSpeedCode;\nnewWetCFamily = floor((newWetCProgram + 0.5) / 3.0);\nnewWetCSizeCode = newWetCProgram - 3 * newWetCFamily;\nnewWetCForwardRate = pitchRatio * (newWetCSpeedCode == 0 || newWetCFamily >= 2 ? 1 : 0.5);\nnewWetCReverseMix = direction < 0 ? clamp((travel - newC - 2 - handoff) / handoff, 0, 1) : 0;\nnewWetCRate = newWetCReverseMix > 0 ? -newWetCForwardRate : newWetCForwardRate;\nnewWetCGranular = newWetCFamily == 3;\nnewWetCLength = dim(tape);\nnewWetC = 0;\nif (!newWetCGranular && newWetCRate == 1) {\n    newWetC = readTransport(tape, writeHead, direction, travel, newCTap, newC, handoff, firstWritten, writtenSpan, 2);\n} else {\n    newWetCWindow = newWetCGranular ? (newWetCSizeCode == 0 ? 0.087 : newWetCSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    newWetCWindow = (newWetCReverseMix > 0 ? clamp(0.30 * newC / samplerate, 0.35, 1.25) : newWetCWindow) * (1 + 0.113 * 2);\n    newWetCFrames = newWetCWindow * samplerate;\n    newWetCPositionA = grainClock / newWetCWindow + 2 * 0.217;\n    newWetCPositionB = newWetCPositionA + 0.5;\n    newWetCGrainA = floor(newWetCPositionA);\n    newWetCGrainB = floor(newWetCPositionB);\n    newWetCPhaseA = newWetCPositionA - newWetCGrainA;\n    newWetCPhaseB = newWetCPositionB - newWetCGrainB;\n    // Indexed scatter lets matching newWetCProgram readers agree at newWetCA handoff.\n    newWetCSeedA = (newWetCGrainA + 1 + 142 * 2) * 12.9898;\n    newWetCSeedB = (newWetCGrainB + 72 + 142 * 2) * 12.9898;\n    newWetCScatterDepth = newWetCGranular * crossfeed * newWetCFrames * 0.71;\n    newWetCDriftDepth = newWetCGranular * motion * newWetCFrames * 0.69;\n    newWetCFrequency = 0.397 + 0.087 * 2;\n    newWetCScatterA = (2 * wrap(sin(newWetCSeedA) * 43758.5453, 0, 1) - 1) * newWetCScatterDepth;\n    newWetCScatterB = (2 * wrap(sin(newWetCSeedB) * 43758.5453, 0, 1) - 1) * newWetCScatterDepth;\n    newWetCDriftA = (0.63 * sin(newWetCGrainA * newWetCWindow * newWetCFrequency + 2 * 2) + 0.37 * (2 * slowA - 1)) * newWetCDriftDepth;\n    newWetCDriftB = (0.63 * sin(newWetCGrainB * newWetCWindow * newWetCFrequency + 2 * 2 + 1) + 0.37 * (2 * slowB - 1)) * newWetCDriftDepth;\n    newWetCSpacing = newWetCGranular * newWetCFrames * 0.71;\n    newWetCShift = (1 - newWetCRate) * newWetCFrames;\n    newWetCDistanceA = clamp(newCTap + newWetCShift * (newWetCPhaseA - 0.5) + newWetCScatterA + newWetCDriftA - newWetCSpacing, 2, newWetCLength - 2);\n    newWetCDistanceB = clamp(newCTap + newWetCShift * (newWetCPhaseB - 0.5) + newWetCScatterB + newWetCDriftB + newWetCSpacing, 2, newWetCLength - 2);\n    newWetCA = readTransport(tape, writeHead, direction, travel, newWetCDistanceA, newC, handoff, firstWritten, writtenSpan, 2);\n    newWetCB = readTransport(tape, writeHead, direction, travel, newWetCDistanceB, newC, handoff, firstWritten, writtenSpan, 2);\n    newWetCWeightA = 0.5 - 0.5 * cos(6.283185307179586 * newWetCPhaseA);\n    newWetC = newWetCA * newWetCWeightA + newWetCB * (1 - newWetCWeightA);\n    if (newWetCReverseMix > 0 && newWetCReverseMix < 1) {\n        newWetCDirect = readTransport(tape, writeHead, direction, travel, newCTap, newC, handoff, firstWritten, writtenSpan, 2);\n        newWetC = newWetCDirect + newWetCReverseMix * (newWetC - newWetCDirect);\n    }\n}\n\nplayC = ((oldWetC) + (amount) * ((newWetC) - (oldWetC)));\n\noldWetDSpeedCode = floor((oldConfig + 0.5) / 12.0);\noldWetDProgram = oldConfig - 12 * oldWetDSpeedCode;\noldWetDFamily = floor((oldWetDProgram + 0.5) / 3.0);\noldWetDSizeCode = oldWetDProgram - 3 * oldWetDFamily;\noldWetDForwardRate = pitchRatio * (oldWetDSpeedCode == 0 || oldWetDFamily >= 2 ? 1 : 0.5);\noldWetDReverseMix = direction < 0 ? clamp((travel - oldD - 2 - handoff) / handoff, 0, 1) : 0;\noldWetDRate = oldWetDReverseMix > 0 ? -oldWetDForwardRate : oldWetDForwardRate;\noldWetDGranular = oldWetDFamily == 3;\noldWetDLength = dim(tape);\noldWetD = 0;\nif (!oldWetDGranular && oldWetDRate == 1) {\n    oldWetD = readTransport(tape, writeHead, direction, travel, oldDTap, oldD, handoff, firstWritten, writtenSpan, 3);\n} else {\n    oldWetDWindow = oldWetDGranular ? (oldWetDSizeCode == 0 ? 0.087 : oldWetDSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    oldWetDWindow = (oldWetDReverseMix > 0 ? clamp(0.30 * oldD / samplerate, 0.35, 1.25) : oldWetDWindow) * (1 + 0.113 * 3);\n    oldWetDFrames = oldWetDWindow * samplerate;\n    oldWetDPositionA = grainClock / oldWetDWindow + 3 * 0.217;\n    oldWetDPositionB = oldWetDPositionA + 0.5;\n    oldWetDGrainA = floor(oldWetDPositionA);\n    oldWetDGrainB = floor(oldWetDPositionB);\n    oldWetDPhaseA = oldWetDPositionA - oldWetDGrainA;\n    oldWetDPhaseB = oldWetDPositionB - oldWetDGrainB;\n    // Indexed scatter lets matching oldWetDProgram readers agree at oldWetDA handoff.\n    oldWetDSeedA = (oldWetDGrainA + 1 + 142 * 3) * 12.9898;\n    oldWetDSeedB = (oldWetDGrainB + 72 + 142 * 3) * 12.9898;\n    oldWetDScatterDepth = oldWetDGranular * crossfeed * oldWetDFrames * 0.71;\n    oldWetDDriftDepth = oldWetDGranular * motion * oldWetDFrames * 0.69;\n    oldWetDFrequency = 0.397 + 0.087 * 3;\n    oldWetDScatterA = (2 * wrap(sin(oldWetDSeedA) * 43758.5453, 0, 1) - 1) * oldWetDScatterDepth;\n    oldWetDScatterB = (2 * wrap(sin(oldWetDSeedB) * 43758.5453, 0, 1) - 1) * oldWetDScatterDepth;\n    oldWetDDriftA = (0.63 * sin(oldWetDGrainA * oldWetDWindow * oldWetDFrequency + 2 * 3) + 0.37 * (2 * slowA - 1)) * oldWetDDriftDepth;\n    oldWetDDriftB = (0.63 * sin(oldWetDGrainB * oldWetDWindow * oldWetDFrequency + 2 * 3 + 1) + 0.37 * (2 * slowB - 1)) * oldWetDDriftDepth;\n    oldWetDSpacing = oldWetDGranular * oldWetDFrames * 0.71;\n    oldWetDShift = (1 - oldWetDRate) * oldWetDFrames;\n    oldWetDDistanceA = clamp(oldDTap + oldWetDShift * (oldWetDPhaseA - 0.5) + oldWetDScatterA + oldWetDDriftA - oldWetDSpacing, 2, oldWetDLength - 2);\n    oldWetDDistanceB = clamp(oldDTap + oldWetDShift * (oldWetDPhaseB - 0.5) + oldWetDScatterB + oldWetDDriftB + oldWetDSpacing, 2, oldWetDLength - 2);\n    oldWetDA = readTransport(tape, writeHead, direction, travel, oldWetDDistanceA, oldD, handoff, firstWritten, writtenSpan, 3);\n    oldWetDB = readTransport(tape, writeHead, direction, travel, oldWetDDistanceB, oldD, handoff, firstWritten, writtenSpan, 3);\n    oldWetDWeightA = 0.5 - 0.5 * cos(6.283185307179586 * oldWetDPhaseA);\n    oldWetD = oldWetDA * oldWetDWeightA + oldWetDB * (1 - oldWetDWeightA);\n    if (oldWetDReverseMix > 0 && oldWetDReverseMix < 1) {\n        oldWetDDirect = readTransport(tape, writeHead, direction, travel, oldDTap, oldD, handoff, firstWritten, writtenSpan, 3);\n        oldWetD = oldWetDDirect + oldWetDReverseMix * (oldWetD - oldWetDDirect);\n    }\n}\n\nnewWetDSpeedCode = floor((newConfig + 0.5) / 12.0);\nnewWetDProgram = newConfig - 12 * newWetDSpeedCode;\nnewWetDFamily = floor((newWetDProgram + 0.5) / 3.0);\nnewWetDSizeCode = newWetDProgram - 3 * newWetDFamily;\nnewWetDForwardRate = pitchRatio * (newWetDSpeedCode == 0 || newWetDFamily >= 2 ? 1 : 0.5);\nnewWetDReverseMix = direction < 0 ? clamp((travel - newD - 2 - handoff) / handoff, 0, 1) : 0;\nnewWetDRate = newWetDReverseMix > 0 ? -newWetDForwardRate : newWetDForwardRate;\nnewWetDGranular = newWetDFamily == 3;\nnewWetDLength = dim(tape);\nnewWetD = 0;\nif (!newWetDGranular && newWetDRate == 1) {\n    newWetD = readTransport(tape, writeHead, direction, travel, newDTap, newD, handoff, firstWritten, writtenSpan, 3);\n} else {\n    newWetDWindow = newWetDGranular ? (newWetDSizeCode == 0 ? 0.087 : newWetDSizeCode == 1 ? 0.177 : 0.347) : 0.155;\n    newWetDWindow = (newWetDReverseMix > 0 ? clamp(0.30 * newD / samplerate, 0.35, 1.25) : newWetDWindow) * (1 + 0.113 * 3);\n    newWetDFrames = newWetDWindow * samplerate;\n    newWetDPositionA = grainClock / newWetDWindow + 3 * 0.217;\n    newWetDPositionB = newWetDPositionA + 0.5;\n    newWetDGrainA = floor(newWetDPositionA);\n    newWetDGrainB = floor(newWetDPositionB);\n    newWetDPhaseA = newWetDPositionA - newWetDGrainA;\n    newWetDPhaseB = newWetDPositionB - newWetDGrainB;\n    // Indexed scatter lets matching newWetDProgram readers agree at newWetDA handoff.\n    newWetDSeedA = (newWetDGrainA + 1 + 142 * 3) * 12.9898;\n    newWetDSeedB = (newWetDGrainB + 72 + 142 * 3) * 12.9898;\n    newWetDScatterDepth = newWetDGranular * crossfeed * newWetDFrames * 0.71;\n    newWetDDriftDepth = newWetDGranular * motion * newWetDFrames * 0.69;\n    newWetDFrequency = 0.397 + 0.087 * 3;\n    newWetDScatterA = (2 * wrap(sin(newWetDSeedA) * 43758.5453, 0, 1) - 1) * newWetDScatterDepth;\n    newWetDScatterB = (2 * wrap(sin(newWetDSeedB) * 43758.5453, 0, 1) - 1) * newWetDScatterDepth;\n    newWetDDriftA = (0.63 * sin(newWetDGrainA * newWetDWindow * newWetDFrequency + 2 * 3) + 0.37 * (2 * slowA - 1)) * newWetDDriftDepth;\n    newWetDDriftB = (0.63 * sin(newWetDGrainB * newWetDWindow * newWetDFrequency + 2 * 3 + 1) + 0.37 * (2 * slowB - 1)) * newWetDDriftDepth;\n    newWetDSpacing = newWetDGranular * newWetDFrames * 0.71;\n    newWetDShift = (1 - newWetDRate) * newWetDFrames;\n    newWetDDistanceA = clamp(newDTap + newWetDShift * (newWetDPhaseA - 0.5) + newWetDScatterA + newWetDDriftA - newWetDSpacing, 2, newWetDLength - 2);\n    newWetDDistanceB = clamp(newDTap + newWetDShift * (newWetDPhaseB - 0.5) + newWetDScatterB + newWetDDriftB + newWetDSpacing, 2, newWetDLength - 2);\n    newWetDA = readTransport(tape, writeHead, direction, travel, newWetDDistanceA, newD, handoff, firstWritten, writtenSpan, 3);\n    newWetDB = readTransport(tape, writeHead, direction, travel, newWetDDistanceB, newD, handoff, firstWritten, writtenSpan, 3);\n    newWetDWeightA = 0.5 - 0.5 * cos(6.283185307179586 * newWetDPhaseA);\n    newWetD = newWetDA * newWetDWeightA + newWetDB * (1 - newWetDWeightA);\n    if (newWetDReverseMix > 0 && newWetDReverseMix < 1) {\n        newWetDDirect = readTransport(tape, writeHead, direction, travel, newDTap, newD, handoff, firstWritten, writtenSpan, 3);\n        newWetD = newWetDDirect + newWetDReverseMix * (newWetD - newWetDDirect);\n    }\n}\n\nplayD = ((oldWetD) + (amount) * ((newWetD) - (oldWetD)));\n\noldAux = oldMode == 0 ? 0 : oldMode == 3 ? (oldProgram == 11 ? 0.66 : 0) : 1;\nnewAux = newMode == 0 ? 0 : newMode == 3 ? (newProgram == 11 ? 0.66 : 0) : 1;\naux = ((oldAux) + (amount) * ((newAux) - (oldAux)));\norbitA = sin(twoPi * panPhaseA);\norbitB = sin(twoPi * panPhaseB);\npanA = -0.56 + 0.72 * motion * delayWeight * orbitA;\npanB = 0.56 + 0.72 * motion * delayWeight * orbitB;\npanC = (1 - ((oldMode == 3) + (amount) * ((newMode == 3) - (oldMode == 3)))) * (-0.24 - 0.53 * motion * delayWeight * orbitB);\npanD = (1 - ((oldMode == 3) + (amount) * ((newMode == 3) - (oldMode == 3)))) * (0.24 - 0.53 * motion * delayWeight * orbitA);\nwetNorm = 1 / sqrt(2 + 2 * aux * aux);\nwetL = wetNorm * (playA * sqrt((1 - clamp(panA, -1, 1)) * 0.5) + playB * sqrt((1 - clamp(panB, -1, 1)) * 0.5)\n      + aux * (playC * sqrt((1 - clamp(panC, -1, 1)) * 0.5) + playD * sqrt((1 - clamp(panD, -1, 1)) * 0.5)));\nwetR = wetNorm * (playA * sqrt((1 + clamp(panA, -1, 1)) * 0.5) + playB * sqrt((1 + clamp(panB, -1, 1)) * 0.5)\n      + aux * (playC * sqrt((1 + clamp(panC, -1, 1)) * 0.5) + playD * sqrt((1 + clamp(panD, -1, 1)) * 0.5)));\n\n// Rhythmic phase is measured in stored frames. Its step follows the host\n// tempo and time signature; a new take starts on the Record press.\nrhythmSize = round(clamp(size, 0, 2));\nrhythmBars = rhythmSize == 0 ? 1 : rhythmSize == 1 ? 2 : 4;\nrhythmPeriod = max(2, round(samplerate * 60.0 * rhythmBars * clamp(mod_beats_per_bar, 0.5, 32) / clamp(mod_tempo, 20, 400)));\nrhythmStyle = round(clamp(rhythm_style, 0, 6));\nrhythmCurrentEpoch = rhythmEpoch + cleared;\nrhythmCapacity = dim(rhythmTape);\nrhythmStart = rhythmSelected && captureRunning && (rhythmFrames < 2 || cleared);\nrhythmFreeForTake = rhythmStart ? rhythm_free >= 0.5 : cleared ? 0 : rhythmTakeFree;\nrhythmFinishEarly = rhythmSelected && rhythmRecordingFirst && !panicBlocking && !cleared\n                 && (rhythmFreeForTake ? !recording : !captureRunning);\nrhythmSealFree = rhythmFreeForTake && rhythmFinishEarly;\nrhythmCapturedLength = clamp(round(rhythmCursor), 2, rhythmCapacity);\nrhythmLength = rhythmStart ? (rhythmFreeForTake ? rhythmCapacity : min(rhythmPeriod, rhythmCapacity))\n             : cleared ? 0 : rhythmSealFree ? rhythmCapturedLength : rhythmFrames;\nrhythmCapturePeriod = rhythmStart ? (rhythmFreeForTake ? rhythmCapacity : rhythmPeriod)\n                    : cleared ? 0 : rhythmSealFree ? rhythmCapturedLength : rhythmFirstPeriod;\nrhythmIsPriming = (rhythmStart || (rhythmRecordingFirst && !rhythmFinishEarly)) && (!cleared || rhythmStart);\nrhythmPlayPeriod = rhythmIsPriming || rhythmFreeForTake ? rhythmCapturePeriod : rhythmPeriod;\nrhythmStep = rhythmLength / max(2, rhythmPlayPeriod);\n// Longer Octaves grains reduce tuning sidebands; preserve the normal Pitch window.\nrhythmGrainWindowLimit = rhythmStyle == 6 ? 0.36 : 0.14;\nrhythmGrainSeconds = min(rhythmGrainWindowLimit, 0.33 * max(2, rhythmPlayPeriod) / samplerate);\nrhythmDirection = reverse >= 0.5 && !rhythmIsPriming ? -1 : 1;\nrhythmPosition = rhythmStart || cleared ? 0 : rhythmFinishEarly ? (rhythmDirection < 0 ? max(0, ceil(rhythmCursor) - 1) : 0) : rhythmCursor;\nrhythmNextPosition = rhythmPosition + rhythmDirection * rhythmStep;\nrhythmCanAdvance = rhythmRuns && (!rhythmFreeForTake || !rhythmIsPriming || (rhythmSelected && captureRunning));\n\n// During the initial take both channels capture at full length. The\n// established right head then scans its shorter span at the same speed.\nrhythmPoly = rhythmStyle == 1 || rhythmStyle == 2;\nrhythmWasPoly = rhythmLastStyle == 1 || rhythmLastStyle == 2;\nrhythmRightRatio = rhythmStyle == 1 ? 0.875 : rhythmStyle == 2 ? 0.75 : 1;\nrhythmRightLength = rhythmPoly && !rhythmIsPriming\n                  ? min(rhythmLength, max(2, round(rhythmLength * rhythmRightRatio))) : rhythmLength;\nrhythmRightPosition = rhythmIsPriming || !rhythmPoly || rhythmStart || cleared ? rhythmPosition\n                    : rhythmFinishEarly ? (rhythmDirection < 0 ? rhythmRightLength - 1 : 0)\n                    : rhythmWasPoly ? wrap(rhythmRightCursor, 0, max(2, rhythmRightLength))\n                    : wrap(rhythmPosition, 0, max(2, rhythmRightLength));\nrhythmRightNextPosition = rhythmRightPosition + rhythmDirection * rhythmStep;\nrhythmPolySwitch = rhythmStyle != rhythmLastStyle && (rhythmPoly || rhythmWasPoly)\n                && !rhythmIsPriming && !rhythmFinishEarly && !cleared;\nrhythmPolyFade = cleared ? 0 : rhythmPolySwitch ? 1 : max(0, rhythmStyleFade - 1.0 / (0.012 * samplerate));\nrhythmFadeFrom = rhythmPolySwitch ? rhythmRightLastSample : rhythmRightFadeFrom;\n// The stored loop and host-facing phase stay unchanged across these styles.\nrhythmCuts = rhythmStyle == 3 ? 8 : rhythmStyle == 4 ? 6 : rhythmStyle == 5 ? 5 : 1;\nrhythmSliceCycle = (rhythmStart || cleared) ? 0 : rhythmFxCycle;\nrhythmSliceRotate = 1 + wrap(3 * rhythmSliceCycle + rhythmStyle, 0, max(1, rhythmCuts - 1));\nrhythmSliceStride = rhythmCuts == 8 ? 1 + 2 * wrap(rhythmSliceCycle + 3, 0, 4)\n                  : rhythmCuts == 6 ? 1 + 4 * wrap(rhythmSliceCycle, 0, 2)\n                  : 1 + wrap(rhythmSliceCycle + 1, 0, 4);\nrhythmSliceEdge = max(1, 0.006 * samplerate * rhythmStep);\nrhythmCycleEdge = rhythmCanAdvance && !rhythmIsPriming && rhythmLength >= 2\n               && (rhythmNextPosition >= rhythmLength || rhythmNextPosition < 0);\nrhythmFxCycle = wrap(rhythmSliceCycle + rhythmCycleEdge, 0, 4096);\n\n// In Octaves, Drift selects down / original / up. The regular Pitch\n// control multiplies the read ratio without changing the loop clock.\nrhythmOctaveTarget = rhythmStyle != 6 ? 1 : mod_drift < 0.333333 ? 0.5 : mod_drift > 0.666667 ? 2 : 1;\nrhythmOctaveSlew = rhythmOctaveState + control * (rhythmOctaveTarget - rhythmOctaveState);\nrhythmOctaveRatio = abs(rhythmOctaveSlew - rhythmOctaveTarget) < 0.00001 ? rhythmOctaveTarget : rhythmOctaveSlew;\nrhythmOctaveState = rhythmOctaveRatio;\n\nrhythmWetL = 0;\nrhythmWetR = 0;\nif (rhythmRuns && rhythmLength >= 2) {\n    if (!rhythmIsPriming) {\n        // Rhythmic effect hook.\n        rhythmWetL = readRhythmFx(rhythmTape, rhythmPosition, rhythmLength, rhythmCurrentEpoch, 0, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n        rhythmWetR = readRhythmFx(rhythmTape, rhythmRightPosition, rhythmRightLength, rhythmCurrentEpoch, 1, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n        // Shift only the wet reader. The tape, overdub and beat clock stay in sync.\n        rhythmPitch = pitchRatio * rhythmOctaveRatio;\n        if (abs(1 - rhythmPitch) > 0.0001) {\n            rhythmGrainWindow = rhythmGrainSeconds * samplerate * rhythmStep;\n            rhythmGrainA = rhythmGrainPhase;\n            rhythmGrainB = wrap(rhythmGrainA + 0.5, 0, 1);\n            rhythmGrainScale = rhythmDirection * (1 - rhythmPitch) * rhythmGrainWindow;\n            rhythmPitchPositionA = rhythmPosition - rhythmGrainScale * (rhythmGrainA - 0.5);\n            rhythmPitchPositionB = rhythmPosition - rhythmGrainScale * (rhythmGrainB - 0.5);\n            rhythmPitchLA = readRhythmFx(rhythmTape, rhythmPitchPositionA, rhythmLength, rhythmCurrentEpoch, 0, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n            rhythmPitchLB = readRhythmFx(rhythmTape, rhythmPitchPositionB, rhythmLength, rhythmCurrentEpoch, 0, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n            rhythmPitchRightA = rhythmRightPosition - rhythmGrainScale * (rhythmGrainA - 0.5);\n            rhythmPitchRightB = rhythmRightPosition - rhythmGrainScale * (rhythmGrainB - 0.5);\n            rhythmPitchRA = readRhythmFx(rhythmTape, rhythmPitchRightA, rhythmRightLength, rhythmCurrentEpoch, 1, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n            rhythmPitchRB = readRhythmFx(rhythmTape, rhythmPitchRightB, rhythmRightLength, rhythmCurrentEpoch, 1, rhythmCuts, rhythmSliceRotate, rhythmSliceStride, rhythmSliceEdge);\n            rhythmGrainWeight = 0.5 - 0.5 * cos(twoPi * rhythmGrainA);\n            rhythmPitchMix = clamp(abs(1 - rhythmPitch) * 80, 0, 1);\n            rhythmShiftL = rhythmPitchLA * rhythmGrainWeight + rhythmPitchLB * (1 - rhythmGrainWeight);\n            rhythmShiftR = rhythmPitchRA * rhythmGrainWeight + rhythmPitchRB * (1 - rhythmGrainWeight);\n            rhythmWetL = rhythmWetL + rhythmPitchMix * (rhythmShiftL - rhythmWetL);\n            rhythmWetR = rhythmWetR + rhythmPitchMix * (rhythmShiftR - rhythmWetR);\n        }\n        rhythmWetR = rhythmWetR + rhythmPolyFade * (rhythmFadeFrom - rhythmWetR);\n    }\n    rhythmErase = rhythmSelected && !holdOn && erasing > 0.0001;\n    if (rhythmSelected && (captureRunning || rhythmErase)) {\n        // One update per cell at the native tempo. At different playback rates\n        // fill crossed cells, bounded for unusually large tempo or meter changes.\n        rhythmWriteFrom = rhythmDirection > 0 ? floor(rhythmPosition) : ceil(rhythmPosition);\n        rhythmWriteTo = rhythmDirection > 0 ? floor(rhythmNextPosition) : ceil(rhythmNextPosition);\n        rhythmWriteRightFrom = rhythmDirection > 0 ? floor(rhythmRightPosition) : ceil(rhythmRightPosition);\n        rhythmWriteRightTo = rhythmDirection > 0 ? floor(rhythmRightNextPosition) : ceil(rhythmRightNextPosition);\n        rhythmCrossedL = abs(rhythmWriteTo - rhythmWriteFrom);\n        rhythmCrossedR = abs(rhythmWriteRightTo - rhythmWriteRightFrom);\n        rhythmWritesL = min(16, rhythmCrossedL);\n        rhythmWritesR = min(16, rhythmCrossedR);\n        rhythmWrites = max(rhythmWritesL, rhythmWritesR);\n        rhythmArmL = captureRunning && (group == 1 || group == 3);\n        rhythmArmR = captureRunning && (group == 2 || group == 3);\n        for (rhythmFrame = 0; rhythmFrame < rhythmWrites; rhythmFrame += 1) {\n            // The independently clocked heads can address different cells.\n            // A new epoch tag also initializes the unaddressed companion lane.\n            rhythmOffsetL = floor(rhythmFrame * rhythmCrossedL / max(1, rhythmWritesL));\n            rhythmOffsetR = floor(rhythmFrame * rhythmCrossedR / max(1, rhythmWritesR));\n            rhythmCellL = wrap(rhythmWriteFrom + rhythmDirection * rhythmOffsetL, 0, rhythmLength);\n            rhythmCellR = wrap(rhythmWriteRightFrom + rhythmDirection * rhythmOffsetR, 0, rhythmRightLength);\n            rhythmValidL = peek(rhythmTape, rhythmCellL, 2) == rhythmCurrentEpoch;\n            rhythmValidR = peek(rhythmTape, rhythmCellR, 2) == rhythmCurrentEpoch;\n            rhythmPrevL = rhythmValidL ? peek(rhythmTape, rhythmCellL, 0) : 0;\n            rhythmPrevR = rhythmValidR ? peek(rhythmTape, rhythmCellR, 1) : 0;\n            rhythmPower = rhythmPrevL * rhythmPrevL + rhythmPrevR * rhythmPrevR;\n            rhythmBuild = max(0, effectiveRegen - 1);\n            rhythmRetention = effectiveRegen * (1 - 0.97 * suppress) / (1 + rhythmBuild * rhythmPower / (0.62 * 0.62));\n            rhythmWriteL = rhythmArmL ? rhythmRetention * rhythmPrevL + 0.67 * injectA * injectedL : rhythmPrevL;\n            rhythmWriteR = rhythmArmR ? rhythmRetention * rhythmPrevR + 0.67 * injectB * injectedR : rhythmPrevR;\n            rhythmKeep = rhythmErase ? 1 - erasing : 1;\n            rhythmTouchL = rhythmFrame < rhythmWritesL && (rhythmArmL || rhythmErase);\n            rhythmTouchR = rhythmFrame < rhythmWritesR && (rhythmArmR || rhythmErase);\n            rhythmRawL = rhythmTouchL ? clamp(fixnan(rhythmWriteL * rhythmKeep), -16, 16) : rhythmPrevL;\n            rhythmRawR = rhythmTouchR ? clamp(fixnan(rhythmWriteR * rhythmKeep), -16, 16) : rhythmPrevR;\n            rhythmPeak = max(rhythmTouchL ? abs(rhythmRawL) : 0, rhythmTouchR ? abs(rhythmRawR) : 0);\n            rhythmSafePeak = min(rhythmPeak, 0.54) + 0.06 * tanh(max(0, rhythmPeak - 0.54) / 0.06);\n            rhythmGuard = rhythmPeak > 0.54 ? rhythmSafePeak / rhythmPeak : 1;\n            rhythmStoreL = rhythmRawL * rhythmGuard;\n            rhythmStoreR = rhythmRawR * rhythmGuard;\n            if (rhythmTouchL && !rhythmValidL && (!rhythmTouchR || rhythmCellL != rhythmCellR)) {\n                poke(rhythmTape, 0, rhythmCellL, 1);\n            }\n            if (rhythmTouchR && !rhythmValidR && (!rhythmTouchL || rhythmCellL != rhythmCellR)) {\n                poke(rhythmTape, 0, rhythmCellR, 0);\n            }\n            if (rhythmTouchL) {\n                poke(rhythmTape, rhythmStoreL, rhythmCellL, 0);\n                poke(rhythmTape, rhythmCurrentEpoch, rhythmCellL, 2);\n            }\n            if (rhythmTouchR) {\n                poke(rhythmTape, rhythmStoreR, rhythmCellR, 1);\n                poke(rhythmTape, rhythmCurrentEpoch, rhythmCellR, 2);\n            }\n        }\n    }\n}\n\n// Independent short, damped, orthogonal diffusion. Blur also takes a\n// smaller live-input send before recording starts. It never alters the tape.\nrhythmVerbTarget = clamp(mod_blur, 0, 1);\nrhythmVerbSlew = 1.0 / (0.020 * samplerate);\nrhythmVerbAmount = rhythmVerbTarget > rhythmVerbControl\n                 ? min(rhythmVerbTarget, rhythmVerbControl + rhythmVerbSlew)\n                 : max(rhythmVerbTarget, rhythmVerbControl - rhythmVerbSlew);\nrhythmVerbControl = rhythmVerbAmount;\nrhythmVerbMuted = panicPressed || (rhythmVerbPanic && !captureRunning);\nrhythmVerbPanic = rhythmVerbMuted;\nrhythmVerbOpen = rhythmRuns && !rhythmVerbMuted && !panicBlocking && rhythmVerbAmount > 0;\nrhythmVerbTail = cleared ? 0 : rhythmVerbOpen ? round(2 * samplerate) : max(0, rhythmVerbTailFrames - 1);\nrhythmVerbActive = rhythmVerbOpen || rhythmVerbTail > 0;\nrhythmVerbAge = cleared ? 0 : rhythmVerbWritten;\nrhythmVerbOutL = 0;\nrhythmVerbOutR = 0;\nrhythmVerbToneA = 0;\nrhythmVerbToneB = 0;\nrhythmVerbToneC = 0;\nrhythmVerbToneD = 0;\nif (rhythmVerbActive) {\n    rhythmVerbCapacity = dim(rhythmVerbTape);\n    rhythmVerbA = min(rhythmVerbCapacity - 1, max(2, round(1009 * samplerate / 48000)));\n    rhythmVerbB = min(rhythmVerbCapacity - 1, max(2, round(1451 * samplerate / 48000)));\n    rhythmVerbC = min(rhythmVerbCapacity - 1, max(2, round(2063 * samplerate / 48000)));\n    rhythmVerbD = min(rhythmVerbCapacity - 1, max(2, round(2833 * samplerate / 48000)));\n    rhythmVerbReadA = rhythmVerbAge >= rhythmVerbA ? peek(rhythmVerbTape, wrap(rhythmVerbHead - rhythmVerbA, 0, rhythmVerbCapacity), 0) : 0;\n    rhythmVerbReadB = rhythmVerbAge >= rhythmVerbB ? peek(rhythmVerbTape, wrap(rhythmVerbHead - rhythmVerbB, 0, rhythmVerbCapacity), 1) : 0;\n    rhythmVerbReadC = rhythmVerbAge >= rhythmVerbC ? peek(rhythmVerbTape, wrap(rhythmVerbHead - rhythmVerbC, 0, rhythmVerbCapacity), 2) : 0;\n    rhythmVerbReadD = rhythmVerbAge >= rhythmVerbD ? peek(rhythmVerbTape, wrap(rhythmVerbHead - rhythmVerbD, 0, rhythmVerbCapacity), 3) : 0;\n    rhythmVerbDamping = 1 - exp(-twoPi * 4400 / samplerate);\n    rhythmVerbToneA = (cleared ? 0 : rhythmVerbToneStateA) + rhythmVerbDamping * (rhythmVerbReadA - (cleared ? 0 : rhythmVerbToneStateA));\n    rhythmVerbToneB = (cleared ? 0 : rhythmVerbToneStateB) + rhythmVerbDamping * (rhythmVerbReadB - (cleared ? 0 : rhythmVerbToneStateB));\n    rhythmVerbToneC = (cleared ? 0 : rhythmVerbToneStateC) + rhythmVerbDamping * (rhythmVerbReadC - (cleared ? 0 : rhythmVerbToneStateC));\n    rhythmVerbToneD = (cleared ? 0 : rhythmVerbToneStateD) + rhythmVerbDamping * (rhythmVerbReadD - (cleared ? 0 : rhythmVerbToneStateD));\n    rhythmVerbNetworkA = 0.5 * (rhythmVerbToneA + rhythmVerbToneB + rhythmVerbToneC + rhythmVerbToneD);\n    rhythmVerbNetworkB = 0.5 * (rhythmVerbToneA - rhythmVerbToneB + rhythmVerbToneC - rhythmVerbToneD);\n    rhythmVerbNetworkC = 0.5 * (rhythmVerbToneA + rhythmVerbToneB - rhythmVerbToneC - rhythmVerbToneD);\n    rhythmVerbNetworkD = 0.5 * (rhythmVerbToneA - rhythmVerbToneB - rhythmVerbToneC + rhythmVerbToneD);\n    rhythmVerbSend = rhythmVerbOpen && !cleared ? rhythmVerbAmount : 0;\n    rhythmVerbInL = rhythmVerbSend * tanh(0.70 * rhythmWetL + 0.38 * (1 - holdMix) * inputL);\n    rhythmVerbInR = rhythmVerbSend * tanh(0.70 * rhythmWetR + 0.38 * (1 - holdMix) * inputR);\n    poke(rhythmVerbTape, 0.65 * tanh((0.47 * rhythmVerbInL + 0.73 * rhythmVerbNetworkA) / 0.65), rhythmVerbHead, 0);\n    poke(rhythmVerbTape, 0.65 * tanh((0.47 * rhythmVerbInR + 0.73 * rhythmVerbNetworkB) / 0.65), rhythmVerbHead, 1);\n    poke(rhythmVerbTape, 0.65 * tanh((0.33 * rhythmVerbInL + 0.73 * rhythmVerbNetworkC) / 0.65), rhythmVerbHead, 2);\n    poke(rhythmVerbTape, 0.65 * tanh((0.33 * rhythmVerbInR + 0.73 * rhythmVerbNetworkD) / 0.65), rhythmVerbHead, 3);\n    rhythmVerbOutL = 0.53 * (rhythmVerbReadA + rhythmVerbReadC);\n    rhythmVerbOutR = 0.53 * (rhythmVerbReadB + rhythmVerbReadD);\n}\nrhythmVerbHead = rhythmVerbActive ? wrap(rhythmVerbHead + 1, 0, dim(rhythmVerbTape)) : rhythmVerbHead;\nrhythmVerbWritten = rhythmVerbActive ? min(rhythmVerbAge + 1, dim(rhythmVerbTape)) : 0;\nrhythmVerbTailFrames = rhythmVerbTail;\nrhythmVerbToneStateA = rhythmVerbActive ? rhythmVerbToneA : 0;\nrhythmVerbToneStateB = rhythmVerbActive ? rhythmVerbToneB : 0;\nrhythmVerbToneStateC = rhythmVerbActive ? rhythmVerbToneC : 0;\nrhythmVerbToneStateD = rhythmVerbActive ? rhythmVerbToneD : 0;\nrhythmVerbWet = clamp(8 * rhythmVerbAmount, 0, 1);\nrhythmWetL = rhythmWetL + rhythmVerbWet * rhythmVerbOutL;\nrhythmWetR = rhythmWetR + rhythmVerbWet * rhythmVerbOutR;\n\nwetL = wetL + rhythmBlend * (rhythmWetL - wetL);\nwetR = wetR + rhythmBlend * (rhythmWetR - wetR);\n\nrhythmFade = rhythmNextFade;\nrhythmFrames = rhythmLength;\nrhythmFirstPeriod = rhythmCapturePeriod;\nrhythmEpoch = rhythmCurrentEpoch;\nrhythmRecordingFirst = rhythmIsPriming && (rhythmNextPosition < rhythmLength || !rhythmCanAdvance);\nrhythmCursor = rhythmCanAdvance && rhythmLength >= 2 ? wrap(rhythmNextPosition, 0, rhythmLength) : rhythmPosition;\nrhythmRightCursor = rhythmCanAdvance && rhythmRightLength >= 2 ? wrap(rhythmRightNextPosition, 0, rhythmRightLength) : rhythmRightPosition;\nrhythmLastStyle = rhythmStyle;\nrhythmTakeFree = rhythmFreeForTake;\nrhythmStyleFade = rhythmPolyFade;\nrhythmRightLastSample = rhythmWetR;\nrhythmRightFadeFrom = rhythmFadeFrom;\nrhythmGrainPhase = wrap(rhythmGrainPhase + 1.0 / (rhythmGrainSeconds * samplerate), 0, 1);\n// Filter the audible wet signal in every mode, including the first return\n// and Hold. The ambient loop's separate filters still bypass during Hold.\nwetHighNextL = cleared ? 0 : wetHighL + highCoefficient * (wetL - wetHighL);\nwetHighNextR = cleared ? 0 : wetHighR + highCoefficient * (wetR - wetHighR);\nwetBrightL = wetL - highAmount * wetHighNextL;\nwetBrightR = wetR - highAmount * wetHighNextR;\nwetLowNextL = cleared ? 0 : wetLowL + lowCoefficient * (wetBrightL - wetLowL);\nwetLowNextR = cleared ? 0 : wetLowR + lowCoefficient * (wetBrightR - wetLowR);\nwetToneL = wetBrightL + lowAmount * (wetLowNextL - wetBrightL);\nwetToneR = wetBrightR + lowAmount * (wetLowNextR - wetBrightR);\nwetHighL = wetHighNextL;\nwetHighR = wetHighNextR;\nwetLowL = wetLowNextL;\nwetLowR = wetLowNextR;\n\nwetLevel = wetFade * (1 - 0.85 * suppress);\n// Keep the wet output tone controls out of the dry compressor sidechain.\ndetector = max(abs(rawL + wetL * wetLevel), abs(rawR + wetR * wetLevel));\nwetL = wetToneL * wetLevel;\nwetR = wetToneR * wetLevel;\n// A Panic must not jump the gain of a continuing dry signal.\npriorCombined = (cleared && !panicClearActive) ? 0 : combinedEnvelope;\nlinked = ((priorCombined) + (detector > priorCombined ? attack : release) * ((detector) - (priorCombined)));\ncompGain = ((1) + (max(character, 0)) * ((1.12 * pow(max(1, linked / 0.24), -0.55)) - (1)));\n// Width shapes only the stereo wet output. Widening gets gentle\n// energy normalization and unity width preserves the original signal.\nwidthMix = widthState + control * (clamp(mod_width, 0, 2) - widthState);\nwidthGain = 1 / sqrt(max(1, (1 + widthMix * widthMix) * 0.5));\nwidthSide = 0.5 * (wetL - wetR) * (widthMix - 1);\nwetL = (wetL + widthSide) * widthGain;\nwetR = (wetR - widthSide) * widthGain;\nout4 = max(abs(wetL), abs(wetR));\ndryGain = cos(blend * 1.570796326794897);\nwetGain = sin(blend * 1.570796326794897);\nlimitedLRaw = clamp(fixnan(gainOut * compGain * (dryGain * rawL + wetGain * wetL)), -16, 16);\nlimitedLMag = abs(limitedLRaw);\nlimitedLKnee = max(0, limitedLMag - 0.75);\nlimitedL = sign(limitedLRaw) * (min(limitedLMag, 0.75) + 0.21 * tanh(limitedLKnee / 0.21));\nout1 = limitedL;\nlimitedRRaw = clamp(fixnan(gainOut * compGain * (dryGain * rawR + wetGain * wetR)), -16, 16);\nlimitedRMag = abs(limitedRRaw);\nlimitedRKnee = max(0, limitedRMag - 0.75);\nlimitedR = sign(limitedRRaw) * (min(limitedRMag, 0.75) + 0.21 * tanh(limitedRKnee / 0.21));\nout2 = limitedR;\n\nif (cleared || ambientRuns) {\n    firstWritten = writtenSpan < 0 ? writeHead : min(firstWritten, writeHead);\n    lastWritten = writtenSpan < 0 ? writeHead : max(lastWritten, writeHead);\n    if (!ambientRuns) {\n        lastWritten = writeHead - 1;\n    }\n}\nif (ambientRuns) {\n    writeHead = writeHead + direction;\n    transportDirection = direction;\n    directionFrames = min(travel + 1, capacity);\n}\nclearSeen = clear;\nfadeLeft = remaining;\nholdState = holdMix;\npanicSeen = panic;\npanicClearing = panicClearActive && !cleared;\npanicNeedsOff = waitingForOff;\nwidthState = widthMix;\nsourceConfig = progress >= 1 ? newConfig : oldConfig;\ntargetConfig = newConfig;\nchangePhase = progress;\ncaptureA = recA;\ncaptureB = recB;\nfeedbackState = regen;\nblurState = crossfeed;\ndriftState = motion;\nmixState = blend;\ndriveState = saturation;\ndynamicsState = character;\neraseState = eraseSmoothed;\ninputGain = gainIn;\noutputGain = gainOut;\nhighState = highCoefficient;\nhighMix = highAmount;\nlowState = lowCoefficient;\nlowMix = lowAmount;\ninputEnvelope = env;\ncombinedEnvelope = linked;\npanPhaseA = wrap(panPhaseA + (0.032 + 0.009 * sin(twoPi * wanderPhaseA) + 0.012 * (2 * slowA - 1)) / samplerate, 0, 1);\npanPhaseB = wrap(panPhaseB + (0.023 + 0.007 * sin(twoPi * wanderPhaseB) + 0.010 * (2 * slowB - 1)) / samplerate, 0, 1);\nwanderPhaseA = wrap(wanderPhaseA + 1.0 / (97 * samplerate), 0, 1);\nwanderPhaseB = wrap(wanderPhaseB + 1.0 / (137 * samplerate), 0, 1);\nchaosClockA = wrap(chaosTickA, 0, 1);\nchaosClockB = wrap(chaosTickB, 0, 1);\nchaosA = chaosNextA;\nchaosB = chaosNextB;\nwanderA = slowA;\nwanderB = slowB;\ngrainClock = grainClock + 1.0 / samplerate;\nout5 = mod_mix_smoothed;\nout6 = mod_feedback;\nout7 = mod_blur;\nout8 = mod_drift;\nout9 = mod_drive;\nout10 = mod_dynamics;\nout11 = mod_input_db;\nout12 = mod_output_db;\nout13 = mod_width;\nout14 = mod_pitch;\nout15 = mod_hpf_hz;\nout16 = mod_lpf_hz;\nout17 = mod_tempo;\nout18 = mod_beats_per_bar;\n"
                         }
                       },
                       {
@@ -7694,6 +7722,468 @@
                             22
                           ]
                         }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-0",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            500,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 3",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-0",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            500,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 5"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-1",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            536,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 4",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-1",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            536,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 6"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-2",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            572,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 5",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-2",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            572,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 7"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-3",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            608,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 6",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-3",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            608,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 8"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-4",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            644,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 7",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-4",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            644,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 9"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-5",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            680,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 8",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-5",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            680,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 10"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-6",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            716,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 9",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-6",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            716,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 11"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-7",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            752,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 10",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-7",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            752,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 12"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-8",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            788,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 11",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-8",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            788,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 13"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-9",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            824,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 12",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-9",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            824,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 14"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-10",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            860,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 13",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-10",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            860,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 15"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-11",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            896,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 14",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-11",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            896,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 16"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-12",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            932,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 15",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-12",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            932,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 17"
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-in-13",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            968,
+                            20,
+                            35,
+                            22
+                          ],
+                          "numinlets": 0,
+                          "numoutlets": 1,
+                          "text": "in 16",
+                          "outlettype": [
+                            ""
+                          ]
+                        }
+                      },
+                      {
+                        "box": {
+                          "id": "drift-mod-out-13",
+                          "maxclass": "newobj",
+                          "patching_rect": [
+                            968,
+                            510,
+                            35,
+                            22
+                          ],
+                          "numinlets": 1,
+                          "numoutlets": 0,
+                          "text": "out 18"
+                        }
                       }
                     ],
                     "lines": [
@@ -7765,6 +8255,342 @@
                           ],
                           "destination": [
                             "out-4",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-0",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            2
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            4
+                          ],
+                          "destination": [
+                            "drift-mod-out-0",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-1",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            3
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            5
+                          ],
+                          "destination": [
+                            "drift-mod-out-1",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-2",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            4
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            6
+                          ],
+                          "destination": [
+                            "drift-mod-out-2",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-3",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            5
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            7
+                          ],
+                          "destination": [
+                            "drift-mod-out-3",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-4",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            6
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            8
+                          ],
+                          "destination": [
+                            "drift-mod-out-4",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-5",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            7
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            9
+                          ],
+                          "destination": [
+                            "drift-mod-out-5",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-6",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            8
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            10
+                          ],
+                          "destination": [
+                            "drift-mod-out-6",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-7",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            9
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            11
+                          ],
+                          "destination": [
+                            "drift-mod-out-7",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-8",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            10
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            12
+                          ],
+                          "destination": [
+                            "drift-mod-out-8",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-9",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            11
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            13
+                          ],
+                          "destination": [
+                            "drift-mod-out-9",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-10",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            12
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            14
+                          ],
+                          "destination": [
+                            "drift-mod-out-10",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-11",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            13
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            15
+                          ],
+                          "destination": [
+                            "drift-mod-out-11",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-12",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            14
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            16
+                          ],
+                          "destination": [
+                            "drift-mod-out-12",
+                            0
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "drift-mod-in-13",
+                            0
+                          ],
+                          "destination": [
+                            "code",
+                            15
+                          ]
+                        }
+                      },
+                      {
+                        "patchline": {
+                          "source": [
+                            "code",
+                            17
+                          ],
+                          "destination": [
+                            "drift-mod-out-13",
                             0
                           ]
                         }
@@ -10038,42 +10864,6 @@
               },
               {
                 "box": {
-                  "id": "mix-state",
-                  "maxclass": "newobj",
-                  "patching_rect": [
-                    265,
-                    767,
-                    74,
-                    22
-                  ],
-                  "numinlets": 2,
-                  "numoutlets": 1,
-                  "outlettype": [
-                    "list"
-                  ],
-                  "text": "pak 0 35."
-                }
-              },
-              {
-                "box": {
-                  "id": "wet-value",
-                  "maxclass": "newobj",
-                  "patching_rect": [
-                    265,
-                    799,
-                    139,
-                    22
-                  ],
-                  "numinlets": 2,
-                  "numoutlets": 1,
-                  "outlettype": [
-                    "float"
-                  ],
-                  "text": "expr $i1 * $f2 * 0.01"
-                }
-              },
-              {
-                "box": {
                   "id": "wet-ramp",
                   "maxclass": "newobj",
                   "patching_rect": [
@@ -11312,6 +12102,532 @@
                   "text": "drift_control_visible drift_size_label 0, drift_control_visible size 0, drift_control_visible drift_transport_label 0, drift_control_visible reverse 0, drift_control_visible half_speed 0, drift_control_visible drift_rhythm_style_label 0, drift_control_visible rhythm_style 0, drift_control_visible drift_rhythm_length_label 0, drift_control_visible rhythm_free 0, drift_control_visible drift_tempo_label 0, drift_control_visible tempo 0, drift_control_visible drift_beats_label 0, drift_control_visible beats_per_bar 0, drift_control_visible drift_rhythm_help 0, drift_control_visible blur 0, drift_control_visible width 0, drift_control_visible pitch 0, drift_control_visible drive 0, drift_control_visible dynamics 0, drift_control_visible drift_hpf_label 0, drift_control_visible hpf 0, drift_control_visible drift_hpf_cutoff_label 0, drift_control_visible hpf_hz 0, drift_control_visible drift_lpf_label 0, drift_control_visible lpf 0, drift_control_visible drift_lpf_cutoff_label 0, drift_control_visible lpf_hz 0, drift_control_visible drift_input_label 1, drift_control_visible drift_input_trim_label 1, drift_control_visible drift_input_left_label 1, drift_control_visible input_meter_left 1, drift_control_visible drift_input_right_label 1, drift_control_visible input_meter_right 1, drift_control_visible input_trim 1, drift_control_visible drift_output_label 1, drift_control_visible drift_output_trim_label 1, drift_control_visible drift_output_left_label 1, drift_control_visible output_meter_left 1, drift_control_visible drift_output_right_label 1, drift_control_visible output_meter_right 1, drift_control_visible output_trim 1, drift_control_visible drift_input_gate_label 1, drift_control_visible input_gate 1, drift_control_visible drift_input_route_label 1, drift_control_visible mono_input 1, drift_control_visible drift_memory_actions_label 1, drift_control_visible erase 1, drift_control_visible clear 1, drift_control_visible panic 1",
                   "outlettype": [
                     ""
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-0",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1030,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 4,
+                  "comment": "LFO offset for Drifting Memory Mix",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-0",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1030,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 7,
+                  "comment": "Effective Drifting Memory Mix"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-1",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1068,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 5,
+                  "comment": "LFO offset for Drifting Memory Feedback",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-1",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1068,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 8,
+                  "comment": "Effective Drifting Memory Feedback"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-2",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1106,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 6,
+                  "comment": "LFO offset for Drifting Memory Blur",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-2",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1106,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 9,
+                  "comment": "Effective Drifting Memory Blur"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-3",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1144,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 7,
+                  "comment": "LFO offset for Drifting Memory Drift",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-3",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1144,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 10,
+                  "comment": "Effective Drifting Memory Drift"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-4",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1182,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 8,
+                  "comment": "LFO offset for Drifting Memory Drive",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-4",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1182,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 11,
+                  "comment": "Effective Drifting Memory Drive"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-5",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1220,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 9,
+                  "comment": "LFO offset for Drifting Memory Dynamics",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-5",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1220,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 12,
+                  "comment": "Effective Drifting Memory Dynamics"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-6",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1258,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 10,
+                  "comment": "LFO offset for Drifting Memory Input Trim",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-6",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1258,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 13,
+                  "comment": "Effective Drifting Memory Input Trim"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-7",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1296,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 11,
+                  "comment": "LFO offset for Drifting Memory Output Trim",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-7",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1296,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 14,
+                  "comment": "Effective Drifting Memory Output Trim"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-8",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1334,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 12,
+                  "comment": "LFO offset for Drifting Memory Width",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-8",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1334,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 15,
+                  "comment": "Effective Drifting Memory Width"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-9",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1372,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 13,
+                  "comment": "LFO offset for Drifting Memory Pitch",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-9",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1372,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 16,
+                  "comment": "Effective Drifting Memory Pitch"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-10",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1410,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 14,
+                  "comment": "LFO offset for Drifting Memory HPF Hz",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-10",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1410,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 17,
+                  "comment": "Effective Drifting Memory HPF Hz"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-11",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1448,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 15,
+                  "comment": "LFO offset for Drifting Memory LPF Hz",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-11",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1448,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 18,
+                  "comment": "Effective Drifting Memory LPF Hz"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-12",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1486,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 16,
+                  "comment": "LFO offset for Drifting Memory BPM",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-12",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1486,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 19,
+                  "comment": "Effective Drifting Memory BPM"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-in-13",
+                  "maxclass": "inlet",
+                  "patching_rect": [
+                    1524,
+                    1020,
+                    30,
+                    30
+                  ],
+                  "numinlets": 0,
+                  "numoutlets": 1,
+                  "index": 17,
+                  "comment": "LFO offset for Drifting Memory Beats/bar",
+                  "outlettype": [
+                    "signal"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-out-13",
+                  "maxclass": "outlet",
+                  "patching_rect": [
+                    1524,
+                    1080,
+                    30,
+                    30
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "index": 20,
+                  "comment": "Effective Drifting Memory Beats/bar"
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-base-mix",
+                  "maxclass": "newobj",
+                  "patching_rect": [
+                    390,
+                    785,
+                    119,
+                    22
+                  ],
+                  "numinlets": 2,
+                  "numoutlets": 1,
+                  "text": "prepend return_mix",
+                  "outlettype": [
+                    ""
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "drift-mod-wet-gain",
+                  "maxclass": "newobj",
+                  "patching_rect": [
+                    390,
+                    863,
+                    45,
+                    22
+                  ],
+                  "numinlets": 2,
+                  "numoutlets": 1,
+                  "text": "*~",
+                  "outlettype": [
+                    "signal"
                   ]
                 }
               }
@@ -12892,54 +14208,6 @@
               {
                 "patchline": {
                   "source": [
-                    "drift-enable",
-                    0
-                  ],
-                  "destination": [
-                    "mix-state",
-                    0
-                  ]
-                }
-              },
-              {
-                "patchline": {
-                  "source": [
-                    "drift-mix",
-                    0
-                  ],
-                  "destination": [
-                    "mix-state",
-                    1
-                  ]
-                }
-              },
-              {
-                "patchline": {
-                  "source": [
-                    "mix-state",
-                    0
-                  ],
-                  "destination": [
-                    "wet-value",
-                    0
-                  ]
-                }
-              },
-              {
-                "patchline": {
-                  "source": [
-                    "wet-value",
-                    0
-                  ],
-                  "destination": [
-                    "wet-ramp",
-                    0
-                  ]
-                }
-              },
-              {
-                "patchline": {
-                  "source": [
                     "wet-ramp",
                     0
                   ],
@@ -12964,7 +14232,7 @@
               {
                 "patchline": {
                   "source": [
-                    "wet-gain",
+                    "drift-mod-wet-gain",
                     0
                   ],
                   "destination": [
@@ -13012,7 +14280,7 @@
               {
                 "patchline": {
                   "source": [
-                    "wet-gain",
+                    "drift-mod-wet-gain",
                     0
                   ],
                   "destination": [
@@ -13108,7 +14376,7 @@
               {
                 "patchline": {
                   "source": [
-                    "wet-gain",
+                    "drift-mod-wet-gain",
                     0
                   ],
                   "destination": [
@@ -13560,6 +14828,402 @@
                     0
                   ]
                 }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-0",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    2
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    4
+                  ],
+                  "destination": [
+                    "drift-mod-out-0",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-1",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    3
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    5
+                  ],
+                  "destination": [
+                    "drift-mod-out-1",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-2",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    4
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    6
+                  ],
+                  "destination": [
+                    "drift-mod-out-2",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-3",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    5
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    7
+                  ],
+                  "destination": [
+                    "drift-mod-out-3",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-4",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    6
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    8
+                  ],
+                  "destination": [
+                    "drift-mod-out-4",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-5",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    7
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    9
+                  ],
+                  "destination": [
+                    "drift-mod-out-5",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-6",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    8
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    10
+                  ],
+                  "destination": [
+                    "drift-mod-out-6",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-7",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    9
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    11
+                  ],
+                  "destination": [
+                    "drift-mod-out-7",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-8",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    10
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    12
+                  ],
+                  "destination": [
+                    "drift-mod-out-8",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-9",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    11
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    13
+                  ],
+                  "destination": [
+                    "drift-mod-out-9",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-10",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    12
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    14
+                  ],
+                  "destination": [
+                    "drift-mod-out-10",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-11",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    13
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    15
+                  ],
+                  "destination": [
+                    "drift-mod-out-11",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-12",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    14
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    16
+                  ],
+                  "destination": [
+                    "drift-mod-out-12",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-in-13",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    15
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    17
+                  ],
+                  "destination": [
+                    "drift-mod-out-13",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mix",
+                    0
+                  ],
+                  "destination": [
+                    "drift-mod-base-mix",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-mod-base-mix",
+                    0
+                  ],
+                  "destination": [
+                    "obj-33",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "drift-enable",
+                    0
+                  ],
+                  "destination": [
+                    "wet-ramp",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "wet-gain",
+                    0
+                  ],
+                  "destination": [
+                    "drift-mod-wet-gain",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-33",
+                    4
+                  ],
+                  "destination": [
+                    "drift-mod-wet-gain",
+                    1
+                  ]
+                }
               }
             ],
             "dependency_cache": [],
@@ -13591,7 +15255,21 @@
             "signal",
             "signal",
             "",
-            ""
+            "",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal"
           ],
           "presentation": 1,
           "presentation_rect": [
@@ -20367,15 +22045,37 @@
           "varname": "mod_signals",
           "maxclass": "newobj",
           "numinlets": 1,
-          "numoutlets": 44,
+          "numoutlets": 66,
           "patching_rect": [
             28,
             886,
             1016,
             22
           ],
-          "text": "mc.unpack~ 44",
+          "text": "mc.unpack~ 66",
           "outlettype": [
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
             "signal",
             "signal",
             "signal",
@@ -20428,7 +22128,7 @@
           "id": "obj-255",
           "varname": "watch_target",
           "maxclass": "newobj",
-          "numinlets": 45,
+          "numinlets": 67,
           "numoutlets": 1,
           "patching_rect": [
             1560,
@@ -20436,7 +22136,7 @@
             660,
             22
           ],
-          "text": "selector~ 44 1",
+          "text": "selector~ 66 1",
           "outlettype": [
             "signal"
           ]
@@ -22186,7 +23886,7 @@
       {
         "box": {
           "id": "obj-332",
-          "varname": "echo_send_1_gain",
+          "varname": "echo_send_1_base_gain",
           "maxclass": "newobj",
           "numinlets": 2,
           "numoutlets": 2,
@@ -22222,6 +23922,63 @@
       {
         "box": {
           "id": "obj-334",
+          "varname": "echo_send_1_mod",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            978,
+            110,
+            22
+          ],
+          "text": "slide~ 240 240",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-335",
+          "varname": "echo_send_1_sum",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1006,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-336",
+          "varname": "echo_send_1_gain",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1034,
+            89,
+            22
+          ],
+          "text": "clip~ 0. 1.",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-337",
           "varname": "echo_send_1_performance_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22237,7 +23994,7 @@
       },
       {
         "box": {
-          "id": "obj-335",
+          "id": "obj-338",
           "varname": "room_send_1",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -22271,7 +24028,7 @@
       },
       {
         "box": {
-          "id": "obj-336",
+          "id": "obj-339",
           "varname": "room_send_1_percent",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22287,7 +24044,7 @@
       },
       {
         "box": {
-          "id": "obj-337",
+          "id": "obj-340",
           "varname": "room_send_1_ramp",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22303,8 +24060,8 @@
       },
       {
         "box": {
-          "id": "obj-338",
-          "varname": "room_send_1_gain",
+          "id": "obj-341",
+          "varname": "room_send_1_base_gain",
           "maxclass": "newobj",
           "numinlets": 2,
           "numoutlets": 2,
@@ -22323,7 +24080,7 @@
       },
       {
         "box": {
-          "id": "obj-339",
+          "id": "obj-342",
           "varname": "room_send_1_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22339,7 +24096,64 @@
       },
       {
         "box": {
-          "id": "obj-340",
+          "id": "obj-343",
+          "varname": "room_send_1_mod",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            978,
+            110,
+            22
+          ],
+          "text": "slide~ 240 240",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-344",
+          "varname": "room_send_1_sum",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1006,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-345",
+          "varname": "room_send_1_gain",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1034,
+            89,
+            22
+          ],
+          "text": "clip~ 0. 1.",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-346",
           "varname": "room_send_1_performance_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22355,7 +24169,7 @@
       },
       {
         "box": {
-          "id": "obj-341",
+          "id": "obj-347",
           "varname": "mixer_gain_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22375,7 +24189,7 @@
       },
       {
         "box": {
-          "id": "obj-342",
+          "id": "obj-348",
           "varname": "peak_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22394,7 +24208,7 @@
       },
       {
         "box": {
-          "id": "obj-343",
+          "id": "obj-349",
           "varname": "mixer_left_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22413,7 +24227,7 @@
       },
       {
         "box": {
-          "id": "obj-344",
+          "id": "obj-350",
           "varname": "echo_send_left_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22432,7 +24246,7 @@
       },
       {
         "box": {
-          "id": "obj-345",
+          "id": "obj-351",
           "varname": "room_send_left_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22451,7 +24265,7 @@
       },
       {
         "box": {
-          "id": "obj-346",
+          "id": "obj-352",
           "varname": "abs_left_1",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -22470,7 +24284,7 @@
       },
       {
         "box": {
-          "id": "obj-347",
+          "id": "obj-353",
           "varname": "mixer_right_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22489,7 +24303,7 @@
       },
       {
         "box": {
-          "id": "obj-348",
+          "id": "obj-354",
           "varname": "echo_send_right_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22508,7 +24322,7 @@
       },
       {
         "box": {
-          "id": "obj-349",
+          "id": "obj-355",
           "varname": "room_send_right_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22527,7 +24341,7 @@
       },
       {
         "box": {
-          "id": "obj-350",
+          "id": "obj-356",
           "varname": "abs_right_1",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -22546,7 +24360,7 @@
       },
       {
         "box": {
-          "id": "obj-351",
+          "id": "obj-357",
           "varname": "track_wave_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22562,7 +24376,7 @@
       },
       {
         "box": {
-          "id": "obj-352",
+          "id": "obj-358",
           "varname": "wave_mouse_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22578,7 +24392,7 @@
       },
       {
         "box": {
-          "id": "obj-353",
+          "id": "obj-359",
           "varname": "edit_play_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22594,7 +24408,7 @@
       },
       {
         "box": {
-          "id": "obj-354",
+          "id": "obj-360",
           "varname": "playhead_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22613,7 +24427,7 @@
       },
       {
         "box": {
-          "id": "obj-355",
+          "id": "obj-361",
           "varname": "playhead_gate_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22629,7 +24443,7 @@
       },
       {
         "box": {
-          "id": "obj-356",
+          "id": "obj-362",
           "varname": "draw_playhead_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22645,7 +24459,7 @@
       },
       {
         "box": {
-          "id": "obj-357",
+          "id": "obj-363",
           "varname": "play_2",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -22693,7 +24507,7 @@
       },
       {
         "box": {
-          "id": "obj-358",
+          "id": "obj-364",
           "varname": "wave_2",
           "maxclass": "waveform~",
           "numinlets": 5,
@@ -22724,7 +24538,7 @@
       },
       {
         "box": {
-          "id": "obj-359",
+          "id": "obj-365",
           "varname": "voice_2",
           "maxclass": "newobj",
           "numinlets": 13,
@@ -22754,7 +24568,7 @@
       },
       {
         "box": {
-          "id": "obj-360",
+          "id": "obj-366",
           "varname": "run_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -22773,7 +24587,7 @@
       },
       {
         "box": {
-          "id": "obj-361",
+          "id": "obj-367",
           "varname": "wave_edit_revision_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -22792,7 +24606,7 @@
       },
       {
         "box": {
-          "id": "obj-362",
+          "id": "obj-368",
           "varname": "start_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -22826,7 +24640,7 @@
       },
       {
         "box": {
-          "id": "obj-363",
+          "id": "obj-369",
           "varname": "base_start_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -22845,7 +24659,7 @@
       },
       {
         "box": {
-          "id": "obj-364",
+          "id": "obj-370",
           "varname": "mod_start_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22864,7 +24678,7 @@
       },
       {
         "box": {
-          "id": "obj-365",
+          "id": "obj-371",
           "varname": "sum_start_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22883,7 +24697,7 @@
       },
       {
         "box": {
-          "id": "obj-366",
+          "id": "obj-372",
           "varname": "unit_start_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22902,7 +24716,7 @@
       },
       {
         "box": {
-          "id": "obj-367",
+          "id": "obj-373",
           "varname": "edit_start_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22918,7 +24732,7 @@
       },
       {
         "box": {
-          "id": "obj-368",
+          "id": "obj-374",
           "varname": "end_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -22952,7 +24766,7 @@
       },
       {
         "box": {
-          "id": "obj-369",
+          "id": "obj-375",
           "varname": "base_end_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -22971,7 +24785,7 @@
       },
       {
         "box": {
-          "id": "obj-370",
+          "id": "obj-376",
           "varname": "mod_end_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -22990,7 +24804,7 @@
       },
       {
         "box": {
-          "id": "obj-371",
+          "id": "obj-377",
           "varname": "sum_end_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23009,7 +24823,7 @@
       },
       {
         "box": {
-          "id": "obj-372",
+          "id": "obj-378",
           "varname": "unit_end_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23028,7 +24842,7 @@
       },
       {
         "box": {
-          "id": "obj-373",
+          "id": "obj-379",
           "varname": "edit_end_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23044,7 +24858,7 @@
       },
       {
         "box": {
-          "id": "obj-374",
+          "id": "obj-380",
           "varname": "rate_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -23078,7 +24892,7 @@
       },
       {
         "box": {
-          "id": "obj-375",
+          "id": "obj-381",
           "varname": "base_rate_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -23097,7 +24911,7 @@
       },
       {
         "box": {
-          "id": "obj-376",
+          "id": "obj-382",
           "varname": "mod_rate_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23116,7 +24930,7 @@
       },
       {
         "box": {
-          "id": "obj-377",
+          "id": "obj-383",
           "varname": "sum_rate_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23135,7 +24949,7 @@
       },
       {
         "box": {
-          "id": "obj-378",
+          "id": "obj-384",
           "varname": "clip_rate_2",
           "maxclass": "newobj",
           "numinlets": 3,
@@ -23154,7 +24968,7 @@
       },
       {
         "box": {
-          "id": "obj-379",
+          "id": "obj-385",
           "varname": "sync_rate_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23170,7 +24984,7 @@
       },
       {
         "box": {
-          "id": "obj-380",
+          "id": "obj-386",
           "varname": "direction_2",
           "maxclass": "live.menu",
           "numinlets": 1,
@@ -23210,7 +25024,7 @@
       },
       {
         "box": {
-          "id": "obj-381",
+          "id": "obj-387",
           "varname": "base_direction_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -23229,7 +25043,7 @@
       },
       {
         "box": {
-          "id": "obj-382",
+          "id": "obj-388",
           "varname": "mod_direction_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23248,7 +25062,7 @@
       },
       {
         "box": {
-          "id": "obj-383",
+          "id": "obj-389",
           "varname": "sum_direction_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23267,7 +25081,7 @@
       },
       {
         "box": {
-          "id": "obj-384",
+          "id": "obj-390",
           "varname": "sync_direction_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23283,7 +25097,7 @@
       },
       {
         "box": {
-          "id": "obj-385",
+          "id": "obj-391",
           "varname": "fade_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -23317,7 +25131,7 @@
       },
       {
         "box": {
-          "id": "obj-386",
+          "id": "obj-392",
           "varname": "base_fade_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -23336,7 +25150,7 @@
       },
       {
         "box": {
-          "id": "obj-387",
+          "id": "obj-393",
           "varname": "mod_fade_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23355,7 +25169,7 @@
       },
       {
         "box": {
-          "id": "obj-388",
+          "id": "obj-394",
           "varname": "sum_fade_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23374,7 +25188,7 @@
       },
       {
         "box": {
-          "id": "obj-389",
+          "id": "obj-395",
           "varname": "sync_fade_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23390,7 +25204,7 @@
       },
       {
         "box": {
-          "id": "obj-390",
+          "id": "obj-396",
           "varname": "drive_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -23424,7 +25238,7 @@
       },
       {
         "box": {
-          "id": "obj-391",
+          "id": "obj-397",
           "varname": "base_drive_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -23443,7 +25257,7 @@
       },
       {
         "box": {
-          "id": "obj-392",
+          "id": "obj-398",
           "varname": "mod_drive_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23462,7 +25276,7 @@
       },
       {
         "box": {
-          "id": "obj-393",
+          "id": "obj-399",
           "varname": "sum_drive_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23481,7 +25295,7 @@
       },
       {
         "box": {
-          "id": "obj-394",
+          "id": "obj-400",
           "varname": "unit_drive_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23500,7 +25314,7 @@
       },
       {
         "box": {
-          "id": "obj-395",
+          "id": "obj-401",
           "varname": "sync_drive_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23516,7 +25330,7 @@
       },
       {
         "box": {
-          "id": "obj-396",
+          "id": "obj-402",
           "varname": "filter_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -23550,7 +25364,7 @@
       },
       {
         "box": {
-          "id": "obj-397",
+          "id": "obj-403",
           "varname": "base_filter_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -23569,7 +25383,7 @@
       },
       {
         "box": {
-          "id": "obj-398",
+          "id": "obj-404",
           "varname": "mod_filter_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23588,7 +25402,7 @@
       },
       {
         "box": {
-          "id": "obj-399",
+          "id": "obj-405",
           "varname": "sum_filter_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23607,7 +25421,7 @@
       },
       {
         "box": {
-          "id": "obj-400",
+          "id": "obj-406",
           "varname": "unit_filter_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23626,7 +25440,7 @@
       },
       {
         "box": {
-          "id": "obj-401",
+          "id": "obj-407",
           "varname": "sync_filter_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23642,7 +25456,7 @@
       },
       {
         "box": {
-          "id": "obj-402",
+          "id": "obj-408",
           "varname": "level_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -23676,7 +25490,7 @@
       },
       {
         "box": {
-          "id": "obj-403",
+          "id": "obj-409",
           "varname": "base_level_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -23695,7 +25509,7 @@
       },
       {
         "box": {
-          "id": "obj-404",
+          "id": "obj-410",
           "varname": "mod_level_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23714,7 +25528,7 @@
       },
       {
         "box": {
-          "id": "obj-405",
+          "id": "obj-411",
           "varname": "sum_level_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23733,7 +25547,7 @@
       },
       {
         "box": {
-          "id": "obj-406",
+          "id": "obj-412",
           "varname": "unit_level_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23752,7 +25566,7 @@
       },
       {
         "box": {
-          "id": "obj-407",
+          "id": "obj-413",
           "varname": "sync_level_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23768,7 +25582,7 @@
       },
       {
         "box": {
-          "id": "obj-408",
+          "id": "obj-414",
           "varname": "pan_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -23802,7 +25616,7 @@
       },
       {
         "box": {
-          "id": "obj-409",
+          "id": "obj-415",
           "varname": "base_pan_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -23821,7 +25635,7 @@
       },
       {
         "box": {
-          "id": "obj-410",
+          "id": "obj-416",
           "varname": "mod_pan_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23840,7 +25654,7 @@
       },
       {
         "box": {
-          "id": "obj-411",
+          "id": "obj-417",
           "varname": "sum_pan_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23859,7 +25673,7 @@
       },
       {
         "box": {
-          "id": "obj-412",
+          "id": "obj-418",
           "varname": "unit_pan_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23878,7 +25692,7 @@
       },
       {
         "box": {
-          "id": "obj-413",
+          "id": "obj-419",
           "varname": "sync_pan_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -23894,7 +25708,7 @@
       },
       {
         "box": {
-          "id": "obj-414",
+          "id": "obj-420",
           "varname": "loop_edit_2",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -23949,7 +25763,7 @@
       },
       {
         "box": {
-          "id": "obj-415",
+          "id": "obj-421",
           "varname": "loop_edit_2_trigger",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -23968,7 +25782,7 @@
       },
       {
         "box": {
-          "id": "obj-416",
+          "id": "obj-422",
           "varname": "loop_edit_2_message",
           "maxclass": "message",
           "numinlets": 2,
@@ -23984,7 +25798,7 @@
       },
       {
         "box": {
-          "id": "obj-417",
+          "id": "obj-423",
           "varname": "mixer_mute_2",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -24015,7 +25829,7 @@
       },
       {
         "box": {
-          "id": "obj-418",
+          "id": "obj-424",
           "varname": "mixer_mute_2_msg",
           "maxclass": "message",
           "numinlets": 2,
@@ -24031,7 +25845,7 @@
       },
       {
         "box": {
-          "id": "obj-419",
+          "id": "obj-425",
           "varname": "mixer_solo_2",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -24062,7 +25876,7 @@
       },
       {
         "box": {
-          "id": "obj-420",
+          "id": "obj-426",
           "varname": "mixer_solo_2_msg",
           "maxclass": "message",
           "numinlets": 2,
@@ -24078,7 +25892,7 @@
       },
       {
         "box": {
-          "id": "obj-421",
+          "id": "obj-427",
           "varname": "mixer_pan_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -24120,7 +25934,7 @@
       },
       {
         "box": {
-          "id": "obj-422",
+          "id": "obj-428",
           "varname": "mixer_level_2",
           "maxclass": "live.slider",
           "numinlets": 1,
@@ -24166,7 +25980,7 @@
       },
       {
         "box": {
-          "id": "obj-423",
+          "id": "obj-429",
           "varname": "mixer_level_value_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -24209,7 +26023,7 @@
       },
       {
         "box": {
-          "id": "obj-424",
+          "id": "obj-430",
           "varname": "meter_2",
           "maxclass": "live.meter~",
           "numinlets": 1,
@@ -24237,7 +26051,7 @@
       },
       {
         "box": {
-          "id": "obj-425",
+          "id": "obj-431",
           "varname": "mixer_level_2_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24253,7 +26067,7 @@
       },
       {
         "box": {
-          "id": "obj-426",
+          "id": "obj-432",
           "varname": "mixer_pan_2_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24269,7 +26083,7 @@
       },
       {
         "box": {
-          "id": "obj-427",
+          "id": "obj-433",
           "varname": "echo_send_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -24303,7 +26117,7 @@
       },
       {
         "box": {
-          "id": "obj-428",
+          "id": "obj-434",
           "varname": "echo_send_2_percent",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24319,7 +26133,7 @@
       },
       {
         "box": {
-          "id": "obj-429",
+          "id": "obj-435",
           "varname": "echo_send_2_ramp",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24335,8 +26149,8 @@
       },
       {
         "box": {
-          "id": "obj-430",
-          "varname": "echo_send_2_gain",
+          "id": "obj-436",
+          "varname": "echo_send_2_base_gain",
           "maxclass": "newobj",
           "numinlets": 2,
           "numoutlets": 2,
@@ -24355,7 +26169,7 @@
       },
       {
         "box": {
-          "id": "obj-431",
+          "id": "obj-437",
           "varname": "echo_send_2_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24371,7 +26185,64 @@
       },
       {
         "box": {
-          "id": "obj-432",
+          "id": "obj-438",
+          "varname": "echo_send_2_mod",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1188,
+            110,
+            22
+          ],
+          "text": "slide~ 240 240",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-439",
+          "varname": "echo_send_2_sum",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1216,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-440",
+          "varname": "echo_send_2_gain",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1244,
+            89,
+            22
+          ],
+          "text": "clip~ 0. 1.",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-441",
           "varname": "echo_send_2_performance_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24387,7 +26258,7 @@
       },
       {
         "box": {
-          "id": "obj-433",
+          "id": "obj-442",
           "varname": "room_send_2",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -24421,7 +26292,7 @@
       },
       {
         "box": {
-          "id": "obj-434",
+          "id": "obj-443",
           "varname": "room_send_2_percent",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24437,7 +26308,7 @@
       },
       {
         "box": {
-          "id": "obj-435",
+          "id": "obj-444",
           "varname": "room_send_2_ramp",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24453,8 +26324,8 @@
       },
       {
         "box": {
-          "id": "obj-436",
-          "varname": "room_send_2_gain",
+          "id": "obj-445",
+          "varname": "room_send_2_base_gain",
           "maxclass": "newobj",
           "numinlets": 2,
           "numoutlets": 2,
@@ -24473,7 +26344,7 @@
       },
       {
         "box": {
-          "id": "obj-437",
+          "id": "obj-446",
           "varname": "room_send_2_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24489,7 +26360,64 @@
       },
       {
         "box": {
-          "id": "obj-438",
+          "id": "obj-447",
+          "varname": "room_send_2_mod",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1188,
+            110,
+            22
+          ],
+          "text": "slide~ 240 240",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-448",
+          "varname": "room_send_2_sum",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1216,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-449",
+          "varname": "room_send_2_gain",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1244,
+            89,
+            22
+          ],
+          "text": "clip~ 0. 1.",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-450",
           "varname": "room_send_2_performance_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24505,7 +26433,7 @@
       },
       {
         "box": {
-          "id": "obj-439",
+          "id": "obj-451",
           "varname": "mixer_gain_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24525,7 +26453,7 @@
       },
       {
         "box": {
-          "id": "obj-440",
+          "id": "obj-452",
           "varname": "peak_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24544,7 +26472,7 @@
       },
       {
         "box": {
-          "id": "obj-441",
+          "id": "obj-453",
           "varname": "mixer_left_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24563,7 +26491,7 @@
       },
       {
         "box": {
-          "id": "obj-442",
+          "id": "obj-454",
           "varname": "echo_send_left_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24582,7 +26510,7 @@
       },
       {
         "box": {
-          "id": "obj-443",
+          "id": "obj-455",
           "varname": "room_send_left_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24601,7 +26529,7 @@
       },
       {
         "box": {
-          "id": "obj-444",
+          "id": "obj-456",
           "varname": "abs_left_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -24620,7 +26548,7 @@
       },
       {
         "box": {
-          "id": "obj-445",
+          "id": "obj-457",
           "varname": "mixer_right_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24639,7 +26567,7 @@
       },
       {
         "box": {
-          "id": "obj-446",
+          "id": "obj-458",
           "varname": "echo_send_right_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24658,7 +26586,7 @@
       },
       {
         "box": {
-          "id": "obj-447",
+          "id": "obj-459",
           "varname": "room_send_right_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24677,7 +26605,7 @@
       },
       {
         "box": {
-          "id": "obj-448",
+          "id": "obj-460",
           "varname": "abs_right_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -24696,7 +26624,7 @@
       },
       {
         "box": {
-          "id": "obj-449",
+          "id": "obj-461",
           "varname": "track_wave_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24712,7 +26640,7 @@
       },
       {
         "box": {
-          "id": "obj-450",
+          "id": "obj-462",
           "varname": "wave_mouse_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24728,7 +26656,7 @@
       },
       {
         "box": {
-          "id": "obj-451",
+          "id": "obj-463",
           "varname": "edit_play_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24744,7 +26672,7 @@
       },
       {
         "box": {
-          "id": "obj-452",
+          "id": "obj-464",
           "varname": "playhead_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24763,7 +26691,7 @@
       },
       {
         "box": {
-          "id": "obj-453",
+          "id": "obj-465",
           "varname": "playhead_gate_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24779,7 +26707,7 @@
       },
       {
         "box": {
-          "id": "obj-454",
+          "id": "obj-466",
           "varname": "draw_playhead_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -24795,7 +26723,7 @@
       },
       {
         "box": {
-          "id": "obj-455",
+          "id": "obj-467",
           "varname": "play_3",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -24843,7 +26771,7 @@
       },
       {
         "box": {
-          "id": "obj-456",
+          "id": "obj-468",
           "varname": "wave_3",
           "maxclass": "waveform~",
           "numinlets": 5,
@@ -24874,7 +26802,7 @@
       },
       {
         "box": {
-          "id": "obj-457",
+          "id": "obj-469",
           "varname": "voice_3",
           "maxclass": "newobj",
           "numinlets": 13,
@@ -24904,7 +26832,7 @@
       },
       {
         "box": {
-          "id": "obj-458",
+          "id": "obj-470",
           "varname": "run_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -24923,7 +26851,7 @@
       },
       {
         "box": {
-          "id": "obj-459",
+          "id": "obj-471",
           "varname": "wave_edit_revision_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -24942,7 +26870,7 @@
       },
       {
         "box": {
-          "id": "obj-460",
+          "id": "obj-472",
           "varname": "start_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -24976,7 +26904,7 @@
       },
       {
         "box": {
-          "id": "obj-461",
+          "id": "obj-473",
           "varname": "base_start_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -24995,7 +26923,7 @@
       },
       {
         "box": {
-          "id": "obj-462",
+          "id": "obj-474",
           "varname": "mod_start_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25014,7 +26942,7 @@
       },
       {
         "box": {
-          "id": "obj-463",
+          "id": "obj-475",
           "varname": "sum_start_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25033,7 +26961,7 @@
       },
       {
         "box": {
-          "id": "obj-464",
+          "id": "obj-476",
           "varname": "unit_start_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25052,7 +26980,7 @@
       },
       {
         "box": {
-          "id": "obj-465",
+          "id": "obj-477",
           "varname": "edit_start_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25068,7 +26996,7 @@
       },
       {
         "box": {
-          "id": "obj-466",
+          "id": "obj-478",
           "varname": "end_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -25102,7 +27030,7 @@
       },
       {
         "box": {
-          "id": "obj-467",
+          "id": "obj-479",
           "varname": "base_end_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -25121,7 +27049,7 @@
       },
       {
         "box": {
-          "id": "obj-468",
+          "id": "obj-480",
           "varname": "mod_end_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25140,7 +27068,7 @@
       },
       {
         "box": {
-          "id": "obj-469",
+          "id": "obj-481",
           "varname": "sum_end_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25159,7 +27087,7 @@
       },
       {
         "box": {
-          "id": "obj-470",
+          "id": "obj-482",
           "varname": "unit_end_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25178,7 +27106,7 @@
       },
       {
         "box": {
-          "id": "obj-471",
+          "id": "obj-483",
           "varname": "edit_end_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25194,7 +27122,7 @@
       },
       {
         "box": {
-          "id": "obj-472",
+          "id": "obj-484",
           "varname": "rate_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -25228,7 +27156,7 @@
       },
       {
         "box": {
-          "id": "obj-473",
+          "id": "obj-485",
           "varname": "base_rate_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -25247,7 +27175,7 @@
       },
       {
         "box": {
-          "id": "obj-474",
+          "id": "obj-486",
           "varname": "mod_rate_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25266,7 +27194,7 @@
       },
       {
         "box": {
-          "id": "obj-475",
+          "id": "obj-487",
           "varname": "sum_rate_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25285,7 +27213,7 @@
       },
       {
         "box": {
-          "id": "obj-476",
+          "id": "obj-488",
           "varname": "clip_rate_3",
           "maxclass": "newobj",
           "numinlets": 3,
@@ -25304,7 +27232,7 @@
       },
       {
         "box": {
-          "id": "obj-477",
+          "id": "obj-489",
           "varname": "sync_rate_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25320,7 +27248,7 @@
       },
       {
         "box": {
-          "id": "obj-478",
+          "id": "obj-490",
           "varname": "direction_3",
           "maxclass": "live.menu",
           "numinlets": 1,
@@ -25360,7 +27288,7 @@
       },
       {
         "box": {
-          "id": "obj-479",
+          "id": "obj-491",
           "varname": "base_direction_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -25379,7 +27307,7 @@
       },
       {
         "box": {
-          "id": "obj-480",
+          "id": "obj-492",
           "varname": "mod_direction_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25398,7 +27326,7 @@
       },
       {
         "box": {
-          "id": "obj-481",
+          "id": "obj-493",
           "varname": "sum_direction_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25417,7 +27345,7 @@
       },
       {
         "box": {
-          "id": "obj-482",
+          "id": "obj-494",
           "varname": "sync_direction_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25433,7 +27361,7 @@
       },
       {
         "box": {
-          "id": "obj-483",
+          "id": "obj-495",
           "varname": "fade_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -25467,7 +27395,7 @@
       },
       {
         "box": {
-          "id": "obj-484",
+          "id": "obj-496",
           "varname": "base_fade_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -25486,7 +27414,7 @@
       },
       {
         "box": {
-          "id": "obj-485",
+          "id": "obj-497",
           "varname": "mod_fade_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25505,7 +27433,7 @@
       },
       {
         "box": {
-          "id": "obj-486",
+          "id": "obj-498",
           "varname": "sum_fade_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25524,7 +27452,7 @@
       },
       {
         "box": {
-          "id": "obj-487",
+          "id": "obj-499",
           "varname": "sync_fade_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25540,7 +27468,7 @@
       },
       {
         "box": {
-          "id": "obj-488",
+          "id": "obj-500",
           "varname": "drive_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -25574,7 +27502,7 @@
       },
       {
         "box": {
-          "id": "obj-489",
+          "id": "obj-501",
           "varname": "base_drive_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -25593,7 +27521,7 @@
       },
       {
         "box": {
-          "id": "obj-490",
+          "id": "obj-502",
           "varname": "mod_drive_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25612,7 +27540,7 @@
       },
       {
         "box": {
-          "id": "obj-491",
+          "id": "obj-503",
           "varname": "sum_drive_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25631,7 +27559,7 @@
       },
       {
         "box": {
-          "id": "obj-492",
+          "id": "obj-504",
           "varname": "unit_drive_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25650,7 +27578,7 @@
       },
       {
         "box": {
-          "id": "obj-493",
+          "id": "obj-505",
           "varname": "sync_drive_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25666,7 +27594,7 @@
       },
       {
         "box": {
-          "id": "obj-494",
+          "id": "obj-506",
           "varname": "filter_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -25700,7 +27628,7 @@
       },
       {
         "box": {
-          "id": "obj-495",
+          "id": "obj-507",
           "varname": "base_filter_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -25719,7 +27647,7 @@
       },
       {
         "box": {
-          "id": "obj-496",
+          "id": "obj-508",
           "varname": "mod_filter_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25738,7 +27666,7 @@
       },
       {
         "box": {
-          "id": "obj-497",
+          "id": "obj-509",
           "varname": "sum_filter_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25757,7 +27685,7 @@
       },
       {
         "box": {
-          "id": "obj-498",
+          "id": "obj-510",
           "varname": "unit_filter_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25776,7 +27704,7 @@
       },
       {
         "box": {
-          "id": "obj-499",
+          "id": "obj-511",
           "varname": "sync_filter_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25792,7 +27720,7 @@
       },
       {
         "box": {
-          "id": "obj-500",
+          "id": "obj-512",
           "varname": "level_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -25826,7 +27754,7 @@
       },
       {
         "box": {
-          "id": "obj-501",
+          "id": "obj-513",
           "varname": "base_level_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -25845,7 +27773,7 @@
       },
       {
         "box": {
-          "id": "obj-502",
+          "id": "obj-514",
           "varname": "mod_level_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25864,7 +27792,7 @@
       },
       {
         "box": {
-          "id": "obj-503",
+          "id": "obj-515",
           "varname": "sum_level_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25883,7 +27811,7 @@
       },
       {
         "box": {
-          "id": "obj-504",
+          "id": "obj-516",
           "varname": "unit_level_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25902,7 +27830,7 @@
       },
       {
         "box": {
-          "id": "obj-505",
+          "id": "obj-517",
           "varname": "sync_level_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25918,7 +27846,7 @@
       },
       {
         "box": {
-          "id": "obj-506",
+          "id": "obj-518",
           "varname": "pan_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -25952,7 +27880,7 @@
       },
       {
         "box": {
-          "id": "obj-507",
+          "id": "obj-519",
           "varname": "base_pan_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -25971,7 +27899,7 @@
       },
       {
         "box": {
-          "id": "obj-508",
+          "id": "obj-520",
           "varname": "mod_pan_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -25990,7 +27918,7 @@
       },
       {
         "box": {
-          "id": "obj-509",
+          "id": "obj-521",
           "varname": "sum_pan_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26009,7 +27937,7 @@
       },
       {
         "box": {
-          "id": "obj-510",
+          "id": "obj-522",
           "varname": "unit_pan_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26028,7 +27956,7 @@
       },
       {
         "box": {
-          "id": "obj-511",
+          "id": "obj-523",
           "varname": "sync_pan_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26044,7 +27972,7 @@
       },
       {
         "box": {
-          "id": "obj-512",
+          "id": "obj-524",
           "varname": "loop_edit_3",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -26099,7 +28027,7 @@
       },
       {
         "box": {
-          "id": "obj-513",
+          "id": "obj-525",
           "varname": "loop_edit_3_trigger",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -26118,7 +28046,7 @@
       },
       {
         "box": {
-          "id": "obj-514",
+          "id": "obj-526",
           "varname": "loop_edit_3_message",
           "maxclass": "message",
           "numinlets": 2,
@@ -26134,7 +28062,7 @@
       },
       {
         "box": {
-          "id": "obj-515",
+          "id": "obj-527",
           "varname": "mixer_mute_3",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -26165,7 +28093,7 @@
       },
       {
         "box": {
-          "id": "obj-516",
+          "id": "obj-528",
           "varname": "mixer_mute_3_msg",
           "maxclass": "message",
           "numinlets": 2,
@@ -26181,7 +28109,7 @@
       },
       {
         "box": {
-          "id": "obj-517",
+          "id": "obj-529",
           "varname": "mixer_solo_3",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -26212,7 +28140,7 @@
       },
       {
         "box": {
-          "id": "obj-518",
+          "id": "obj-530",
           "varname": "mixer_solo_3_msg",
           "maxclass": "message",
           "numinlets": 2,
@@ -26228,7 +28156,7 @@
       },
       {
         "box": {
-          "id": "obj-519",
+          "id": "obj-531",
           "varname": "mixer_pan_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -26270,7 +28198,7 @@
       },
       {
         "box": {
-          "id": "obj-520",
+          "id": "obj-532",
           "varname": "mixer_level_3",
           "maxclass": "live.slider",
           "numinlets": 1,
@@ -26316,7 +28244,7 @@
       },
       {
         "box": {
-          "id": "obj-521",
+          "id": "obj-533",
           "varname": "mixer_level_value_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -26359,7 +28287,7 @@
       },
       {
         "box": {
-          "id": "obj-522",
+          "id": "obj-534",
           "varname": "meter_3",
           "maxclass": "live.meter~",
           "numinlets": 1,
@@ -26387,7 +28315,7 @@
       },
       {
         "box": {
-          "id": "obj-523",
+          "id": "obj-535",
           "varname": "mixer_level_3_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26403,7 +28331,7 @@
       },
       {
         "box": {
-          "id": "obj-524",
+          "id": "obj-536",
           "varname": "mixer_pan_3_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26419,7 +28347,7 @@
       },
       {
         "box": {
-          "id": "obj-525",
+          "id": "obj-537",
           "varname": "echo_send_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -26453,7 +28381,7 @@
       },
       {
         "box": {
-          "id": "obj-526",
+          "id": "obj-538",
           "varname": "echo_send_3_percent",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26469,7 +28397,7 @@
       },
       {
         "box": {
-          "id": "obj-527",
+          "id": "obj-539",
           "varname": "echo_send_3_ramp",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26485,8 +28413,8 @@
       },
       {
         "box": {
-          "id": "obj-528",
-          "varname": "echo_send_3_gain",
+          "id": "obj-540",
+          "varname": "echo_send_3_base_gain",
           "maxclass": "newobj",
           "numinlets": 2,
           "numoutlets": 2,
@@ -26505,7 +28433,7 @@
       },
       {
         "box": {
-          "id": "obj-529",
+          "id": "obj-541",
           "varname": "echo_send_3_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26521,7 +28449,64 @@
       },
       {
         "box": {
-          "id": "obj-530",
+          "id": "obj-542",
+          "varname": "echo_send_3_mod",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1398,
+            110,
+            22
+          ],
+          "text": "slide~ 240 240",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-543",
+          "varname": "echo_send_3_sum",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1426,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-544",
+          "varname": "echo_send_3_gain",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1454,
+            89,
+            22
+          ],
+          "text": "clip~ 0. 1.",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-545",
           "varname": "echo_send_3_performance_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26537,7 +28522,7 @@
       },
       {
         "box": {
-          "id": "obj-531",
+          "id": "obj-546",
           "varname": "room_send_3",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -26571,7 +28556,7 @@
       },
       {
         "box": {
-          "id": "obj-532",
+          "id": "obj-547",
           "varname": "room_send_3_percent",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26587,7 +28572,7 @@
       },
       {
         "box": {
-          "id": "obj-533",
+          "id": "obj-548",
           "varname": "room_send_3_ramp",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26603,8 +28588,8 @@
       },
       {
         "box": {
-          "id": "obj-534",
-          "varname": "room_send_3_gain",
+          "id": "obj-549",
+          "varname": "room_send_3_base_gain",
           "maxclass": "newobj",
           "numinlets": 2,
           "numoutlets": 2,
@@ -26623,7 +28608,7 @@
       },
       {
         "box": {
-          "id": "obj-535",
+          "id": "obj-550",
           "varname": "room_send_3_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26639,7 +28624,64 @@
       },
       {
         "box": {
-          "id": "obj-536",
+          "id": "obj-551",
+          "varname": "room_send_3_mod",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1398,
+            110,
+            22
+          ],
+          "text": "slide~ 240 240",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-552",
+          "varname": "room_send_3_sum",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1426,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-553",
+          "varname": "room_send_3_gain",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1454,
+            89,
+            22
+          ],
+          "text": "clip~ 0. 1.",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-554",
           "varname": "room_send_3_performance_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26655,7 +28697,7 @@
       },
       {
         "box": {
-          "id": "obj-537",
+          "id": "obj-555",
           "varname": "mixer_gain_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26675,7 +28717,7 @@
       },
       {
         "box": {
-          "id": "obj-538",
+          "id": "obj-556",
           "varname": "peak_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26694,7 +28736,7 @@
       },
       {
         "box": {
-          "id": "obj-539",
+          "id": "obj-557",
           "varname": "mixer_left_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26713,7 +28755,7 @@
       },
       {
         "box": {
-          "id": "obj-540",
+          "id": "obj-558",
           "varname": "echo_send_left_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26732,7 +28774,7 @@
       },
       {
         "box": {
-          "id": "obj-541",
+          "id": "obj-559",
           "varname": "room_send_left_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26751,7 +28793,7 @@
       },
       {
         "box": {
-          "id": "obj-542",
+          "id": "obj-560",
           "varname": "abs_left_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -26770,7 +28812,7 @@
       },
       {
         "box": {
-          "id": "obj-543",
+          "id": "obj-561",
           "varname": "mixer_right_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26789,7 +28831,7 @@
       },
       {
         "box": {
-          "id": "obj-544",
+          "id": "obj-562",
           "varname": "echo_send_right_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26808,7 +28850,7 @@
       },
       {
         "box": {
-          "id": "obj-545",
+          "id": "obj-563",
           "varname": "room_send_right_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26827,7 +28869,7 @@
       },
       {
         "box": {
-          "id": "obj-546",
+          "id": "obj-564",
           "varname": "abs_right_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -26846,7 +28888,7 @@
       },
       {
         "box": {
-          "id": "obj-547",
+          "id": "obj-565",
           "varname": "track_wave_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26862,7 +28904,7 @@
       },
       {
         "box": {
-          "id": "obj-548",
+          "id": "obj-566",
           "varname": "wave_mouse_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26878,7 +28920,7 @@
       },
       {
         "box": {
-          "id": "obj-549",
+          "id": "obj-567",
           "varname": "edit_play_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26894,7 +28936,7 @@
       },
       {
         "box": {
-          "id": "obj-550",
+          "id": "obj-568",
           "varname": "playhead_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26913,7 +28955,7 @@
       },
       {
         "box": {
-          "id": "obj-551",
+          "id": "obj-569",
           "varname": "playhead_gate_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26929,7 +28971,7 @@
       },
       {
         "box": {
-          "id": "obj-552",
+          "id": "obj-570",
           "varname": "draw_playhead_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -26945,7 +28987,7 @@
       },
       {
         "box": {
-          "id": "obj-553",
+          "id": "obj-571",
           "varname": "play_4",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -26993,7 +29035,7 @@
       },
       {
         "box": {
-          "id": "obj-554",
+          "id": "obj-572",
           "varname": "wave_4",
           "maxclass": "waveform~",
           "numinlets": 5,
@@ -27024,7 +29066,7 @@
       },
       {
         "box": {
-          "id": "obj-555",
+          "id": "obj-573",
           "varname": "voice_4",
           "maxclass": "newobj",
           "numinlets": 13,
@@ -27054,7 +29096,7 @@
       },
       {
         "box": {
-          "id": "obj-556",
+          "id": "obj-574",
           "varname": "run_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27073,7 +29115,7 @@
       },
       {
         "box": {
-          "id": "obj-557",
+          "id": "obj-575",
           "varname": "wave_edit_revision_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27092,7 +29134,7 @@
       },
       {
         "box": {
-          "id": "obj-558",
+          "id": "obj-576",
           "varname": "start_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -27126,7 +29168,7 @@
       },
       {
         "box": {
-          "id": "obj-559",
+          "id": "obj-577",
           "varname": "base_start_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27145,7 +29187,7 @@
       },
       {
         "box": {
-          "id": "obj-560",
+          "id": "obj-578",
           "varname": "mod_start_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27164,7 +29206,7 @@
       },
       {
         "box": {
-          "id": "obj-561",
+          "id": "obj-579",
           "varname": "sum_start_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27183,7 +29225,7 @@
       },
       {
         "box": {
-          "id": "obj-562",
+          "id": "obj-580",
           "varname": "unit_start_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27202,7 +29244,7 @@
       },
       {
         "box": {
-          "id": "obj-563",
+          "id": "obj-581",
           "varname": "edit_start_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27218,7 +29260,7 @@
       },
       {
         "box": {
-          "id": "obj-564",
+          "id": "obj-582",
           "varname": "end_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -27252,7 +29294,7 @@
       },
       {
         "box": {
-          "id": "obj-565",
+          "id": "obj-583",
           "varname": "base_end_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27271,7 +29313,7 @@
       },
       {
         "box": {
-          "id": "obj-566",
+          "id": "obj-584",
           "varname": "mod_end_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27290,7 +29332,7 @@
       },
       {
         "box": {
-          "id": "obj-567",
+          "id": "obj-585",
           "varname": "sum_end_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27309,7 +29351,7 @@
       },
       {
         "box": {
-          "id": "obj-568",
+          "id": "obj-586",
           "varname": "unit_end_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27328,7 +29370,7 @@
       },
       {
         "box": {
-          "id": "obj-569",
+          "id": "obj-587",
           "varname": "edit_end_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27344,7 +29386,7 @@
       },
       {
         "box": {
-          "id": "obj-570",
+          "id": "obj-588",
           "varname": "rate_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -27378,7 +29420,7 @@
       },
       {
         "box": {
-          "id": "obj-571",
+          "id": "obj-589",
           "varname": "base_rate_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27397,7 +29439,7 @@
       },
       {
         "box": {
-          "id": "obj-572",
+          "id": "obj-590",
           "varname": "mod_rate_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27416,7 +29458,7 @@
       },
       {
         "box": {
-          "id": "obj-573",
+          "id": "obj-591",
           "varname": "sum_rate_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27435,7 +29477,7 @@
       },
       {
         "box": {
-          "id": "obj-574",
+          "id": "obj-592",
           "varname": "clip_rate_4",
           "maxclass": "newobj",
           "numinlets": 3,
@@ -27454,7 +29496,7 @@
       },
       {
         "box": {
-          "id": "obj-575",
+          "id": "obj-593",
           "varname": "sync_rate_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27470,7 +29512,7 @@
       },
       {
         "box": {
-          "id": "obj-576",
+          "id": "obj-594",
           "varname": "direction_4",
           "maxclass": "live.menu",
           "numinlets": 1,
@@ -27510,7 +29552,7 @@
       },
       {
         "box": {
-          "id": "obj-577",
+          "id": "obj-595",
           "varname": "base_direction_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27529,7 +29571,7 @@
       },
       {
         "box": {
-          "id": "obj-578",
+          "id": "obj-596",
           "varname": "mod_direction_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27548,7 +29590,7 @@
       },
       {
         "box": {
-          "id": "obj-579",
+          "id": "obj-597",
           "varname": "sum_direction_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27567,7 +29609,7 @@
       },
       {
         "box": {
-          "id": "obj-580",
+          "id": "obj-598",
           "varname": "sync_direction_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27583,7 +29625,7 @@
       },
       {
         "box": {
-          "id": "obj-581",
+          "id": "obj-599",
           "varname": "fade_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -27617,7 +29659,7 @@
       },
       {
         "box": {
-          "id": "obj-582",
+          "id": "obj-600",
           "varname": "base_fade_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27636,7 +29678,7 @@
       },
       {
         "box": {
-          "id": "obj-583",
+          "id": "obj-601",
           "varname": "mod_fade_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27655,7 +29697,7 @@
       },
       {
         "box": {
-          "id": "obj-584",
+          "id": "obj-602",
           "varname": "sum_fade_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27674,7 +29716,7 @@
       },
       {
         "box": {
-          "id": "obj-585",
+          "id": "obj-603",
           "varname": "sync_fade_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27690,7 +29732,7 @@
       },
       {
         "box": {
-          "id": "obj-586",
+          "id": "obj-604",
           "varname": "drive_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -27724,7 +29766,7 @@
       },
       {
         "box": {
-          "id": "obj-587",
+          "id": "obj-605",
           "varname": "base_drive_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27743,7 +29785,7 @@
       },
       {
         "box": {
-          "id": "obj-588",
+          "id": "obj-606",
           "varname": "mod_drive_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27762,7 +29804,7 @@
       },
       {
         "box": {
-          "id": "obj-589",
+          "id": "obj-607",
           "varname": "sum_drive_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27781,7 +29823,7 @@
       },
       {
         "box": {
-          "id": "obj-590",
+          "id": "obj-608",
           "varname": "unit_drive_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27800,7 +29842,7 @@
       },
       {
         "box": {
-          "id": "obj-591",
+          "id": "obj-609",
           "varname": "sync_drive_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27816,7 +29858,7 @@
       },
       {
         "box": {
-          "id": "obj-592",
+          "id": "obj-610",
           "varname": "filter_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -27850,7 +29892,7 @@
       },
       {
         "box": {
-          "id": "obj-593",
+          "id": "obj-611",
           "varname": "base_filter_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27869,7 +29911,7 @@
       },
       {
         "box": {
-          "id": "obj-594",
+          "id": "obj-612",
           "varname": "mod_filter_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27888,7 +29930,7 @@
       },
       {
         "box": {
-          "id": "obj-595",
+          "id": "obj-613",
           "varname": "sum_filter_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27907,7 +29949,7 @@
       },
       {
         "box": {
-          "id": "obj-596",
+          "id": "obj-614",
           "varname": "unit_filter_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27926,7 +29968,7 @@
       },
       {
         "box": {
-          "id": "obj-597",
+          "id": "obj-615",
           "varname": "sync_filter_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -27942,7 +29984,7 @@
       },
       {
         "box": {
-          "id": "obj-598",
+          "id": "obj-616",
           "varname": "level_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -27976,7 +30018,7 @@
       },
       {
         "box": {
-          "id": "obj-599",
+          "id": "obj-617",
           "varname": "base_level_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -27995,7 +30037,7 @@
       },
       {
         "box": {
-          "id": "obj-600",
+          "id": "obj-618",
           "varname": "mod_level_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28014,7 +30056,7 @@
       },
       {
         "box": {
-          "id": "obj-601",
+          "id": "obj-619",
           "varname": "sum_level_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28033,7 +30075,7 @@
       },
       {
         "box": {
-          "id": "obj-602",
+          "id": "obj-620",
           "varname": "unit_level_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28052,7 +30094,7 @@
       },
       {
         "box": {
-          "id": "obj-603",
+          "id": "obj-621",
           "varname": "sync_level_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28068,7 +30110,7 @@
       },
       {
         "box": {
-          "id": "obj-604",
+          "id": "obj-622",
           "varname": "pan_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -28102,7 +30144,7 @@
       },
       {
         "box": {
-          "id": "obj-605",
+          "id": "obj-623",
           "varname": "base_pan_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -28121,7 +30163,7 @@
       },
       {
         "box": {
-          "id": "obj-606",
+          "id": "obj-624",
           "varname": "mod_pan_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28140,7 +30182,7 @@
       },
       {
         "box": {
-          "id": "obj-607",
+          "id": "obj-625",
           "varname": "sum_pan_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28159,7 +30201,7 @@
       },
       {
         "box": {
-          "id": "obj-608",
+          "id": "obj-626",
           "varname": "unit_pan_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28178,7 +30220,7 @@
       },
       {
         "box": {
-          "id": "obj-609",
+          "id": "obj-627",
           "varname": "sync_pan_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28194,7 +30236,7 @@
       },
       {
         "box": {
-          "id": "obj-610",
+          "id": "obj-628",
           "varname": "loop_edit_4",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -28249,7 +30291,7 @@
       },
       {
         "box": {
-          "id": "obj-611",
+          "id": "obj-629",
           "varname": "loop_edit_4_trigger",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -28268,7 +30310,7 @@
       },
       {
         "box": {
-          "id": "obj-612",
+          "id": "obj-630",
           "varname": "loop_edit_4_message",
           "maxclass": "message",
           "numinlets": 2,
@@ -28284,7 +30326,7 @@
       },
       {
         "box": {
-          "id": "obj-613",
+          "id": "obj-631",
           "varname": "mixer_mute_4",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -28315,7 +30357,7 @@
       },
       {
         "box": {
-          "id": "obj-614",
+          "id": "obj-632",
           "varname": "mixer_mute_4_msg",
           "maxclass": "message",
           "numinlets": 2,
@@ -28331,7 +30373,7 @@
       },
       {
         "box": {
-          "id": "obj-615",
+          "id": "obj-633",
           "varname": "mixer_solo_4",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -28362,7 +30404,7 @@
       },
       {
         "box": {
-          "id": "obj-616",
+          "id": "obj-634",
           "varname": "mixer_solo_4_msg",
           "maxclass": "message",
           "numinlets": 2,
@@ -28378,7 +30420,7 @@
       },
       {
         "box": {
-          "id": "obj-617",
+          "id": "obj-635",
           "varname": "mixer_pan_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -28420,7 +30462,7 @@
       },
       {
         "box": {
-          "id": "obj-618",
+          "id": "obj-636",
           "varname": "mixer_level_4",
           "maxclass": "live.slider",
           "numinlets": 1,
@@ -28466,7 +30508,7 @@
       },
       {
         "box": {
-          "id": "obj-619",
+          "id": "obj-637",
           "varname": "mixer_level_value_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -28509,7 +30551,7 @@
       },
       {
         "box": {
-          "id": "obj-620",
+          "id": "obj-638",
           "varname": "meter_4",
           "maxclass": "live.meter~",
           "numinlets": 1,
@@ -28537,7 +30579,7 @@
       },
       {
         "box": {
-          "id": "obj-621",
+          "id": "obj-639",
           "varname": "mixer_level_4_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28553,7 +30595,7 @@
       },
       {
         "box": {
-          "id": "obj-622",
+          "id": "obj-640",
           "varname": "mixer_pan_4_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28569,7 +30611,7 @@
       },
       {
         "box": {
-          "id": "obj-623",
+          "id": "obj-641",
           "varname": "echo_send_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -28603,7 +30645,7 @@
       },
       {
         "box": {
-          "id": "obj-624",
+          "id": "obj-642",
           "varname": "echo_send_4_percent",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28619,7 +30661,7 @@
       },
       {
         "box": {
-          "id": "obj-625",
+          "id": "obj-643",
           "varname": "echo_send_4_ramp",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28635,8 +30677,8 @@
       },
       {
         "box": {
-          "id": "obj-626",
-          "varname": "echo_send_4_gain",
+          "id": "obj-644",
+          "varname": "echo_send_4_base_gain",
           "maxclass": "newobj",
           "numinlets": 2,
           "numoutlets": 2,
@@ -28655,7 +30697,7 @@
       },
       {
         "box": {
-          "id": "obj-627",
+          "id": "obj-645",
           "varname": "echo_send_4_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28671,7 +30713,64 @@
       },
       {
         "box": {
-          "id": "obj-628",
+          "id": "obj-646",
+          "varname": "echo_send_4_mod",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1608,
+            110,
+            22
+          ],
+          "text": "slide~ 240 240",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-647",
+          "varname": "echo_send_4_sum",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1636,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-648",
+          "varname": "echo_send_4_gain",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3860,
+            1664,
+            89,
+            22
+          ],
+          "text": "clip~ 0. 1.",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-649",
           "varname": "echo_send_4_performance_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28687,7 +30786,7 @@
       },
       {
         "box": {
-          "id": "obj-629",
+          "id": "obj-650",
           "varname": "room_send_4",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -28721,7 +30820,7 @@
       },
       {
         "box": {
-          "id": "obj-630",
+          "id": "obj-651",
           "varname": "room_send_4_percent",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28737,7 +30836,7 @@
       },
       {
         "box": {
-          "id": "obj-631",
+          "id": "obj-652",
           "varname": "room_send_4_ramp",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28753,8 +30852,8 @@
       },
       {
         "box": {
-          "id": "obj-632",
-          "varname": "room_send_4_gain",
+          "id": "obj-653",
+          "varname": "room_send_4_base_gain",
           "maxclass": "newobj",
           "numinlets": 2,
           "numoutlets": 2,
@@ -28773,7 +30872,7 @@
       },
       {
         "box": {
-          "id": "obj-633",
+          "id": "obj-654",
           "varname": "room_send_4_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28789,7 +30888,64 @@
       },
       {
         "box": {
-          "id": "obj-634",
+          "id": "obj-655",
+          "varname": "room_send_4_mod",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1608,
+            110,
+            22
+          ],
+          "text": "slide~ 240 240",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-656",
+          "varname": "room_send_4_sum",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1636,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-657",
+          "varname": "room_send_4_gain",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            3995,
+            1664,
+            89,
+            22
+          ],
+          "text": "clip~ 0. 1.",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-658",
           "varname": "room_send_4_performance_sync",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28805,7 +30961,7 @@
       },
       {
         "box": {
-          "id": "obj-635",
+          "id": "obj-659",
           "varname": "mixer_gain_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28825,7 +30981,7 @@
       },
       {
         "box": {
-          "id": "obj-636",
+          "id": "obj-660",
           "varname": "peak_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28844,7 +31000,7 @@
       },
       {
         "box": {
-          "id": "obj-637",
+          "id": "obj-661",
           "varname": "mixer_left_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28863,7 +31019,7 @@
       },
       {
         "box": {
-          "id": "obj-638",
+          "id": "obj-662",
           "varname": "echo_send_left_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28882,7 +31038,7 @@
       },
       {
         "box": {
-          "id": "obj-639",
+          "id": "obj-663",
           "varname": "room_send_left_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28901,7 +31057,7 @@
       },
       {
         "box": {
-          "id": "obj-640",
+          "id": "obj-664",
           "varname": "abs_left_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -28920,7 +31076,7 @@
       },
       {
         "box": {
-          "id": "obj-641",
+          "id": "obj-665",
           "varname": "mixer_right_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28939,7 +31095,7 @@
       },
       {
         "box": {
-          "id": "obj-642",
+          "id": "obj-666",
           "varname": "echo_send_right_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28958,7 +31114,7 @@
       },
       {
         "box": {
-          "id": "obj-643",
+          "id": "obj-667",
           "varname": "room_send_right_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -28977,7 +31133,7 @@
       },
       {
         "box": {
-          "id": "obj-644",
+          "id": "obj-668",
           "varname": "abs_right_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -28996,7 +31152,7 @@
       },
       {
         "box": {
-          "id": "obj-645",
+          "id": "obj-669",
           "varname": "track_wave_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29012,7 +31168,7 @@
       },
       {
         "box": {
-          "id": "obj-646",
+          "id": "obj-670",
           "varname": "wave_mouse_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29028,7 +31184,7 @@
       },
       {
         "box": {
-          "id": "obj-647",
+          "id": "obj-671",
           "varname": "edit_play_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29044,7 +31200,7 @@
       },
       {
         "box": {
-          "id": "obj-648",
+          "id": "obj-672",
           "varname": "playhead_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29063,7 +31219,7 @@
       },
       {
         "box": {
-          "id": "obj-649",
+          "id": "obj-673",
           "varname": "playhead_gate_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29079,7 +31235,7 @@
       },
       {
         "box": {
-          "id": "obj-650",
+          "id": "obj-674",
           "varname": "draw_playhead_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29095,7 +31251,7 @@
       },
       {
         "box": {
-          "id": "obj-651",
+          "id": "obj-675",
           "varname": "stereo_field_open_message",
           "maxclass": "message",
           "numinlets": 2,
@@ -29111,7 +31267,7 @@
       },
       {
         "box": {
-          "id": "obj-652",
+          "id": "obj-676",
           "varname": "stereo_field_window",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29127,7 +31283,7 @@
       },
       {
         "box": {
-          "id": "obj-653",
+          "id": "obj-677",
           "varname": "stereo_field_panel",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29228,7 +31384,7 @@
                   "patching_rect": [
                     12,
                     368,
-                    480,
+                    392,
                     22
                   ],
                   "fontsize": 12,
@@ -29237,9 +31393,72 @@
                   "presentation_rect": [
                     12,
                     368,
-                    480,
+                    392,
                     22
                   ]
+                }
+              },
+              {
+                "box": {
+                  "id": "obj-5",
+                  "varname": "stereo_field_close",
+                  "maxclass": "textbutton",
+                  "numinlets": 1,
+                  "numoutlets": 3,
+                  "patching_rect": [
+                    310,
+                    396,
+                    78,
+                    22
+                  ],
+                  "mode": 0,
+                  "outputmode": 1,
+                  "text": "Close",
+                  "texton": "Close",
+                  "outlettype": [
+                    "bang",
+                    "",
+                    "int"
+                  ],
+                  "presentation": 1,
+                  "presentation_rect": [
+                    414,
+                    366,
+                    78,
+                    23
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "obj-6",
+                  "varname": "stereo_field_close_message",
+                  "maxclass": "message",
+                  "numinlets": 2,
+                  "numoutlets": 1,
+                  "patching_rect": [
+                    310,
+                    428,
+                    62,
+                    22
+                  ],
+                  "text": "wclose"
+                }
+              },
+              {
+                "box": {
+                  "id": "obj-7",
+                  "varname": "stereo_field_thispatcher",
+                  "maxclass": "newobj",
+                  "numinlets": 1,
+                  "numoutlets": 2,
+                  "patching_rect": [
+                    310,
+                    460,
+                    89,
+                    22
+                  ],
+                  "text": "thispatcher"
                 }
               }
             ],
@@ -29267,6 +31486,30 @@
                     0
                   ]
                 }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-5",
+                    0
+                  ],
+                  "destination": [
+                    "obj-6",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-6",
+                    0
+                  ],
+                  "destination": [
+                    "obj-7",
+                    0
+                  ]
+                }
               }
             ]
           },
@@ -29277,7 +31520,7 @@
       },
       {
         "box": {
-          "id": "obj-654",
+          "id": "obj-678",
           "varname": "pad_motion_stop",
           "maxclass": "message",
           "numinlets": 2,
@@ -29293,7 +31536,7 @@
       },
       {
         "box": {
-          "id": "obj-655",
+          "id": "obj-679",
           "varname": "stereo_field_position",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29309,7 +31552,7 @@
       },
       {
         "box": {
-          "id": "obj-656",
+          "id": "obj-680",
           "varname": "stereo_field_voice",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29325,7 +31568,7 @@
       },
       {
         "box": {
-          "id": "obj-657",
+          "id": "obj-681",
           "varname": "stereo_field_init",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29344,7 +31587,7 @@
       },
       {
         "box": {
-          "id": "obj-658",
+          "id": "obj-682",
           "varname": "stereo_field_edit_1",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29364,7 +31607,7 @@
       },
       {
         "box": {
-          "id": "obj-659",
+          "id": "obj-683",
           "varname": "stereo_field_state_1",
           "maxclass": "newobj",
           "numinlets": 3,
@@ -29383,7 +31626,7 @@
       },
       {
         "box": {
-          "id": "obj-660",
+          "id": "obj-684",
           "varname": "stereo_field_source_1",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29399,7 +31642,7 @@
       },
       {
         "box": {
-          "id": "obj-661",
+          "id": "obj-685",
           "varname": "stereo_field_edit_2",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29419,7 +31662,7 @@
       },
       {
         "box": {
-          "id": "obj-662",
+          "id": "obj-686",
           "varname": "stereo_field_state_2",
           "maxclass": "newobj",
           "numinlets": 3,
@@ -29438,7 +31681,7 @@
       },
       {
         "box": {
-          "id": "obj-663",
+          "id": "obj-687",
           "varname": "stereo_field_source_2",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29454,7 +31697,7 @@
       },
       {
         "box": {
-          "id": "obj-664",
+          "id": "obj-688",
           "varname": "stereo_field_edit_3",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29474,7 +31717,7 @@
       },
       {
         "box": {
-          "id": "obj-665",
+          "id": "obj-689",
           "varname": "stereo_field_state_3",
           "maxclass": "newobj",
           "numinlets": 3,
@@ -29493,7 +31736,7 @@
       },
       {
         "box": {
-          "id": "obj-666",
+          "id": "obj-690",
           "varname": "stereo_field_source_3",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29509,7 +31752,7 @@
       },
       {
         "box": {
-          "id": "obj-667",
+          "id": "obj-691",
           "varname": "stereo_field_edit_4",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29529,7 +31772,7 @@
       },
       {
         "box": {
-          "id": "obj-668",
+          "id": "obj-692",
           "varname": "stereo_field_state_4",
           "maxclass": "newobj",
           "numinlets": 3,
@@ -29548,7 +31791,7 @@
       },
       {
         "box": {
-          "id": "obj-669",
+          "id": "obj-693",
           "varname": "stereo_field_source_4",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -29564,7 +31807,7 @@
       },
       {
         "box": {
-          "id": "obj-670",
+          "id": "obj-694",
           "varname": "input_heading",
           "maxclass": "comment",
           "numinlets": 1,
@@ -29591,7 +31834,7 @@
       },
       {
         "box": {
-          "id": "obj-671",
+          "id": "obj-695",
           "varname": "input_gain_label",
           "maxclass": "comment",
           "numinlets": 1,
@@ -29616,7 +31859,7 @@
       },
       {
         "box": {
-          "id": "obj-672",
+          "id": "obj-696",
           "varname": "input_level_label",
           "maxclass": "comment",
           "numinlets": 1,
@@ -29642,7 +31885,7 @@
       },
       {
         "box": {
-          "id": "obj-673",
+          "id": "obj-697",
           "varname": "input_record_state",
           "maxclass": "comment",
           "numinlets": 1,
@@ -29675,7 +31918,7 @@
       },
       {
         "box": {
-          "id": "obj-674",
+          "id": "obj-698",
           "varname": "input_record_time",
           "maxclass": "comment",
           "numinlets": 1,
@@ -29703,7 +31946,7 @@
       },
       {
         "box": {
-          "id": "obj-675",
+          "id": "obj-699",
           "varname": "load",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -29735,7 +31978,7 @@
       },
       {
         "box": {
-          "id": "obj-676",
+          "id": "obj-700",
           "varname": "load_click",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29755,7 +31998,7 @@
       },
       {
         "box": {
-          "id": "obj-677",
+          "id": "obj-701",
           "varname": "load_message",
           "maxclass": "message",
           "numinlets": 2,
@@ -29771,7 +32014,7 @@
       },
       {
         "box": {
-          "id": "obj-678",
+          "id": "obj-702",
           "varname": "demo",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -29803,7 +32046,7 @@
       },
       {
         "box": {
-          "id": "obj-679",
+          "id": "obj-703",
           "varname": "demo_click",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29823,7 +32066,7 @@
       },
       {
         "box": {
-          "id": "obj-680",
+          "id": "obj-704",
           "varname": "demo_message",
           "maxclass": "message",
           "numinlets": 2,
@@ -29839,7 +32082,7 @@
       },
       {
         "box": {
-          "id": "obj-681",
+          "id": "obj-705",
           "varname": "input_record_button",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -29873,7 +32116,7 @@
       },
       {
         "box": {
-          "id": "obj-682",
+          "id": "obj-706",
           "varname": "input_record_button_click",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29893,7 +32136,7 @@
       },
       {
         "box": {
-          "id": "obj-683",
+          "id": "obj-707",
           "varname": "input_record_button_message",
           "maxclass": "message",
           "numinlets": 2,
@@ -29909,7 +32152,7 @@
       },
       {
         "box": {
-          "id": "obj-684",
+          "id": "obj-708",
           "varname": "input_save_button",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -29944,7 +32187,7 @@
       },
       {
         "box": {
-          "id": "obj-685",
+          "id": "obj-709",
           "varname": "input_save_button_click",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -29964,7 +32207,7 @@
       },
       {
         "box": {
-          "id": "obj-686",
+          "id": "obj-710",
           "varname": "input_save_button_message",
           "maxclass": "message",
           "numinlets": 2,
@@ -29980,7 +32223,7 @@
       },
       {
         "box": {
-          "id": "obj-687",
+          "id": "obj-711",
           "varname": "input_left_label",
           "maxclass": "comment",
           "numinlets": 1,
@@ -30005,7 +32248,7 @@
       },
       {
         "box": {
-          "id": "obj-688",
+          "id": "obj-712",
           "varname": "input_left",
           "maxclass": "umenu",
           "numinlets": 1,
@@ -30040,7 +32283,7 @@
       },
       {
         "box": {
-          "id": "obj-689",
+          "id": "obj-713",
           "varname": "input_left_message",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30056,7 +32299,7 @@
       },
       {
         "box": {
-          "id": "obj-690",
+          "id": "obj-714",
           "varname": "input_right_label",
           "maxclass": "comment",
           "numinlets": 1,
@@ -30081,7 +32324,7 @@
       },
       {
         "box": {
-          "id": "obj-691",
+          "id": "obj-715",
           "varname": "input_right",
           "maxclass": "umenu",
           "numinlets": 1,
@@ -30116,7 +32359,7 @@
       },
       {
         "box": {
-          "id": "obj-692",
+          "id": "obj-716",
           "varname": "input_right_message",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30132,7 +32375,7 @@
       },
       {
         "box": {
-          "id": "obj-693",
+          "id": "obj-717",
           "varname": "input_gain",
           "maxclass": "live.numbox",
           "numinlets": 1,
@@ -30176,7 +32419,7 @@
       },
       {
         "box": {
-          "id": "obj-694",
+          "id": "obj-718",
           "varname": "input_gain_ramp",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30192,7 +32435,7 @@
       },
       {
         "box": {
-          "id": "obj-695",
+          "id": "obj-719",
           "varname": "input_gain_base",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30212,7 +32455,7 @@
       },
       {
         "box": {
-          "id": "obj-696",
+          "id": "obj-720",
           "varname": "input_gain_mod",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30231,7 +32474,7 @@
       },
       {
         "box": {
-          "id": "obj-697",
+          "id": "obj-721",
           "varname": "input_gain_sum",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30250,7 +32493,7 @@
       },
       {
         "box": {
-          "id": "obj-698",
+          "id": "obj-722",
           "varname": "input_gain_effective",
           "maxclass": "newobj",
           "numinlets": 3,
@@ -30269,7 +32512,7 @@
       },
       {
         "box": {
-          "id": "obj-699",
+          "id": "obj-723",
           "varname": "input_gain_signal",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -30288,7 +32531,7 @@
       },
       {
         "box": {
-          "id": "obj-700",
+          "id": "obj-724",
           "varname": "input_adc",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -30308,7 +32551,7 @@
       },
       {
         "box": {
-          "id": "obj-701",
+          "id": "obj-725",
           "varname": "input_recorder",
           "maxclass": "newobj",
           "numinlets": 4,
@@ -30327,7 +32570,7 @@
       },
       {
         "box": {
-          "id": "obj-702",
+          "id": "obj-726",
           "varname": "input_progress",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30346,7 +32589,7 @@
       },
       {
         "box": {
-          "id": "obj-703",
+          "id": "obj-727",
           "varname": "input_progress_message",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30362,7 +32605,7 @@
       },
       {
         "box": {
-          "id": "obj-704",
+          "id": "obj-728",
           "varname": "input_meter_label_L",
           "maxclass": "comment",
           "numinlets": 1,
@@ -30388,7 +32631,7 @@
       },
       {
         "box": {
-          "id": "obj-705",
+          "id": "obj-729",
           "varname": "input_meter_L",
           "maxclass": "live.meter~",
           "numinlets": 1,
@@ -30419,7 +32662,7 @@
       },
       {
         "box": {
-          "id": "obj-706",
+          "id": "obj-730",
           "varname": "input_trim_L",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30438,7 +32681,7 @@
       },
       {
         "box": {
-          "id": "obj-707",
+          "id": "obj-731",
           "varname": "input_meter_label_R",
           "maxclass": "comment",
           "numinlets": 1,
@@ -30464,7 +32707,7 @@
       },
       {
         "box": {
-          "id": "obj-708",
+          "id": "obj-732",
           "varname": "input_meter_R",
           "maxclass": "live.meter~",
           "numinlets": 1,
@@ -30495,7 +32738,7 @@
       },
       {
         "box": {
-          "id": "obj-709",
+          "id": "obj-733",
           "varname": "input_trim_R",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30514,7 +32757,7 @@
       },
       {
         "box": {
-          "id": "obj-710",
+          "id": "obj-734",
           "varname": "input_clock",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30533,7 +32776,7 @@
       },
       {
         "box": {
-          "id": "obj-711",
+          "id": "obj-735",
           "varname": "input_clock_message",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30549,7 +32792,7 @@
       },
       {
         "box": {
-          "id": "obj-712",
+          "id": "obj-736",
           "varname": "input_rate_message",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30565,7 +32808,7 @@
       },
       {
         "box": {
-          "id": "obj-713",
+          "id": "obj-737",
           "varname": "input_device_channels",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30585,7 +32828,7 @@
       },
       {
         "box": {
-          "id": "obj-714",
+          "id": "obj-738",
           "varname": "input_count_message",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30601,7 +32844,7 @@
       },
       {
         "box": {
-          "id": "obj-715",
+          "id": "obj-739",
           "varname": "input_save_dialog",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -30622,7 +32865,7 @@
       },
       {
         "box": {
-          "id": "obj-716",
+          "id": "obj-740",
           "varname": "input_save_path",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30638,7 +32881,7 @@
       },
       {
         "box": {
-          "id": "obj-717",
+          "id": "obj-741",
           "varname": "source_drawer_toggle",
           "maxclass": "live.text",
           "numinlets": 1,
@@ -30689,7 +32932,7 @@
       },
       {
         "box": {
-          "id": "obj-718",
+          "id": "obj-742",
           "varname": "source_drawer_command",
           "maxclass": "newobj",
           "numinlets": 2,
@@ -30705,7 +32948,7 @@
       },
       {
         "box": {
-          "id": "obj-719",
+          "id": "obj-743",
           "varname": "surface_transport",
           "maxclass": "panel",
           "numinlets": 1,
@@ -30737,7 +32980,7 @@
       },
       {
         "box": {
-          "id": "obj-720",
+          "id": "obj-744",
           "varname": "transport_label",
           "maxclass": "comment",
           "numinlets": 1,
@@ -30768,7 +33011,7 @@
       },
       {
         "box": {
-          "id": "obj-721",
+          "id": "obj-745",
           "varname": "source_drawer_anchor",
           "maxclass": "panel",
           "numinlets": 1,
@@ -30801,7 +33044,7 @@
       },
       {
         "box": {
-          "id": "obj-722",
+          "id": "obj-746",
           "varname": "surface_source_files",
           "maxclass": "panel",
           "numinlets": 1,
@@ -30835,7 +33078,7 @@
       },
       {
         "box": {
-          "id": "obj-723",
+          "id": "obj-747",
           "varname": "drawer_input_title",
           "maxclass": "comment",
           "numinlets": 1,
@@ -30862,7 +33105,7 @@
       },
       {
         "box": {
-          "id": "obj-724",
+          "id": "obj-748",
           "varname": "drawer_capture_title",
           "maxclass": "comment",
           "numinlets": 1,
@@ -30889,7 +33132,7 @@
       },
       {
         "box": {
-          "id": "obj-725",
+          "id": "obj-749",
           "varname": "drawer_files_title",
           "maxclass": "comment",
           "numinlets": 1,
@@ -30916,7 +33159,7 @@
       },
       {
         "box": {
-          "id": "obj-726",
+          "id": "obj-750",
           "varname": "surface_visuals",
           "maxclass": "panel",
           "numinlets": 1,
@@ -34828,6 +37071,66 @@
       {
         "patchline": {
           "source": [
+            "obj-254",
+            44
+          ],
+          "destination": [
+            "obj-334",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-332",
+            0
+          ],
+          "destination": [
+            "obj-335",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-334",
+            0
+          ],
+          "destination": [
+            "obj-335",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-335",
+            0
+          ],
+          "destination": [
+            "obj-336",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-336",
+            0
+          ],
+          "destination": [
+            "obj-255",
+            45
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-329",
             0
           ],
@@ -34892,7 +37195,7 @@
             0
           ],
           "destination": [
-            "obj-334",
+            "obj-337",
             0
           ]
         }
@@ -34900,7 +37203,7 @@
       {
         "patchline": {
           "source": [
-            "obj-334",
+            "obj-337",
             0
           ],
           "destination": [
@@ -34924,11 +37227,11 @@
       {
         "patchline": {
           "source": [
-            "obj-335",
-            0
+            "obj-254",
+            45
           ],
           "destination": [
-            "obj-336",
+            "obj-343",
             0
           ]
         }
@@ -34936,11 +37239,11 @@
       {
         "patchline": {
           "source": [
-            "obj-336",
+            "obj-341",
             0
           ],
           "destination": [
-            "obj-337",
+            "obj-344",
             0
           ]
         }
@@ -34948,20 +37251,44 @@
       {
         "patchline": {
           "source": [
-            "obj-337",
+            "obj-343",
             0
           ],
           "destination": [
+            "obj-344",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-344",
+            0
+          ],
+          "destination": [
+            "obj-345",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-345",
+            0
+          ],
+          "destination": [
+            "obj-255",
+            46
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-338",
             0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-335",
-            0
           ],
           "destination": [
             "obj-339",
@@ -34973,6 +37300,42 @@
         "patchline": {
           "source": [
             "obj-339",
+            0
+          ],
+          "destination": [
+            "obj-340",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-340",
+            0
+          ],
+          "destination": [
+            "obj-341",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-338",
+            0
+          ],
+          "destination": [
+            "obj-342",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-342",
             0
           ],
           "destination": [
@@ -34984,11 +37347,11 @@
       {
         "patchline": {
           "source": [
-            "obj-335",
+            "obj-338",
             0
           ],
           "destination": [
-            "obj-340",
+            "obj-346",
             0
           ]
         }
@@ -34996,7 +37359,7 @@
       {
         "patchline": {
           "source": [
-            "obj-340",
+            "obj-346",
             0
           ],
           "destination": [
@@ -35012,7 +37375,7 @@
             1
           ],
           "destination": [
-            "obj-335",
+            "obj-338",
             0
           ]
         }
@@ -35020,7 +37383,7 @@
       {
         "patchline": {
           "source": [
-            "obj-342",
+            "obj-348",
             0
           ],
           "destination": [
@@ -35036,7 +37399,7 @@
             0
           ],
           "destination": [
-            "obj-343",
+            "obj-349",
             0
           ]
         }
@@ -35044,11 +37407,11 @@
       {
         "patchline": {
           "source": [
-            "obj-341",
+            "obj-347",
             0
           ],
           "destination": [
-            "obj-343",
+            "obj-349",
             1
           ]
         }
@@ -35056,7 +37419,7 @@
       {
         "patchline": {
           "source": [
-            "obj-343",
+            "obj-349",
             0
           ],
           "destination": [
@@ -35068,11 +37431,11 @@
       {
         "patchline": {
           "source": [
-            "obj-343",
+            "obj-349",
             0
           ],
           "destination": [
-            "obj-344",
+            "obj-350",
             0
           ]
         }
@@ -35080,11 +37443,11 @@
       {
         "patchline": {
           "source": [
-            "obj-332",
+            "obj-336",
             0
           ],
           "destination": [
-            "obj-344",
+            "obj-350",
             1
           ]
         }
@@ -35092,7 +37455,7 @@
       {
         "patchline": {
           "source": [
-            "obj-344",
+            "obj-350",
             0
           ],
           "destination": [
@@ -35104,11 +37467,11 @@
       {
         "patchline": {
           "source": [
-            "obj-343",
+            "obj-349",
             0
           ],
           "destination": [
-            "obj-345",
+            "obj-351",
             0
           ]
         }
@@ -35116,11 +37479,11 @@
       {
         "patchline": {
           "source": [
-            "obj-338",
+            "obj-345",
             0
           ],
           "destination": [
-            "obj-345",
+            "obj-351",
             1
           ]
         }
@@ -35128,7 +37491,7 @@
       {
         "patchline": {
           "source": [
-            "obj-345",
+            "obj-351",
             0
           ],
           "destination": [
@@ -35140,11 +37503,11 @@
       {
         "patchline": {
           "source": [
-            "obj-343",
+            "obj-349",
             0
           ],
           "destination": [
-            "obj-346",
+            "obj-352",
             0
           ]
         }
@@ -35152,11 +37515,11 @@
       {
         "patchline": {
           "source": [
-            "obj-346",
+            "obj-352",
             0
           ],
           "destination": [
-            "obj-342",
+            "obj-348",
             0
           ]
         }
@@ -35168,7 +37531,7 @@
             1
           ],
           "destination": [
-            "obj-347",
+            "obj-353",
             0
           ]
         }
@@ -35176,11 +37539,11 @@
       {
         "patchline": {
           "source": [
-            "obj-341",
+            "obj-347",
             0
           ],
           "destination": [
-            "obj-347",
+            "obj-353",
             1
           ]
         }
@@ -35188,7 +37551,7 @@
       {
         "patchline": {
           "source": [
-            "obj-347",
+            "obj-353",
             0
           ],
           "destination": [
@@ -35200,11 +37563,11 @@
       {
         "patchline": {
           "source": [
-            "obj-347",
+            "obj-353",
             0
           ],
           "destination": [
-            "obj-348",
+            "obj-354",
             0
           ]
         }
@@ -35212,11 +37575,11 @@
       {
         "patchline": {
           "source": [
-            "obj-332",
+            "obj-336",
             0
           ],
           "destination": [
-            "obj-348",
+            "obj-354",
             1
           ]
         }
@@ -35224,7 +37587,7 @@
       {
         "patchline": {
           "source": [
-            "obj-348",
+            "obj-354",
             0
           ],
           "destination": [
@@ -35236,11 +37599,11 @@
       {
         "patchline": {
           "source": [
-            "obj-347",
+            "obj-353",
             0
           ],
           "destination": [
-            "obj-349",
+            "obj-355",
             0
           ]
         }
@@ -35248,11 +37611,11 @@
       {
         "patchline": {
           "source": [
-            "obj-338",
+            "obj-345",
             0
           ],
           "destination": [
-            "obj-349",
+            "obj-355",
             1
           ]
         }
@@ -35260,7 +37623,7 @@
       {
         "patchline": {
           "source": [
-            "obj-349",
+            "obj-355",
             0
           ],
           "destination": [
@@ -35272,11 +37635,11 @@
       {
         "patchline": {
           "source": [
-            "obj-347",
+            "obj-353",
             0
           ],
           "destination": [
-            "obj-350",
+            "obj-356",
             0
           ]
         }
@@ -35284,11 +37647,11 @@
       {
         "patchline": {
           "source": [
-            "obj-350",
+            "obj-356",
             0
           ],
           "destination": [
-            "obj-342",
+            "obj-348",
             1
           ]
         }
@@ -35300,7 +37663,7 @@
             5
           ],
           "destination": [
-            "obj-351",
+            "obj-357",
             0
           ]
         }
@@ -35308,7 +37671,7 @@
       {
         "patchline": {
           "source": [
-            "obj-351",
+            "obj-357",
             0
           ],
           "destination": [
@@ -35324,7 +37687,7 @@
             4
           ],
           "destination": [
-            "obj-352",
+            "obj-358",
             0
           ]
         }
@@ -35332,7 +37695,7 @@
       {
         "patchline": {
           "source": [
-            "obj-352",
+            "obj-358",
             0
           ],
           "destination": [
@@ -35348,7 +37711,7 @@
             0
           ],
           "destination": [
-            "obj-353",
+            "obj-359",
             0
           ]
         }
@@ -35356,7 +37719,7 @@
       {
         "patchline": {
           "source": [
-            "obj-353",
+            "obj-359",
             0
           ],
           "destination": [
@@ -35372,7 +37735,7 @@
             2
           ],
           "destination": [
-            "obj-354",
+            "obj-360",
             0
           ]
         }
@@ -35380,11 +37743,11 @@
       {
         "patchline": {
           "source": [
-            "obj-354",
+            "obj-360",
             0
           ],
           "destination": [
-            "obj-355",
+            "obj-361",
             1
           ]
         }
@@ -35392,11 +37755,11 @@
       {
         "patchline": {
           "source": [
-            "obj-355",
+            "obj-361",
             0
           ],
           "destination": [
-            "obj-356",
+            "obj-362",
             0
           ]
         }
@@ -35404,7 +37767,7 @@
       {
         "patchline": {
           "source": [
-            "obj-356",
+            "obj-362",
             0
           ],
           "destination": [
@@ -35420,7 +37783,7 @@
             1
           ],
           "destination": [
-            "obj-358",
+            "obj-364",
             2
           ]
         }
@@ -35428,11 +37791,11 @@
       {
         "patchline": {
           "source": [
-            "obj-360",
+            "obj-366",
             0
           ],
           "destination": [
-            "obj-359",
+            "obj-365",
             9
           ]
         }
@@ -35444,7 +37807,7 @@
             0
           ],
           "destination": [
-            "obj-359",
+            "obj-365",
             10
           ]
         }
@@ -35456,7 +37819,7 @@
             0
           ],
           "destination": [
-            "obj-359",
+            "obj-365",
             11
           ]
         }
@@ -35464,11 +37827,11 @@
       {
         "patchline": {
           "source": [
-            "obj-361",
+            "obj-367",
             0
           ],
           "destination": [
-            "obj-359",
+            "obj-365",
             12
           ]
         }
@@ -35476,7 +37839,7 @@
       {
         "patchline": {
           "source": [
-            "obj-359",
+            "obj-365",
             7
           ],
           "destination": [
@@ -35490,102 +37853,6 @@
           "source": [
             "obj-254",
             9
-          ],
-          "destination": [
-            "obj-364",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-363",
-            0
-          ],
-          "destination": [
-            "obj-365",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-364",
-            0
-          ],
-          "destination": [
-            "obj-365",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-365",
-            0
-          ],
-          "destination": [
-            "obj-366",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-366",
-            0
-          ],
-          "destination": [
-            "obj-359",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-359",
-            3
-          ],
-          "destination": [
-            "obj-255",
-            10
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-362",
-            0
-          ],
-          "destination": [
-            "obj-367",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-367",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            10
           ],
           "destination": [
             "obj-370",
@@ -35636,20 +37903,20 @@
             0
           ],
           "destination": [
-            "obj-359",
-            1
+            "obj-365",
+            0
           ]
         }
       },
       {
         "patchline": {
           "source": [
-            "obj-359",
-            4
+            "obj-365",
+            3
           ],
           "destination": [
             "obj-255",
-            11
+            10
           ]
         }
       },
@@ -35681,7 +37948,7 @@
         "patchline": {
           "source": [
             "obj-254",
-            11
+            10
           ],
           "destination": [
             "obj-376",
@@ -35732,32 +37999,20 @@
             0
           ],
           "destination": [
-            "obj-359",
-            2
+            "obj-365",
+            1
           ]
         }
       },
       {
         "patchline": {
           "source": [
-            "obj-359",
-            5
+            "obj-365",
+            4
           ],
           "destination": [
             "obj-255",
-            12
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-374",
-            0
-          ],
-          "destination": [
-            "obj-375",
-            0
+            11
           ]
         }
       },
@@ -35789,7 +38044,7 @@
         "patchline": {
           "source": [
             "obj-254",
-            12
+            11
           ],
           "destination": [
             "obj-382",
@@ -35828,7 +38083,115 @@
             0
           ],
           "destination": [
-            "obj-359",
+            "obj-384",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-384",
+            0
+          ],
+          "destination": [
+            "obj-365",
+            2
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-365",
+            5
+          ],
+          "destination": [
+            "obj-255",
+            12
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-380",
+            0
+          ],
+          "destination": [
+            "obj-381",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-380",
+            0
+          ],
+          "destination": [
+            "obj-385",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-385",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            12
+          ],
+          "destination": [
+            "obj-388",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-387",
+            0
+          ],
+          "destination": [
+            "obj-389",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-388",
+            0
+          ],
+          "destination": [
+            "obj-389",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-389",
+            0
+          ],
+          "destination": [
+            "obj-365",
             3
           ]
         }
@@ -35836,7 +38199,7 @@
       {
         "patchline": {
           "source": [
-            "obj-359",
+            "obj-365",
             6
           ],
           "destination": [
@@ -35848,11 +38211,11 @@
       {
         "patchline": {
           "source": [
-            "obj-380",
+            "obj-386",
             0
           ],
           "destination": [
-            "obj-381",
+            "obj-387",
             0
           ]
         }
@@ -35860,11 +38223,11 @@
       {
         "patchline": {
           "source": [
-            "obj-380",
+            "obj-386",
             0
           ],
           "destination": [
-            "obj-384",
+            "obj-390",
             0
           ]
         }
@@ -35872,7 +38235,7 @@
       {
         "patchline": {
           "source": [
-            "obj-384",
+            "obj-390",
             0
           ],
           "destination": [
@@ -35888,7 +38251,7 @@
             13
           ],
           "destination": [
-            "obj-387",
+            "obj-393",
             0
           ]
         }
@@ -35896,11 +38259,11 @@
       {
         "patchline": {
           "source": [
-            "obj-386",
+            "obj-392",
             0
           ],
           "destination": [
-            "obj-388",
+            "obj-394",
             0
           ]
         }
@@ -35908,11 +38271,11 @@
       {
         "patchline": {
           "source": [
-            "obj-387",
+            "obj-393",
             0
           ],
           "destination": [
-            "obj-388",
+            "obj-394",
             1
           ]
         }
@@ -35920,11 +38283,11 @@
       {
         "patchline": {
           "source": [
-            "obj-388",
+            "obj-394",
             0
           ],
           "destination": [
-            "obj-359",
+            "obj-365",
             4
           ]
         }
@@ -35932,7 +38295,7 @@
       {
         "patchline": {
           "source": [
-            "obj-359",
+            "obj-365",
             7
           ],
           "destination": [
@@ -35944,11 +38307,11 @@
       {
         "patchline": {
           "source": [
-            "obj-385",
+            "obj-391",
             0
           ],
           "destination": [
-            "obj-386",
+            "obj-392",
             0
           ]
         }
@@ -35956,11 +38319,11 @@
       {
         "patchline": {
           "source": [
-            "obj-385",
+            "obj-391",
             0
           ],
           "destination": [
-            "obj-389",
+            "obj-395",
             0
           ]
         }
@@ -35968,7 +38331,7 @@
       {
         "patchline": {
           "source": [
-            "obj-389",
+            "obj-395",
             0
           ],
           "destination": [
@@ -35982,114 +38345,6 @@
           "source": [
             "obj-254",
             14
-          ],
-          "destination": [
-            "obj-392",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-391",
-            0
-          ],
-          "destination": [
-            "obj-393",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-392",
-            0
-          ],
-          "destination": [
-            "obj-393",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-393",
-            0
-          ],
-          "destination": [
-            "obj-394",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-394",
-            0
-          ],
-          "destination": [
-            "obj-359",
-            5
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-359",
-            8
-          ],
-          "destination": [
-            "obj-255",
-            15
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-390",
-            0
-          ],
-          "destination": [
-            "obj-391",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-390",
-            0
-          ],
-          "destination": [
-            "obj-395",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-395",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            15
           ],
           "destination": [
             "obj-398",
@@ -36140,7 +38395,115 @@
             0
           ],
           "destination": [
-            "obj-359",
+            "obj-365",
+            5
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-365",
+            8
+          ],
+          "destination": [
+            "obj-255",
+            15
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-396",
+            0
+          ],
+          "destination": [
+            "obj-397",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-396",
+            0
+          ],
+          "destination": [
+            "obj-401",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-401",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            15
+          ],
+          "destination": [
+            "obj-404",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-403",
+            0
+          ],
+          "destination": [
+            "obj-405",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-404",
+            0
+          ],
+          "destination": [
+            "obj-405",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-405",
+            0
+          ],
+          "destination": [
+            "obj-406",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-406",
+            0
+          ],
+          "destination": [
+            "obj-365",
             6
           ]
         }
@@ -36148,7 +38511,7 @@
       {
         "patchline": {
           "source": [
-            "obj-359",
+            "obj-365",
             9
           ],
           "destination": [
@@ -36160,11 +38523,11 @@
       {
         "patchline": {
           "source": [
-            "obj-396",
+            "obj-402",
             0
           ],
           "destination": [
-            "obj-397",
+            "obj-403",
             0
           ]
         }
@@ -36172,11 +38535,11 @@
       {
         "patchline": {
           "source": [
-            "obj-396",
+            "obj-402",
             0
           ],
           "destination": [
-            "obj-401",
+            "obj-407",
             0
           ]
         }
@@ -36184,7 +38547,7 @@
       {
         "patchline": {
           "source": [
-            "obj-401",
+            "obj-407",
             0
           ],
           "destination": [
@@ -36200,7 +38563,7 @@
             16
           ],
           "destination": [
-            "obj-404",
+            "obj-410",
             0
           ]
         }
@@ -36208,11 +38571,11 @@
       {
         "patchline": {
           "source": [
-            "obj-403",
+            "obj-409",
             0
           ],
           "destination": [
-            "obj-405",
+            "obj-411",
             0
           ]
         }
@@ -36220,11 +38583,11 @@
       {
         "patchline": {
           "source": [
-            "obj-404",
+            "obj-410",
             0
           ],
           "destination": [
-            "obj-405",
+            "obj-411",
             1
           ]
         }
@@ -36232,11 +38595,11 @@
       {
         "patchline": {
           "source": [
-            "obj-405",
+            "obj-411",
             0
           ],
           "destination": [
-            "obj-406",
+            "obj-412",
             0
           ]
         }
@@ -36244,11 +38607,11 @@
       {
         "patchline": {
           "source": [
-            "obj-406",
+            "obj-412",
             0
           ],
           "destination": [
-            "obj-359",
+            "obj-365",
             7
           ]
         }
@@ -36256,7 +38619,7 @@
       {
         "patchline": {
           "source": [
-            "obj-359",
+            "obj-365",
             10
           ],
           "destination": [
@@ -36268,11 +38631,11 @@
       {
         "patchline": {
           "source": [
-            "obj-402",
+            "obj-408",
             0
           ],
           "destination": [
-            "obj-403",
+            "obj-409",
             0
           ]
         }
@@ -36280,11 +38643,11 @@
       {
         "patchline": {
           "source": [
-            "obj-402",
+            "obj-408",
             0
           ],
           "destination": [
-            "obj-407",
+            "obj-413",
             0
           ]
         }
@@ -36292,7 +38655,7 @@
       {
         "patchline": {
           "source": [
-            "obj-407",
+            "obj-413",
             0
           ],
           "destination": [
@@ -36308,7 +38671,7 @@
             17
           ],
           "destination": [
-            "obj-410",
+            "obj-416",
             0
           ]
         }
@@ -36316,11 +38679,11 @@
       {
         "patchline": {
           "source": [
-            "obj-409",
+            "obj-415",
             0
           ],
           "destination": [
-            "obj-411",
+            "obj-417",
             0
           ]
         }
@@ -36328,120 +38691,12 @@
       {
         "patchline": {
           "source": [
-            "obj-410",
+            "obj-416",
             0
           ],
           "destination": [
-            "obj-411",
+            "obj-417",
             1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-411",
-            0
-          ],
-          "destination": [
-            "obj-412",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-412",
-            0
-          ],
-          "destination": [
-            "obj-359",
-            8
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-359",
-            11
-          ],
-          "destination": [
-            "obj-255",
-            18
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-408",
-            0
-          ],
-          "destination": [
-            "obj-409",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-408",
-            0
-          ],
-          "destination": [
-            "obj-413",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-413",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-414",
-            0
-          ],
-          "destination": [
-            "obj-415",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-415",
-            0
-          ],
-          "destination": [
-            "obj-416",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-416",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
           ]
         }
       },
@@ -36464,7 +38719,43 @@
             0
           ],
           "destination": [
-            "obj-204",
+            "obj-365",
+            8
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-365",
+            11
+          ],
+          "destination": [
+            "obj-255",
+            18
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-414",
+            0
+          ],
+          "destination": [
+            "obj-415",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-414",
+            0
+          ],
+          "destination": [
+            "obj-419",
             0
           ]
         }
@@ -36476,7 +38767,7 @@
             0
           ],
           "destination": [
-            "obj-420",
+            "obj-30",
             0
           ]
         }
@@ -36488,55 +38779,7 @@
             0
           ],
           "destination": [
-            "obj-204",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-423",
-            0
-          ],
-          "destination": [
-            "obj-402",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-422",
-            0
-          ],
-          "destination": [
-            "obj-402",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-402",
-            0
-          ],
-          "destination": [
-            "obj-425",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-425",
-            0
-          ],
-          "destination": [
-            "obj-422",
+            "obj-421",
             0
           ]
         }
@@ -36548,7 +38791,7 @@
             0
           ],
           "destination": [
-            "obj-408",
+            "obj-422",
             0
           ]
         }
@@ -36556,91 +38799,7 @@
       {
         "patchline": {
           "source": [
-            "obj-408",
-            0
-          ],
-          "destination": [
-            "obj-426",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-426",
-            0
-          ],
-          "destination": [
-            "obj-421",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-425",
-            0
-          ],
-          "destination": [
-            "obj-423",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-427",
-            0
-          ],
-          "destination": [
-            "obj-428",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-428",
-            0
-          ],
-          "destination": [
-            "obj-429",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-429",
-            0
-          ],
-          "destination": [
-            "obj-430",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-427",
-            0
-          ],
-          "destination": [
-            "obj-431",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-431",
+            "obj-422",
             0
           ],
           "destination": [
@@ -36652,7 +38811,115 @@
       {
         "patchline": {
           "source": [
+            "obj-423",
+            0
+          ],
+          "destination": [
+            "obj-424",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-424",
+            0
+          ],
+          "destination": [
+            "obj-204",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-425",
+            0
+          ],
+          "destination": [
+            "obj-426",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-426",
+            0
+          ],
+          "destination": [
+            "obj-204",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-429",
+            0
+          ],
+          "destination": [
+            "obj-408",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-428",
+            0
+          ],
+          "destination": [
+            "obj-408",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-408",
+            0
+          ],
+          "destination": [
+            "obj-431",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-431",
+            0
+          ],
+          "destination": [
+            "obj-428",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-427",
+            0
+          ],
+          "destination": [
+            "obj-414",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-414",
             0
           ],
           "destination": [
@@ -36668,7 +38935,7 @@
             0
           ],
           "destination": [
-            "obj-161",
+            "obj-427",
             0
           ]
         }
@@ -36676,12 +38943,72 @@
       {
         "patchline": {
           "source": [
-            "obj-162",
-            2
+            "obj-431",
+            0
           ],
           "destination": [
-            "obj-427",
+            "obj-429",
             0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            46
+          ],
+          "destination": [
+            "obj-438",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-436",
+            0
+          ],
+          "destination": [
+            "obj-439",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-438",
+            0
+          ],
+          "destination": [
+            "obj-439",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-439",
+            0
+          ],
+          "destination": [
+            "obj-440",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-440",
+            0
+          ],
+          "destination": [
+            "obj-255",
+            47
           ]
         }
       },
@@ -36752,7 +39079,7 @@
             0
           ],
           "destination": [
-            "obj-438",
+            "obj-441",
             0
           ]
         }
@@ -36760,7 +39087,163 @@
       {
         "patchline": {
           "source": [
-            "obj-438",
+            "obj-441",
+            0
+          ],
+          "destination": [
+            "obj-161",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-162",
+            2
+          ],
+          "destination": [
+            "obj-433",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            47
+          ],
+          "destination": [
+            "obj-447",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-445",
+            0
+          ],
+          "destination": [
+            "obj-448",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-447",
+            0
+          ],
+          "destination": [
+            "obj-448",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-448",
+            0
+          ],
+          "destination": [
+            "obj-449",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-449",
+            0
+          ],
+          "destination": [
+            "obj-255",
+            48
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-442",
+            0
+          ],
+          "destination": [
+            "obj-443",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-443",
+            0
+          ],
+          "destination": [
+            "obj-444",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-444",
+            0
+          ],
+          "destination": [
+            "obj-445",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-442",
+            0
+          ],
+          "destination": [
+            "obj-446",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-446",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-442",
+            0
+          ],
+          "destination": [
+            "obj-450",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-450",
             0
           ],
           "destination": [
@@ -36776,7 +39259,7 @@
             3
           ],
           "destination": [
-            "obj-433",
+            "obj-442",
             0
           ]
         }
@@ -36784,11 +39267,11 @@
       {
         "patchline": {
           "source": [
-            "obj-440",
+            "obj-452",
             0
           ],
           "destination": [
-            "obj-424",
+            "obj-430",
             0
           ]
         }
@@ -36796,11 +39279,11 @@
       {
         "patchline": {
           "source": [
-            "obj-359",
+            "obj-365",
             0
           ],
           "destination": [
-            "obj-441",
+            "obj-453",
             0
           ]
         }
@@ -36808,11 +39291,11 @@
       {
         "patchline": {
           "source": [
-            "obj-439",
+            "obj-451",
             0
           ],
           "destination": [
-            "obj-441",
+            "obj-453",
             1
           ]
         }
@@ -36820,7 +39303,7 @@
       {
         "patchline": {
           "source": [
-            "obj-441",
+            "obj-453",
             0
           ],
           "destination": [
@@ -36832,11 +39315,11 @@
       {
         "patchline": {
           "source": [
-            "obj-441",
+            "obj-453",
             0
           ],
           "destination": [
-            "obj-442",
+            "obj-454",
             0
           ]
         }
@@ -36844,11 +39327,11 @@
       {
         "patchline": {
           "source": [
-            "obj-430",
+            "obj-440",
             0
           ],
           "destination": [
-            "obj-442",
+            "obj-454",
             1
           ]
         }
@@ -36856,7 +39339,7 @@
       {
         "patchline": {
           "source": [
-            "obj-442",
+            "obj-454",
             0
           ],
           "destination": [
@@ -36868,11 +39351,11 @@
       {
         "patchline": {
           "source": [
-            "obj-441",
+            "obj-453",
             0
           ],
           "destination": [
-            "obj-443",
+            "obj-455",
             0
           ]
         }
@@ -36880,11 +39363,11 @@
       {
         "patchline": {
           "source": [
-            "obj-436",
+            "obj-449",
             0
           ],
           "destination": [
-            "obj-443",
+            "obj-455",
             1
           ]
         }
@@ -36892,7 +39375,7 @@
       {
         "patchline": {
           "source": [
-            "obj-443",
+            "obj-455",
             0
           ],
           "destination": [
@@ -36904,11 +39387,11 @@
       {
         "patchline": {
           "source": [
-            "obj-441",
+            "obj-453",
             0
           ],
           "destination": [
-            "obj-444",
+            "obj-456",
             0
           ]
         }
@@ -36916,11 +39399,11 @@
       {
         "patchline": {
           "source": [
-            "obj-444",
+            "obj-456",
             0
           ],
           "destination": [
-            "obj-440",
+            "obj-452",
             0
           ]
         }
@@ -36928,11 +39411,11 @@
       {
         "patchline": {
           "source": [
-            "obj-359",
+            "obj-365",
             1
           ],
           "destination": [
-            "obj-445",
+            "obj-457",
             0
           ]
         }
@@ -36940,11 +39423,11 @@
       {
         "patchline": {
           "source": [
-            "obj-439",
+            "obj-451",
             0
           ],
           "destination": [
-            "obj-445",
+            "obj-457",
             1
           ]
         }
@@ -36952,7 +39435,7 @@
       {
         "patchline": {
           "source": [
-            "obj-445",
+            "obj-457",
             0
           ],
           "destination": [
@@ -36964,11 +39447,11 @@
       {
         "patchline": {
           "source": [
-            "obj-445",
+            "obj-457",
             0
           ],
           "destination": [
-            "obj-446",
+            "obj-458",
             0
           ]
         }
@@ -36976,11 +39459,11 @@
       {
         "patchline": {
           "source": [
-            "obj-430",
+            "obj-440",
             0
           ],
           "destination": [
-            "obj-446",
+            "obj-458",
             1
           ]
         }
@@ -36988,7 +39471,7 @@
       {
         "patchline": {
           "source": [
-            "obj-446",
+            "obj-458",
             0
           ],
           "destination": [
@@ -37000,11 +39483,11 @@
       {
         "patchline": {
           "source": [
-            "obj-445",
+            "obj-457",
             0
           ],
           "destination": [
-            "obj-447",
+            "obj-459",
             0
           ]
         }
@@ -37012,11 +39495,11 @@
       {
         "patchline": {
           "source": [
-            "obj-436",
+            "obj-449",
             0
           ],
           "destination": [
-            "obj-447",
+            "obj-459",
             1
           ]
         }
@@ -37024,7 +39507,7 @@
       {
         "patchline": {
           "source": [
-            "obj-447",
+            "obj-459",
             0
           ],
           "destination": [
@@ -37036,11 +39519,11 @@
       {
         "patchline": {
           "source": [
-            "obj-445",
+            "obj-457",
             0
           ],
           "destination": [
-            "obj-448",
+            "obj-460",
             0
           ]
         }
@@ -37048,11 +39531,11 @@
       {
         "patchline": {
           "source": [
-            "obj-448",
+            "obj-460",
             0
           ],
           "destination": [
-            "obj-440",
+            "obj-452",
             1
           ]
         }
@@ -37060,11 +39543,11 @@
       {
         "patchline": {
           "source": [
-            "obj-358",
+            "obj-364",
             5
           ],
           "destination": [
-            "obj-449",
+            "obj-461",
             0
           ]
         }
@@ -37072,7 +39555,7 @@
       {
         "patchline": {
           "source": [
-            "obj-449",
+            "obj-461",
             0
           ],
           "destination": [
@@ -37084,11 +39567,11 @@
       {
         "patchline": {
           "source": [
-            "obj-358",
+            "obj-364",
             4
           ],
           "destination": [
-            "obj-450",
+            "obj-462",
             0
           ]
         }
@@ -37096,7 +39579,7 @@
       {
         "patchline": {
           "source": [
-            "obj-450",
+            "obj-462",
             0
           ],
           "destination": [
@@ -37108,11 +39591,11 @@
       {
         "patchline": {
           "source": [
-            "obj-357",
+            "obj-363",
             0
           ],
           "destination": [
-            "obj-451",
+            "obj-463",
             0
           ]
         }
@@ -37120,7 +39603,7 @@
       {
         "patchline": {
           "source": [
-            "obj-451",
+            "obj-463",
             0
           ],
           "destination": [
@@ -37132,11 +39615,11 @@
       {
         "patchline": {
           "source": [
-            "obj-359",
+            "obj-365",
             2
           ],
           "destination": [
-            "obj-452",
+            "obj-464",
             0
           ]
         }
@@ -37144,11 +39627,11 @@
       {
         "patchline": {
           "source": [
-            "obj-452",
+            "obj-464",
             0
           ],
           "destination": [
-            "obj-453",
+            "obj-465",
             1
           ]
         }
@@ -37156,11 +39639,11 @@
       {
         "patchline": {
           "source": [
-            "obj-453",
+            "obj-465",
             0
           ],
           "destination": [
-            "obj-454",
+            "obj-466",
             0
           ]
         }
@@ -37168,11 +39651,11 @@
       {
         "patchline": {
           "source": [
-            "obj-454",
+            "obj-466",
             0
           ],
           "destination": [
-            "obj-358",
+            "obj-364",
             0
           ]
         }
@@ -37184,7 +39667,7 @@
             2
           ],
           "destination": [
-            "obj-456",
+            "obj-468",
             2
           ]
         }
@@ -37192,11 +39675,11 @@
       {
         "patchline": {
           "source": [
-            "obj-458",
+            "obj-470",
             0
           ],
           "destination": [
-            "obj-457",
+            "obj-469",
             9
           ]
         }
@@ -37208,7 +39691,7 @@
             0
           ],
           "destination": [
-            "obj-457",
+            "obj-469",
             10
           ]
         }
@@ -37220,7 +39703,7 @@
             0
           ],
           "destination": [
-            "obj-457",
+            "obj-469",
             11
           ]
         }
@@ -37228,11 +39711,11 @@
       {
         "patchline": {
           "source": [
-            "obj-459",
+            "obj-471",
             0
           ],
           "destination": [
-            "obj-457",
+            "obj-469",
             12
           ]
         }
@@ -37240,7 +39723,7 @@
       {
         "patchline": {
           "source": [
-            "obj-457",
+            "obj-469",
             7
           ],
           "destination": [
@@ -37256,7 +39739,7 @@
             18
           ],
           "destination": [
-            "obj-462",
+            "obj-474",
             0
           ]
         }
@@ -37264,11 +39747,11 @@
       {
         "patchline": {
           "source": [
-            "obj-461",
+            "obj-473",
             0
           ],
           "destination": [
-            "obj-463",
+            "obj-475",
             0
           ]
         }
@@ -37276,11 +39759,11 @@
       {
         "patchline": {
           "source": [
-            "obj-462",
+            "obj-474",
             0
           ],
           "destination": [
-            "obj-463",
+            "obj-475",
             1
           ]
         }
@@ -37288,11 +39771,11 @@
       {
         "patchline": {
           "source": [
-            "obj-463",
+            "obj-475",
             0
           ],
           "destination": [
-            "obj-464",
+            "obj-476",
             0
           ]
         }
@@ -37300,11 +39783,11 @@
       {
         "patchline": {
           "source": [
-            "obj-464",
+            "obj-476",
             0
           ],
           "destination": [
-            "obj-457",
+            "obj-469",
             0
           ]
         }
@@ -37312,7 +39795,7 @@
       {
         "patchline": {
           "source": [
-            "obj-457",
+            "obj-469",
             3
           ],
           "destination": [
@@ -37324,11 +39807,11 @@
       {
         "patchline": {
           "source": [
-            "obj-460",
+            "obj-472",
             0
           ],
           "destination": [
-            "obj-465",
+            "obj-477",
             0
           ]
         }
@@ -37336,7 +39819,7 @@
       {
         "patchline": {
           "source": [
-            "obj-465",
+            "obj-477",
             0
           ],
           "destination": [
@@ -37350,210 +39833,6 @@
           "source": [
             "obj-254",
             19
-          ],
-          "destination": [
-            "obj-468",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-467",
-            0
-          ],
-          "destination": [
-            "obj-469",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-468",
-            0
-          ],
-          "destination": [
-            "obj-469",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-469",
-            0
-          ],
-          "destination": [
-            "obj-470",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-470",
-            0
-          ],
-          "destination": [
-            "obj-457",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-457",
-            4
-          ],
-          "destination": [
-            "obj-255",
-            20
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-466",
-            0
-          ],
-          "destination": [
-            "obj-471",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-471",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            20
-          ],
-          "destination": [
-            "obj-474",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-473",
-            0
-          ],
-          "destination": [
-            "obj-475",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-474",
-            0
-          ],
-          "destination": [
-            "obj-475",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-475",
-            0
-          ],
-          "destination": [
-            "obj-476",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-476",
-            0
-          ],
-          "destination": [
-            "obj-457",
-            2
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-457",
-            5
-          ],
-          "destination": [
-            "obj-255",
-            21
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-472",
-            0
-          ],
-          "destination": [
-            "obj-473",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-472",
-            0
-          ],
-          "destination": [
-            "obj-477",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-477",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            21
           ],
           "destination": [
             "obj-480",
@@ -37592,7 +39871,211 @@
             0
           ],
           "destination": [
-            "obj-457",
+            "obj-482",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-482",
+            0
+          ],
+          "destination": [
+            "obj-469",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-469",
+            4
+          ],
+          "destination": [
+            "obj-255",
+            20
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-478",
+            0
+          ],
+          "destination": [
+            "obj-483",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-483",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            20
+          ],
+          "destination": [
+            "obj-486",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-485",
+            0
+          ],
+          "destination": [
+            "obj-487",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-486",
+            0
+          ],
+          "destination": [
+            "obj-487",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-487",
+            0
+          ],
+          "destination": [
+            "obj-488",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-488",
+            0
+          ],
+          "destination": [
+            "obj-469",
+            2
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-469",
+            5
+          ],
+          "destination": [
+            "obj-255",
+            21
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-484",
+            0
+          ],
+          "destination": [
+            "obj-485",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-484",
+            0
+          ],
+          "destination": [
+            "obj-489",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-489",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            21
+          ],
+          "destination": [
+            "obj-492",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-491",
+            0
+          ],
+          "destination": [
+            "obj-493",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-492",
+            0
+          ],
+          "destination": [
+            "obj-493",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-493",
+            0
+          ],
+          "destination": [
+            "obj-469",
             3
           ]
         }
@@ -37600,7 +40083,7 @@
       {
         "patchline": {
           "source": [
-            "obj-457",
+            "obj-469",
             6
           ],
           "destination": [
@@ -37612,11 +40095,11 @@
       {
         "patchline": {
           "source": [
-            "obj-478",
+            "obj-490",
             0
           ],
           "destination": [
-            "obj-479",
+            "obj-491",
             0
           ]
         }
@@ -37624,11 +40107,11 @@
       {
         "patchline": {
           "source": [
-            "obj-478",
+            "obj-490",
             0
           ],
           "destination": [
-            "obj-482",
+            "obj-494",
             0
           ]
         }
@@ -37636,7 +40119,7 @@
       {
         "patchline": {
           "source": [
-            "obj-482",
+            "obj-494",
             0
           ],
           "destination": [
@@ -37652,7 +40135,7 @@
             22
           ],
           "destination": [
-            "obj-485",
+            "obj-497",
             0
           ]
         }
@@ -37660,11 +40143,11 @@
       {
         "patchline": {
           "source": [
-            "obj-484",
+            "obj-496",
             0
           ],
           "destination": [
-            "obj-486",
+            "obj-498",
             0
           ]
         }
@@ -37672,11 +40155,11 @@
       {
         "patchline": {
           "source": [
-            "obj-485",
+            "obj-497",
             0
           ],
           "destination": [
-            "obj-486",
+            "obj-498",
             1
           ]
         }
@@ -37684,11 +40167,11 @@
       {
         "patchline": {
           "source": [
-            "obj-486",
+            "obj-498",
             0
           ],
           "destination": [
-            "obj-457",
+            "obj-469",
             4
           ]
         }
@@ -37696,7 +40179,7 @@
       {
         "patchline": {
           "source": [
-            "obj-457",
+            "obj-469",
             7
           ],
           "destination": [
@@ -37708,152 +40191,8 @@
       {
         "patchline": {
           "source": [
-            "obj-483",
+            "obj-495",
             0
-          ],
-          "destination": [
-            "obj-484",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-483",
-            0
-          ],
-          "destination": [
-            "obj-487",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-487",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            23
-          ],
-          "destination": [
-            "obj-490",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-489",
-            0
-          ],
-          "destination": [
-            "obj-491",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-490",
-            0
-          ],
-          "destination": [
-            "obj-491",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-491",
-            0
-          ],
-          "destination": [
-            "obj-492",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-492",
-            0
-          ],
-          "destination": [
-            "obj-457",
-            5
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-457",
-            8
-          ],
-          "destination": [
-            "obj-255",
-            24
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-488",
-            0
-          ],
-          "destination": [
-            "obj-489",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-488",
-            0
-          ],
-          "destination": [
-            "obj-493",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-493",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            24
           ],
           "destination": [
             "obj-496",
@@ -37868,7 +40207,7 @@
             0
           ],
           "destination": [
-            "obj-497",
+            "obj-499",
             0
           ]
         }
@@ -37876,11 +40215,47 @@
       {
         "patchline": {
           "source": [
-            "obj-496",
+            "obj-499",
             0
           ],
           "destination": [
-            "obj-497",
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            23
+          ],
+          "destination": [
+            "obj-502",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-501",
+            0
+          ],
+          "destination": [
+            "obj-503",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-502",
+            0
+          ],
+          "destination": [
+            "obj-503",
             1
           ]
         }
@@ -37888,11 +40263,11 @@
       {
         "patchline": {
           "source": [
-            "obj-497",
+            "obj-503",
             0
           ],
           "destination": [
-            "obj-498",
+            "obj-504",
             0
           ]
         }
@@ -37900,11 +40275,119 @@
       {
         "patchline": {
           "source": [
-            "obj-498",
+            "obj-504",
             0
           ],
           "destination": [
-            "obj-457",
+            "obj-469",
+            5
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-469",
+            8
+          ],
+          "destination": [
+            "obj-255",
+            24
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-500",
+            0
+          ],
+          "destination": [
+            "obj-501",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-500",
+            0
+          ],
+          "destination": [
+            "obj-505",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-505",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            24
+          ],
+          "destination": [
+            "obj-508",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-507",
+            0
+          ],
+          "destination": [
+            "obj-509",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-508",
+            0
+          ],
+          "destination": [
+            "obj-509",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-509",
+            0
+          ],
+          "destination": [
+            "obj-510",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-510",
+            0
+          ],
+          "destination": [
+            "obj-469",
             6
           ]
         }
@@ -37912,7 +40395,7 @@
       {
         "patchline": {
           "source": [
-            "obj-457",
+            "obj-469",
             9
           ],
           "destination": [
@@ -37924,11 +40407,11 @@
       {
         "patchline": {
           "source": [
-            "obj-494",
+            "obj-506",
             0
           ],
           "destination": [
-            "obj-495",
+            "obj-507",
             0
           ]
         }
@@ -37936,11 +40419,11 @@
       {
         "patchline": {
           "source": [
-            "obj-494",
+            "obj-506",
             0
           ],
           "destination": [
-            "obj-499",
+            "obj-511",
             0
           ]
         }
@@ -37948,7 +40431,7 @@
       {
         "patchline": {
           "source": [
-            "obj-499",
+            "obj-511",
             0
           ],
           "destination": [
@@ -37964,223 +40447,7 @@
             25
           ],
           "destination": [
-            "obj-502",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-501",
-            0
-          ],
-          "destination": [
-            "obj-503",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-502",
-            0
-          ],
-          "destination": [
-            "obj-503",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-503",
-            0
-          ],
-          "destination": [
-            "obj-504",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-504",
-            0
-          ],
-          "destination": [
-            "obj-457",
-            7
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-457",
-            10
-          ],
-          "destination": [
-            "obj-255",
-            26
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-500",
-            0
-          ],
-          "destination": [
-            "obj-501",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-500",
-            0
-          ],
-          "destination": [
-            "obj-505",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-505",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            26
-          ],
-          "destination": [
-            "obj-508",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-507",
-            0
-          ],
-          "destination": [
-            "obj-509",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-508",
-            0
-          ],
-          "destination": [
-            "obj-509",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-509",
-            0
-          ],
-          "destination": [
-            "obj-510",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-510",
-            0
-          ],
-          "destination": [
-            "obj-457",
-            8
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-457",
-            11
-          ],
-          "destination": [
-            "obj-255",
-            27
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-506",
-            0
-          ],
-          "destination": [
-            "obj-507",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-506",
-            0
-          ],
-          "destination": [
-            "obj-511",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-511",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-512",
-            0
-          ],
-          "destination": [
-            "obj-513",
+            "obj-514",
             0
           ]
         }
@@ -38192,7 +40459,7 @@
             0
           ],
           "destination": [
-            "obj-514",
+            "obj-515",
             0
           ]
         }
@@ -38204,8 +40471,8 @@
             0
           ],
           "destination": [
-            "obj-30",
-            0
+            "obj-515",
+            1
           ]
         }
       },
@@ -38228,7 +40495,43 @@
             0
           ],
           "destination": [
-            "obj-204",
+            "obj-469",
+            7
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-469",
+            10
+          ],
+          "destination": [
+            "obj-255",
+            26
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-512",
+            0
+          ],
+          "destination": [
+            "obj-513",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-512",
+            0
+          ],
+          "destination": [
+            "obj-517",
             0
           ]
         }
@@ -38240,7 +40543,7 @@
             0
           ],
           "destination": [
-            "obj-518",
+            "obj-30",
             0
           ]
         }
@@ -38248,56 +40551,8 @@
       {
         "patchline": {
           "source": [
-            "obj-518",
-            0
-          ],
-          "destination": [
-            "obj-204",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-521",
-            0
-          ],
-          "destination": [
-            "obj-500",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-520",
-            0
-          ],
-          "destination": [
-            "obj-500",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-500",
-            0
-          ],
-          "destination": [
-            "obj-523",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-523",
-            0
+            "obj-254",
+            26
           ],
           "destination": [
             "obj-520",
@@ -38312,42 +40567,6 @@
             0
           ],
           "destination": [
-            "obj-506",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-506",
-            0
-          ],
-          "destination": [
-            "obj-524",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-524",
-            0
-          ],
-          "destination": [
-            "obj-519",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-523",
-            0
-          ],
-          "destination": [
             "obj-521",
             0
           ]
@@ -38356,199 +40575,19 @@
       {
         "patchline": {
           "source": [
-            "obj-525",
+            "obj-520",
             0
           ],
           "destination": [
-            "obj-526",
-            0
+            "obj-521",
+            1
           ]
         }
       },
       {
         "patchline": {
           "source": [
-            "obj-526",
-            0
-          ],
-          "destination": [
-            "obj-527",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-527",
-            0
-          ],
-          "destination": [
-            "obj-528",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-525",
-            0
-          ],
-          "destination": [
-            "obj-529",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-529",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-525",
-            0
-          ],
-          "destination": [
-            "obj-530",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-530",
-            0
-          ],
-          "destination": [
-            "obj-161",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-162",
-            4
-          ],
-          "destination": [
-            "obj-525",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-531",
-            0
-          ],
-          "destination": [
-            "obj-532",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-532",
-            0
-          ],
-          "destination": [
-            "obj-533",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-533",
-            0
-          ],
-          "destination": [
-            "obj-534",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-531",
-            0
-          ],
-          "destination": [
-            "obj-535",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-535",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-531",
-            0
-          ],
-          "destination": [
-            "obj-536",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-536",
-            0
-          ],
-          "destination": [
-            "obj-161",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-162",
-            5
-          ],
-          "destination": [
-            "obj-531",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-538",
+            "obj-521",
             0
           ],
           "destination": [
@@ -38560,119 +40599,35 @@
       {
         "patchline": {
           "source": [
-            "obj-457",
+            "obj-522",
             0
           ],
           "destination": [
-            "obj-539",
-            0
+            "obj-469",
+            8
           ]
         }
       },
       {
         "patchline": {
           "source": [
-            "obj-537",
-            0
-          ],
-          "destination": [
-            "obj-539",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-539",
-            0
-          ],
-          "destination": [
-            "obj-154",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-539",
-            0
-          ],
-          "destination": [
-            "obj-540",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-528",
-            0
-          ],
-          "destination": [
-            "obj-540",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-540",
-            0
-          ],
-          "destination": [
-            "obj-154",
-            9
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-539",
-            0
-          ],
-          "destination": [
-            "obj-541",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-534",
-            0
-          ],
-          "destination": [
-            "obj-541",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-541",
-            0
-          ],
-          "destination": [
-            "obj-154",
+            "obj-469",
             11
+          ],
+          "destination": [
+            "obj-255",
+            27
           ]
         }
       },
       {
         "patchline": {
           "source": [
-            "obj-539",
+            "obj-518",
             0
           ],
           "destination": [
-            "obj-542",
+            "obj-519",
             0
           ]
         }
@@ -38680,11 +40635,11 @@
       {
         "patchline": {
           "source": [
-            "obj-542",
+            "obj-518",
             0
           ],
           "destination": [
-            "obj-538",
+            "obj-523",
             0
           ]
         }
@@ -38692,151 +40647,7 @@
       {
         "patchline": {
           "source": [
-            "obj-457",
-            1
-          ],
-          "destination": [
-            "obj-543",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-537",
-            0
-          ],
-          "destination": [
-            "obj-543",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-543",
-            0
-          ],
-          "destination": [
-            "obj-154",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-543",
-            0
-          ],
-          "destination": [
-            "obj-544",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-528",
-            0
-          ],
-          "destination": [
-            "obj-544",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-544",
-            0
-          ],
-          "destination": [
-            "obj-154",
-            10
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-543",
-            0
-          ],
-          "destination": [
-            "obj-545",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-534",
-            0
-          ],
-          "destination": [
-            "obj-545",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-545",
-            0
-          ],
-          "destination": [
-            "obj-154",
-            12
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-543",
-            0
-          ],
-          "destination": [
-            "obj-546",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-546",
-            0
-          ],
-          "destination": [
-            "obj-538",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-456",
-            5
-          ],
-          "destination": [
-            "obj-547",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-547",
+            "obj-523",
             0
           ],
           "destination": [
@@ -38848,11 +40659,335 @@
       {
         "patchline": {
           "source": [
-            "obj-456",
+            "obj-524",
+            0
+          ],
+          "destination": [
+            "obj-525",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-525",
+            0
+          ],
+          "destination": [
+            "obj-526",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-526",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-527",
+            0
+          ],
+          "destination": [
+            "obj-528",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-528",
+            0
+          ],
+          "destination": [
+            "obj-204",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-529",
+            0
+          ],
+          "destination": [
+            "obj-530",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-530",
+            0
+          ],
+          "destination": [
+            "obj-204",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-533",
+            0
+          ],
+          "destination": [
+            "obj-512",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-532",
+            0
+          ],
+          "destination": [
+            "obj-512",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-512",
+            0
+          ],
+          "destination": [
+            "obj-535",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-535",
+            0
+          ],
+          "destination": [
+            "obj-532",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-531",
+            0
+          ],
+          "destination": [
+            "obj-518",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-518",
+            0
+          ],
+          "destination": [
+            "obj-536",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-536",
+            0
+          ],
+          "destination": [
+            "obj-531",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-535",
+            0
+          ],
+          "destination": [
+            "obj-533",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            48
+          ],
+          "destination": [
+            "obj-542",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-540",
+            0
+          ],
+          "destination": [
+            "obj-543",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-542",
+            0
+          ],
+          "destination": [
+            "obj-543",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-543",
+            0
+          ],
+          "destination": [
+            "obj-544",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-544",
+            0
+          ],
+          "destination": [
+            "obj-255",
+            49
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-537",
+            0
+          ],
+          "destination": [
+            "obj-538",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-538",
+            0
+          ],
+          "destination": [
+            "obj-539",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-539",
+            0
+          ],
+          "destination": [
+            "obj-540",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-537",
+            0
+          ],
+          "destination": [
+            "obj-541",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-541",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-537",
+            0
+          ],
+          "destination": [
+            "obj-545",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-545",
+            0
+          ],
+          "destination": [
+            "obj-161",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-162",
             4
           ],
           "destination": [
-            "obj-548",
+            "obj-537",
             0
           ]
         }
@@ -38860,59 +40995,35 @@
       {
         "patchline": {
           "source": [
-            "obj-548",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-455",
-            0
-          ],
-          "destination": [
-            "obj-549",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-549",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-457",
-            2
-          ],
-          "destination": [
-            "obj-550",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-550",
-            0
+            "obj-254",
+            49
           ],
           "destination": [
             "obj-551",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-549",
+            0
+          ],
+          "destination": [
+            "obj-552",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-551",
+            0
+          ],
+          "destination": [
+            "obj-552",
             1
           ]
         }
@@ -38920,11 +41031,11 @@
       {
         "patchline": {
           "source": [
-            "obj-551",
+            "obj-552",
             0
           ],
           "destination": [
-            "obj-552",
+            "obj-553",
             0
           ]
         }
@@ -38932,11 +41043,23 @@
       {
         "patchline": {
           "source": [
-            "obj-552",
+            "obj-553",
             0
           ],
           "destination": [
-            "obj-456",
+            "obj-255",
+            50
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-546",
+            0
+          ],
+          "destination": [
+            "obj-547",
             0
           ]
         }
@@ -38944,12 +41067,84 @@
       {
         "patchline": {
           "source": [
+            "obj-547",
+            0
+          ],
+          "destination": [
+            "obj-548",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-548",
+            0
+          ],
+          "destination": [
+            "obj-549",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-546",
+            0
+          ],
+          "destination": [
+            "obj-550",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-550",
+            0
+          ],
+          "destination": [
             "obj-30",
-            3
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-546",
+            0
           ],
           "destination": [
             "obj-554",
-            2
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-554",
+            0
+          ],
+          "destination": [
+            "obj-161",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-162",
+            5
+          ],
+          "destination": [
+            "obj-546",
+            0
           ]
         }
       },
@@ -38960,7 +41155,79 @@
             0
           ],
           "destination": [
+            "obj-534",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-469",
+            0
+          ],
+          "destination": [
+            "obj-557",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-555",
+            0
+          ],
+          "destination": [
+            "obj-557",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-557",
+            0
+          ],
+          "destination": [
+            "obj-154",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-557",
+            0
+          ],
+          "destination": [
+            "obj-558",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-544",
+            0
+          ],
+          "destination": [
+            "obj-558",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-558",
+            0
+          ],
+          "destination": [
+            "obj-154",
             9
           ]
         }
@@ -38968,23 +41235,35 @@
       {
         "patchline": {
           "source": [
-            "obj-42",
+            "obj-557",
             0
           ],
           "destination": [
-            "obj-555",
-            10
+            "obj-559",
+            0
           ]
         }
       },
       {
         "patchline": {
           "source": [
-            "obj-250",
+            "obj-553",
             0
           ],
           "destination": [
-            "obj-555",
+            "obj-559",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-559",
+            0
+          ],
+          "destination": [
+            "obj-154",
             11
           ]
         }
@@ -38996,8 +41275,32 @@
             0
           ],
           "destination": [
-            "obj-555",
-            12
+            "obj-560",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-560",
+            0
+          ],
+          "destination": [
+            "obj-556",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-469",
+            1
+          ],
+          "destination": [
+            "obj-561",
+            0
           ]
         }
       },
@@ -39005,6 +41308,306 @@
         "patchline": {
           "source": [
             "obj-555",
+            0
+          ],
+          "destination": [
+            "obj-561",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-561",
+            0
+          ],
+          "destination": [
+            "obj-154",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-561",
+            0
+          ],
+          "destination": [
+            "obj-562",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-544",
+            0
+          ],
+          "destination": [
+            "obj-562",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-562",
+            0
+          ],
+          "destination": [
+            "obj-154",
+            10
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-561",
+            0
+          ],
+          "destination": [
+            "obj-563",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-553",
+            0
+          ],
+          "destination": [
+            "obj-563",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-563",
+            0
+          ],
+          "destination": [
+            "obj-154",
+            12
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-561",
+            0
+          ],
+          "destination": [
+            "obj-564",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-564",
+            0
+          ],
+          "destination": [
+            "obj-556",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-468",
+            5
+          ],
+          "destination": [
+            "obj-565",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-565",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-468",
+            4
+          ],
+          "destination": [
+            "obj-566",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-566",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-467",
+            0
+          ],
+          "destination": [
+            "obj-567",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-567",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-469",
+            2
+          ],
+          "destination": [
+            "obj-568",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-568",
+            0
+          ],
+          "destination": [
+            "obj-569",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-569",
+            0
+          ],
+          "destination": [
+            "obj-570",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-570",
+            0
+          ],
+          "destination": [
+            "obj-468",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-30",
+            3
+          ],
+          "destination": [
+            "obj-572",
+            2
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-574",
+            0
+          ],
+          "destination": [
+            "obj-573",
+            9
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-42",
+            0
+          ],
+          "destination": [
+            "obj-573",
+            10
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-250",
+            0
+          ],
+          "destination": [
+            "obj-573",
+            11
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-575",
+            0
+          ],
+          "destination": [
+            "obj-573",
+            12
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-573",
             7
           ],
           "destination": [
@@ -39020,7 +41623,7 @@
             27
           ],
           "destination": [
-            "obj-560",
+            "obj-578",
             0
           ]
         }
@@ -39028,11 +41631,11 @@
       {
         "patchline": {
           "source": [
-            "obj-559",
+            "obj-577",
             0
           ],
           "destination": [
-            "obj-561",
+            "obj-579",
             0
           ]
         }
@@ -39040,11 +41643,11 @@
       {
         "patchline": {
           "source": [
-            "obj-560",
+            "obj-578",
             0
           ],
           "destination": [
-            "obj-561",
+            "obj-579",
             1
           ]
         }
@@ -39052,11 +41655,11 @@
       {
         "patchline": {
           "source": [
-            "obj-561",
+            "obj-579",
             0
           ],
           "destination": [
-            "obj-562",
+            "obj-580",
             0
           ]
         }
@@ -39064,11 +41667,11 @@
       {
         "patchline": {
           "source": [
-            "obj-562",
+            "obj-580",
             0
           ],
           "destination": [
-            "obj-555",
+            "obj-573",
             0
           ]
         }
@@ -39076,7 +41679,7 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             3
           ],
           "destination": [
@@ -39088,11 +41691,11 @@
       {
         "patchline": {
           "source": [
-            "obj-558",
+            "obj-576",
             0
           ],
           "destination": [
-            "obj-563",
+            "obj-581",
             0
           ]
         }
@@ -39100,7 +41703,7 @@
       {
         "patchline": {
           "source": [
-            "obj-563",
+            "obj-581",
             0
           ],
           "destination": [
@@ -39116,7 +41719,7 @@
             28
           ],
           "destination": [
-            "obj-566",
+            "obj-584",
             0
           ]
         }
@@ -39124,11 +41727,11 @@
       {
         "patchline": {
           "source": [
-            "obj-565",
+            "obj-583",
             0
           ],
           "destination": [
-            "obj-567",
+            "obj-585",
             0
           ]
         }
@@ -39136,11 +41739,11 @@
       {
         "patchline": {
           "source": [
-            "obj-566",
+            "obj-584",
             0
           ],
           "destination": [
-            "obj-567",
+            "obj-585",
             1
           ]
         }
@@ -39148,11 +41751,11 @@
       {
         "patchline": {
           "source": [
-            "obj-567",
+            "obj-585",
             0
           ],
           "destination": [
-            "obj-568",
+            "obj-586",
             0
           ]
         }
@@ -39160,11 +41763,11 @@
       {
         "patchline": {
           "source": [
-            "obj-568",
+            "obj-586",
             0
           ],
           "destination": [
-            "obj-555",
+            "obj-573",
             1
           ]
         }
@@ -39172,7 +41775,7 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             4
           ],
           "destination": [
@@ -39184,11 +41787,11 @@
       {
         "patchline": {
           "source": [
-            "obj-564",
+            "obj-582",
             0
           ],
           "destination": [
-            "obj-569",
+            "obj-587",
             0
           ]
         }
@@ -39196,7 +41799,7 @@
       {
         "patchline": {
           "source": [
-            "obj-569",
+            "obj-587",
             0
           ],
           "destination": [
@@ -39212,7 +41815,7 @@
             29
           ],
           "destination": [
-            "obj-572",
+            "obj-590",
             0
           ]
         }
@@ -39220,11 +41823,11 @@
       {
         "patchline": {
           "source": [
-            "obj-571",
+            "obj-589",
             0
           ],
           "destination": [
-            "obj-573",
+            "obj-591",
             0
           ]
         }
@@ -39232,11 +41835,11 @@
       {
         "patchline": {
           "source": [
-            "obj-572",
+            "obj-590",
             0
           ],
           "destination": [
-            "obj-573",
+            "obj-591",
             1
           ]
         }
@@ -39244,11 +41847,11 @@
       {
         "patchline": {
           "source": [
-            "obj-573",
+            "obj-591",
             0
           ],
           "destination": [
-            "obj-574",
+            "obj-592",
             0
           ]
         }
@@ -39256,11 +41859,11 @@
       {
         "patchline": {
           "source": [
-            "obj-574",
+            "obj-592",
             0
           ],
           "destination": [
-            "obj-555",
+            "obj-573",
             2
           ]
         }
@@ -39268,7 +41871,7 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             5
           ],
           "destination": [
@@ -39280,11 +41883,11 @@
       {
         "patchline": {
           "source": [
-            "obj-570",
+            "obj-588",
             0
           ],
           "destination": [
-            "obj-571",
+            "obj-589",
             0
           ]
         }
@@ -39292,11 +41895,11 @@
       {
         "patchline": {
           "source": [
-            "obj-570",
+            "obj-588",
             0
           ],
           "destination": [
-            "obj-575",
+            "obj-593",
             0
           ]
         }
@@ -39304,7 +41907,7 @@
       {
         "patchline": {
           "source": [
-            "obj-575",
+            "obj-593",
             0
           ],
           "destination": [
@@ -39320,7 +41923,7 @@
             30
           ],
           "destination": [
-            "obj-578",
+            "obj-596",
             0
           ]
         }
@@ -39328,11 +41931,11 @@
       {
         "patchline": {
           "source": [
-            "obj-577",
+            "obj-595",
             0
           ],
           "destination": [
-            "obj-579",
+            "obj-597",
             0
           ]
         }
@@ -39340,11 +41943,11 @@
       {
         "patchline": {
           "source": [
-            "obj-578",
+            "obj-596",
             0
           ],
           "destination": [
-            "obj-579",
+            "obj-597",
             1
           ]
         }
@@ -39352,11 +41955,11 @@
       {
         "patchline": {
           "source": [
-            "obj-579",
+            "obj-597",
             0
           ],
           "destination": [
-            "obj-555",
+            "obj-573",
             3
           ]
         }
@@ -39364,7 +41967,7 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             6
           ],
           "destination": [
@@ -39376,11 +41979,11 @@
       {
         "patchline": {
           "source": [
-            "obj-576",
+            "obj-594",
             0
           ],
           "destination": [
-            "obj-577",
+            "obj-595",
             0
           ]
         }
@@ -39388,11 +41991,11 @@
       {
         "patchline": {
           "source": [
-            "obj-576",
+            "obj-594",
             0
           ],
           "destination": [
-            "obj-580",
+            "obj-598",
             0
           ]
         }
@@ -39400,7 +42003,7 @@
       {
         "patchline": {
           "source": [
-            "obj-580",
+            "obj-598",
             0
           ],
           "destination": [
@@ -39416,7 +42019,7 @@
             31
           ],
           "destination": [
-            "obj-583",
+            "obj-601",
             0
           ]
         }
@@ -39424,11 +42027,11 @@
       {
         "patchline": {
           "source": [
-            "obj-582",
+            "obj-600",
             0
           ],
           "destination": [
-            "obj-584",
+            "obj-602",
             0
           ]
         }
@@ -39436,11 +42039,11 @@
       {
         "patchline": {
           "source": [
-            "obj-583",
+            "obj-601",
             0
           ],
           "destination": [
-            "obj-584",
+            "obj-602",
             1
           ]
         }
@@ -39448,11 +42051,11 @@
       {
         "patchline": {
           "source": [
-            "obj-584",
+            "obj-602",
             0
           ],
           "destination": [
-            "obj-555",
+            "obj-573",
             4
           ]
         }
@@ -39460,7 +42063,7 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             7
           ],
           "destination": [
@@ -39472,11 +42075,11 @@
       {
         "patchline": {
           "source": [
-            "obj-581",
+            "obj-599",
             0
           ],
           "destination": [
-            "obj-582",
+            "obj-600",
             0
           ]
         }
@@ -39484,11 +42087,11 @@
       {
         "patchline": {
           "source": [
-            "obj-581",
+            "obj-599",
             0
           ],
           "destination": [
-            "obj-585",
+            "obj-603",
             0
           ]
         }
@@ -39496,7 +42099,7 @@
       {
         "patchline": {
           "source": [
-            "obj-585",
+            "obj-603",
             0
           ],
           "destination": [
@@ -39512,7 +42115,7 @@
             32
           ],
           "destination": [
-            "obj-588",
+            "obj-606",
             0
           ]
         }
@@ -39520,11 +42123,11 @@
       {
         "patchline": {
           "source": [
-            "obj-587",
+            "obj-605",
             0
           ],
           "destination": [
-            "obj-589",
+            "obj-607",
             0
           ]
         }
@@ -39532,11 +42135,11 @@
       {
         "patchline": {
           "source": [
-            "obj-588",
+            "obj-606",
             0
           ],
           "destination": [
-            "obj-589",
+            "obj-607",
             1
           ]
         }
@@ -39544,11 +42147,11 @@
       {
         "patchline": {
           "source": [
-            "obj-589",
+            "obj-607",
             0
           ],
           "destination": [
-            "obj-590",
+            "obj-608",
             0
           ]
         }
@@ -39556,11 +42159,11 @@
       {
         "patchline": {
           "source": [
-            "obj-590",
+            "obj-608",
             0
           ],
           "destination": [
-            "obj-555",
+            "obj-573",
             5
           ]
         }
@@ -39568,336 +42171,12 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             8
           ],
           "destination": [
             "obj-255",
             33
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-586",
-            0
-          ],
-          "destination": [
-            "obj-587",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-586",
-            0
-          ],
-          "destination": [
-            "obj-591",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-591",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            33
-          ],
-          "destination": [
-            "obj-594",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-593",
-            0
-          ],
-          "destination": [
-            "obj-595",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-594",
-            0
-          ],
-          "destination": [
-            "obj-595",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-595",
-            0
-          ],
-          "destination": [
-            "obj-596",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-596",
-            0
-          ],
-          "destination": [
-            "obj-555",
-            6
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-555",
-            9
-          ],
-          "destination": [
-            "obj-255",
-            34
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-592",
-            0
-          ],
-          "destination": [
-            "obj-593",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-592",
-            0
-          ],
-          "destination": [
-            "obj-597",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-597",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            34
-          ],
-          "destination": [
-            "obj-600",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-599",
-            0
-          ],
-          "destination": [
-            "obj-601",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-600",
-            0
-          ],
-          "destination": [
-            "obj-601",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-601",
-            0
-          ],
-          "destination": [
-            "obj-602",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-602",
-            0
-          ],
-          "destination": [
-            "obj-555",
-            7
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-555",
-            10
-          ],
-          "destination": [
-            "obj-255",
-            35
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-598",
-            0
-          ],
-          "destination": [
-            "obj-599",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-598",
-            0
-          ],
-          "destination": [
-            "obj-603",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-603",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-254",
-            35
-          ],
-          "destination": [
-            "obj-606",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-605",
-            0
-          ],
-          "destination": [
-            "obj-607",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-606",
-            0
-          ],
-          "destination": [
-            "obj-607",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-607",
-            0
-          ],
-          "destination": [
-            "obj-608",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-608",
-            0
-          ],
-          "destination": [
-            "obj-555",
-            8
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-555",
-            11
-          ],
-          "destination": [
-            "obj-255",
-            36
           ]
         }
       },
@@ -39940,20 +42219,8 @@
       {
         "patchline": {
           "source": [
-            "obj-610",
-            0
-          ],
-          "destination": [
-            "obj-611",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-611",
-            0
+            "obj-254",
+            33
           ],
           "destination": [
             "obj-612",
@@ -39964,12 +42231,24 @@
       {
         "patchline": {
           "source": [
+            "obj-611",
+            0
+          ],
+          "destination": [
+            "obj-613",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-612",
             0
           ],
           "destination": [
-            "obj-30",
-            0
+            "obj-613",
+            1
           ]
         }
       },
@@ -39992,7 +42271,43 @@
             0
           ],
           "destination": [
-            "obj-204",
+            "obj-573",
+            6
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-573",
+            9
+          ],
+          "destination": [
+            "obj-255",
+            34
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-610",
+            0
+          ],
+          "destination": [
+            "obj-611",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-610",
+            0
+          ],
+          "destination": [
+            "obj-615",
             0
           ]
         }
@@ -40004,7 +42319,7 @@
             0
           ],
           "destination": [
-            "obj-616",
+            "obj-30",
             0
           ]
         }
@@ -40012,56 +42327,8 @@
       {
         "patchline": {
           "source": [
-            "obj-616",
-            0
-          ],
-          "destination": [
-            "obj-204",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-619",
-            0
-          ],
-          "destination": [
-            "obj-598",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-618",
-            0
-          ],
-          "destination": [
-            "obj-598",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-598",
-            0
-          ],
-          "destination": [
-            "obj-621",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-621",
-            0
+            "obj-254",
+            34
           ],
           "destination": [
             "obj-618",
@@ -40076,7 +42343,7 @@
             0
           ],
           "destination": [
-            "obj-604",
+            "obj-619",
             0
           ]
         }
@@ -40084,11 +42351,23 @@
       {
         "patchline": {
           "source": [
-            "obj-604",
+            "obj-618",
             0
           ],
           "destination": [
-            "obj-622",
+            "obj-619",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-619",
+            0
+          ],
+          "destination": [
+            "obj-620",
             0
           ]
         }
@@ -40096,7 +42375,31 @@
       {
         "patchline": {
           "source": [
-            "obj-622",
+            "obj-620",
+            0
+          ],
+          "destination": [
+            "obj-573",
+            7
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-573",
+            10
+          ],
+          "destination": [
+            "obj-255",
+            35
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-616",
             0
           ],
           "destination": [
@@ -40108,11 +42411,35 @@
       {
         "patchline": {
           "source": [
+            "obj-616",
+            0
+          ],
+          "destination": [
+            "obj-621",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-621",
             0
           ],
           "destination": [
-            "obj-619",
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            35
+          ],
+          "destination": [
+            "obj-624",
             0
           ]
         }
@@ -40124,7 +42451,7 @@
             0
           ],
           "destination": [
-            "obj-624",
+            "obj-625",
             0
           ]
         }
@@ -40137,7 +42464,7 @@
           ],
           "destination": [
             "obj-625",
-            0
+            1
           ]
         }
       },
@@ -40156,7 +42483,43 @@
       {
         "patchline": {
           "source": [
+            "obj-626",
+            0
+          ],
+          "destination": [
+            "obj-573",
+            8
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-573",
+            11
+          ],
+          "destination": [
+            "obj-255",
+            36
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-622",
+            0
+          ],
+          "destination": [
             "obj-623",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-622",
             0
           ],
           "destination": [
@@ -40180,11 +42543,11 @@
       {
         "patchline": {
           "source": [
-            "obj-623",
+            "obj-628",
             0
           ],
           "destination": [
-            "obj-628",
+            "obj-629",
             0
           ]
         }
@@ -40192,7 +42555,307 @@
       {
         "patchline": {
           "source": [
-            "obj-628",
+            "obj-629",
+            0
+          ],
+          "destination": [
+            "obj-630",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-630",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-631",
+            0
+          ],
+          "destination": [
+            "obj-632",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-632",
+            0
+          ],
+          "destination": [
+            "obj-204",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-633",
+            0
+          ],
+          "destination": [
+            "obj-634",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-634",
+            0
+          ],
+          "destination": [
+            "obj-204",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-637",
+            0
+          ],
+          "destination": [
+            "obj-616",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-636",
+            0
+          ],
+          "destination": [
+            "obj-616",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-616",
+            0
+          ],
+          "destination": [
+            "obj-639",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-639",
+            0
+          ],
+          "destination": [
+            "obj-636",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-635",
+            0
+          ],
+          "destination": [
+            "obj-622",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-622",
+            0
+          ],
+          "destination": [
+            "obj-640",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-640",
+            0
+          ],
+          "destination": [
+            "obj-635",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-639",
+            0
+          ],
+          "destination": [
+            "obj-637",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            50
+          ],
+          "destination": [
+            "obj-646",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-644",
+            0
+          ],
+          "destination": [
+            "obj-647",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-646",
+            0
+          ],
+          "destination": [
+            "obj-647",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-647",
+            0
+          ],
+          "destination": [
+            "obj-648",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-648",
+            0
+          ],
+          "destination": [
+            "obj-255",
+            51
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-641",
+            0
+          ],
+          "destination": [
+            "obj-642",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-642",
+            0
+          ],
+          "destination": [
+            "obj-643",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-643",
+            0
+          ],
+          "destination": [
+            "obj-644",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-641",
+            0
+          ],
+          "destination": [
+            "obj-645",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-645",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-641",
+            0
+          ],
+          "destination": [
+            "obj-649",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-649",
             0
           ],
           "destination": [
@@ -40208,7 +42871,7 @@
             6
           ],
           "destination": [
-            "obj-623",
+            "obj-641",
             0
           ]
         }
@@ -40216,11 +42879,23 @@
       {
         "patchline": {
           "source": [
-            "obj-629",
+            "obj-254",
+            51
+          ],
+          "destination": [
+            "obj-655",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-653",
             0
           ],
           "destination": [
-            "obj-630",
+            "obj-656",
             0
           ]
         }
@@ -40228,23 +42903,23 @@
       {
         "patchline": {
           "source": [
-            "obj-630",
+            "obj-655",
             0
           ],
           "destination": [
-            "obj-631",
-            0
+            "obj-656",
+            1
           ]
         }
       },
       {
         "patchline": {
           "source": [
-            "obj-631",
+            "obj-656",
             0
           ],
           "destination": [
-            "obj-632",
+            "obj-657",
             0
           ]
         }
@@ -40252,11 +42927,23 @@
       {
         "patchline": {
           "source": [
-            "obj-629",
+            "obj-657",
             0
           ],
           "destination": [
-            "obj-633",
+            "obj-255",
+            52
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-650",
+            0
+          ],
+          "destination": [
+            "obj-651",
             0
           ]
         }
@@ -40264,7 +42951,43 @@
       {
         "patchline": {
           "source": [
-            "obj-633",
+            "obj-651",
+            0
+          ],
+          "destination": [
+            "obj-652",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-652",
+            0
+          ],
+          "destination": [
+            "obj-653",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-650",
+            0
+          ],
+          "destination": [
+            "obj-654",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-654",
             0
           ],
           "destination": [
@@ -40276,11 +42999,11 @@
       {
         "patchline": {
           "source": [
-            "obj-629",
+            "obj-650",
             0
           ],
           "destination": [
-            "obj-634",
+            "obj-658",
             0
           ]
         }
@@ -40288,7 +43011,7 @@
       {
         "patchline": {
           "source": [
-            "obj-634",
+            "obj-658",
             0
           ],
           "destination": [
@@ -40304,7 +43027,7 @@
             7
           ],
           "destination": [
-            "obj-629",
+            "obj-650",
             0
           ]
         }
@@ -40312,11 +43035,11 @@
       {
         "patchline": {
           "source": [
-            "obj-636",
+            "obj-660",
             0
           ],
           "destination": [
-            "obj-620",
+            "obj-638",
             0
           ]
         }
@@ -40324,11 +43047,11 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             0
           ],
           "destination": [
-            "obj-637",
+            "obj-661",
             0
           ]
         }
@@ -40336,11 +43059,11 @@
       {
         "patchline": {
           "source": [
-            "obj-635",
+            "obj-659",
             0
           ],
           "destination": [
-            "obj-637",
+            "obj-661",
             1
           ]
         }
@@ -40348,7 +43071,7 @@
       {
         "patchline": {
           "source": [
-            "obj-637",
+            "obj-661",
             0
           ],
           "destination": [
@@ -40360,11 +43083,11 @@
       {
         "patchline": {
           "source": [
-            "obj-637",
+            "obj-661",
             0
           ],
           "destination": [
-            "obj-638",
+            "obj-662",
             0
           ]
         }
@@ -40372,11 +43095,11 @@
       {
         "patchline": {
           "source": [
-            "obj-626",
+            "obj-648",
             0
           ],
           "destination": [
-            "obj-638",
+            "obj-662",
             1
           ]
         }
@@ -40384,7 +43107,7 @@
       {
         "patchline": {
           "source": [
-            "obj-638",
+            "obj-662",
             0
           ],
           "destination": [
@@ -40396,11 +43119,11 @@
       {
         "patchline": {
           "source": [
-            "obj-637",
+            "obj-661",
             0
           ],
           "destination": [
-            "obj-639",
+            "obj-663",
             0
           ]
         }
@@ -40408,11 +43131,11 @@
       {
         "patchline": {
           "source": [
-            "obj-632",
+            "obj-657",
             0
           ],
           "destination": [
-            "obj-639",
+            "obj-663",
             1
           ]
         }
@@ -40420,7 +43143,7 @@
       {
         "patchline": {
           "source": [
-            "obj-639",
+            "obj-663",
             0
           ],
           "destination": [
@@ -40432,11 +43155,11 @@
       {
         "patchline": {
           "source": [
-            "obj-637",
+            "obj-661",
             0
           ],
           "destination": [
-            "obj-640",
+            "obj-664",
             0
           ]
         }
@@ -40444,11 +43167,11 @@
       {
         "patchline": {
           "source": [
-            "obj-640",
+            "obj-664",
             0
           ],
           "destination": [
-            "obj-636",
+            "obj-660",
             0
           ]
         }
@@ -40456,11 +43179,11 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             1
           ],
           "destination": [
-            "obj-641",
+            "obj-665",
             0
           ]
         }
@@ -40468,11 +43191,11 @@
       {
         "patchline": {
           "source": [
-            "obj-635",
+            "obj-659",
             0
           ],
           "destination": [
-            "obj-641",
+            "obj-665",
             1
           ]
         }
@@ -40480,7 +43203,7 @@
       {
         "patchline": {
           "source": [
-            "obj-641",
+            "obj-665",
             0
           ],
           "destination": [
@@ -40492,11 +43215,11 @@
       {
         "patchline": {
           "source": [
-            "obj-641",
+            "obj-665",
             0
           ],
           "destination": [
-            "obj-642",
+            "obj-666",
             0
           ]
         }
@@ -40504,11 +43227,11 @@
       {
         "patchline": {
           "source": [
-            "obj-626",
+            "obj-648",
             0
           ],
           "destination": [
-            "obj-642",
+            "obj-666",
             1
           ]
         }
@@ -40516,7 +43239,7 @@
       {
         "patchline": {
           "source": [
-            "obj-642",
+            "obj-666",
             0
           ],
           "destination": [
@@ -40528,11 +43251,11 @@
       {
         "patchline": {
           "source": [
-            "obj-641",
+            "obj-665",
             0
           ],
           "destination": [
-            "obj-643",
+            "obj-667",
             0
           ]
         }
@@ -40540,11 +43263,11 @@
       {
         "patchline": {
           "source": [
-            "obj-632",
+            "obj-657",
             0
           ],
           "destination": [
-            "obj-643",
+            "obj-667",
             1
           ]
         }
@@ -40552,7 +43275,7 @@
       {
         "patchline": {
           "source": [
-            "obj-643",
+            "obj-667",
             0
           ],
           "destination": [
@@ -40564,11 +43287,11 @@
       {
         "patchline": {
           "source": [
-            "obj-641",
+            "obj-665",
             0
           ],
           "destination": [
-            "obj-644",
+            "obj-668",
             0
           ]
         }
@@ -40576,11 +43299,11 @@
       {
         "patchline": {
           "source": [
-            "obj-644",
+            "obj-668",
             0
           ],
           "destination": [
-            "obj-636",
+            "obj-660",
             1
           ]
         }
@@ -40588,11 +43311,11 @@
       {
         "patchline": {
           "source": [
-            "obj-554",
+            "obj-572",
             5
           ],
           "destination": [
-            "obj-645",
+            "obj-669",
             0
           ]
         }
@@ -40600,7 +43323,7 @@
       {
         "patchline": {
           "source": [
-            "obj-645",
+            "obj-669",
             0
           ],
           "destination": [
@@ -40612,11 +43335,11 @@
       {
         "patchline": {
           "source": [
-            "obj-554",
+            "obj-572",
             4
           ],
           "destination": [
-            "obj-646",
+            "obj-670",
             0
           ]
         }
@@ -40624,7 +43347,7 @@
       {
         "patchline": {
           "source": [
-            "obj-646",
+            "obj-670",
             0
           ],
           "destination": [
@@ -40636,11 +43359,11 @@
       {
         "patchline": {
           "source": [
-            "obj-553",
+            "obj-571",
             0
           ],
           "destination": [
-            "obj-647",
+            "obj-671",
             0
           ]
         }
@@ -40648,7 +43371,7 @@
       {
         "patchline": {
           "source": [
-            "obj-647",
+            "obj-671",
             0
           ],
           "destination": [
@@ -40660,11 +43383,11 @@
       {
         "patchline": {
           "source": [
-            "obj-555",
+            "obj-573",
             2
           ],
           "destination": [
-            "obj-648",
+            "obj-672",
             0
           ]
         }
@@ -40672,11 +43395,11 @@
       {
         "patchline": {
           "source": [
-            "obj-648",
+            "obj-672",
             0
           ],
           "destination": [
-            "obj-649",
+            "obj-673",
             1
           ]
         }
@@ -40684,11 +43407,11 @@
       {
         "patchline": {
           "source": [
-            "obj-649",
+            "obj-673",
             0
           ],
           "destination": [
-            "obj-650",
+            "obj-674",
             0
           ]
         }
@@ -40696,11 +43419,11 @@
       {
         "patchline": {
           "source": [
-            "obj-650",
+            "obj-674",
             0
           ],
           "destination": [
-            "obj-554",
+            "obj-572",
             0
           ]
         }
@@ -40712,463 +43435,7 @@
             8
           ],
           "destination": [
-            "obj-651",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-651",
-            0
-          ],
-          "destination": [
-            "obj-652",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-652",
-            0
-          ],
-          "destination": [
-            "obj-653",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-654",
-            0
-          ],
-          "destination": [
-            "obj-653",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-654",
-            0
-          ],
-          "destination": [
-            "obj-154",
-            8
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-653",
-            0
-          ],
-          "destination": [
-            "obj-655",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-655",
-            0
-          ],
-          "destination": [
-            "obj-656",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-656",
-            0
-          ],
-          "destination": [
-            "obj-658",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-658",
-            0
-          ],
-          "destination": [
-            "obj-310",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-310",
-            0
-          ],
-          "destination": [
-            "obj-659",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-658",
-            1
-          ],
-          "destination": [
-            "obj-304",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-304",
-            0
-          ],
-          "destination": [
-            "obj-659",
-            2
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-657",
-            0
-          ],
-          "destination": [
-            "obj-659",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-659",
-            0
-          ],
-          "destination": [
-            "obj-660",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-660",
-            0
-          ],
-          "destination": [
-            "obj-653",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-656",
-            1
-          ],
-          "destination": [
-            "obj-661",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-661",
-            0
-          ],
-          "destination": [
-            "obj-408",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-408",
-            0
-          ],
-          "destination": [
-            "obj-662",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-661",
-            1
-          ],
-          "destination": [
-            "obj-402",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-402",
-            0
-          ],
-          "destination": [
-            "obj-662",
-            2
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-657",
-            0
-          ],
-          "destination": [
-            "obj-662",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-662",
-            0
-          ],
-          "destination": [
-            "obj-663",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-663",
-            0
-          ],
-          "destination": [
-            "obj-653",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-656",
-            2
-          ],
-          "destination": [
-            "obj-664",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-664",
-            0
-          ],
-          "destination": [
-            "obj-506",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-506",
-            0
-          ],
-          "destination": [
-            "obj-665",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-664",
-            1
-          ],
-          "destination": [
-            "obj-500",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-500",
-            0
-          ],
-          "destination": [
-            "obj-665",
-            2
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-657",
-            0
-          ],
-          "destination": [
-            "obj-665",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-665",
-            0
-          ],
-          "destination": [
-            "obj-666",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-666",
-            0
-          ],
-          "destination": [
-            "obj-653",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-656",
-            3
-          ],
-          "destination": [
-            "obj-667",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-667",
-            0
-          ],
-          "destination": [
-            "obj-604",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-604",
-            0
-          ],
-          "destination": [
-            "obj-668",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-667",
-            1
-          ],
-          "destination": [
-            "obj-598",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-598",
-            0
-          ],
-          "destination": [
-            "obj-668",
-            2
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-657",
-            0
-          ],
-          "destination": [
-            "obj-668",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-668",
-            0
-          ],
-          "destination": [
-            "obj-669",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-669",
-            0
-          ],
-          "destination": [
-            "obj-653",
+            "obj-675",
             0
           ]
         }
@@ -41200,11 +43467,11 @@
       {
         "patchline": {
           "source": [
-            "obj-677",
+            "obj-678",
             0
           ],
           "destination": [
-            "obj-30",
+            "obj-677",
             0
           ]
         }
@@ -41216,6 +43483,18 @@
             0
           ],
           "destination": [
+            "obj-154",
+            8
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-677",
+            0
+          ],
+          "destination": [
             "obj-679",
             0
           ]
@@ -41240,8 +43519,56 @@
             0
           ],
           "destination": [
-            "obj-30",
+            "obj-682",
             0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-682",
+            0
+          ],
+          "destination": [
+            "obj-310",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-310",
+            0
+          ],
+          "destination": [
+            "obj-683",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-682",
+            1
+          ],
+          "destination": [
+            "obj-304",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-304",
+            0
+          ],
+          "destination": [
+            "obj-683",
+            2
           ]
         }
       },
@@ -41252,18 +43579,6 @@
             0
           ],
           "destination": [
-            "obj-682",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-682",
-            0
-          ],
-          "destination": [
             "obj-683",
             0
           ]
@@ -41276,7 +43591,7 @@
             0
           ],
           "destination": [
-            "obj-30",
+            "obj-684",
             0
           ]
         }
@@ -41288,6 +43603,18 @@
             0
           ],
           "destination": [
+            "obj-677",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-680",
+            1
+          ],
+          "destination": [
             "obj-685",
             0
           ]
@@ -41297,6 +43624,54 @@
         "patchline": {
           "source": [
             "obj-685",
+            0
+          ],
+          "destination": [
+            "obj-414",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-414",
+            0
+          ],
+          "destination": [
+            "obj-686",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-685",
+            1
+          ],
+          "destination": [
+            "obj-408",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-408",
+            0
+          ],
+          "destination": [
+            "obj-686",
+            2
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-681",
             0
           ],
           "destination": [
@@ -41312,7 +43687,31 @@
             0
           ],
           "destination": [
-            "obj-30",
+            "obj-687",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-687",
+            0
+          ],
+          "destination": [
+            "obj-677",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-680",
+            2
+          ],
+          "destination": [
+            "obj-688",
             0
           ]
         }
@@ -41324,6 +43723,54 @@
             0
           ],
           "destination": [
+            "obj-518",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-518",
+            0
+          ],
+          "destination": [
+            "obj-689",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-688",
+            1
+          ],
+          "destination": [
+            "obj-512",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-512",
+            0
+          ],
+          "destination": [
+            "obj-689",
+            2
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-681",
+            0
+          ],
+          "destination": [
             "obj-689",
             0
           ]
@@ -41336,7 +43783,31 @@
             0
           ],
           "destination": [
-            "obj-30",
+            "obj-690",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-690",
+            0
+          ],
+          "destination": [
+            "obj-677",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-680",
+            3
+          ],
+          "destination": [
+            "obj-691",
             0
           ]
         }
@@ -41348,6 +43819,54 @@
             0
           ],
           "destination": [
+            "obj-622",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-622",
+            0
+          ],
+          "destination": [
+            "obj-692",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-691",
+            1
+          ],
+          "destination": [
+            "obj-616",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-616",
+            0
+          ],
+          "destination": [
+            "obj-692",
+            2
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-681",
+            0
+          ],
+          "destination": [
             "obj-692",
             0
           ]
@@ -41360,7 +43879,7 @@
             0
           ],
           "destination": [
-            "obj-30",
+            "obj-693",
             0
           ]
         }
@@ -41372,7 +43891,7 @@
             0
           ],
           "destination": [
-            "obj-694",
+            "obj-677",
             0
           ]
         }
@@ -41380,59 +43899,11 @@
       {
         "patchline": {
           "source": [
-            "obj-694",
-            0
-          ],
-          "destination": [
-            "obj-695",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-695",
-            0
-          ],
-          "destination": [
-            "obj-697",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-696",
-            0
-          ],
-          "destination": [
-            "obj-697",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-697",
-            0
-          ],
-          "destination": [
-            "obj-698",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-698",
-            0
-          ],
-          "destination": [
             "obj-699",
+            0
+          ],
+          "destination": [
+            "obj-700",
             0
           ]
         }
@@ -41444,7 +43915,7 @@
             0
           ],
           "destination": [
-            "obj-706",
+            "obj-701",
             0
           ]
         }
@@ -41452,24 +43923,60 @@
       {
         "patchline": {
           "source": [
-            "obj-699",
+            "obj-701",
             0
           ],
           "destination": [
-            "obj-706",
-            1
+            "obj-30",
+            0
           ]
         }
       },
       {
         "patchline": {
           "source": [
-            "obj-706",
+            "obj-702",
             0
           ],
           "destination": [
+            "obj-703",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-703",
+            0
+          ],
+          "destination": [
+            "obj-704",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-704",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-705",
             0
+          ],
+          "destination": [
+            "obj-706",
+            0
           ]
         }
       },
@@ -41480,7 +43987,7 @@
             0
           ],
           "destination": [
-            "obj-701",
+            "obj-707",
             0
           ]
         }
@@ -41488,11 +43995,11 @@
       {
         "patchline": {
           "source": [
-            "obj-700",
-            1
+            "obj-707",
+            0
           ],
           "destination": [
-            "obj-709",
+            "obj-30",
             0
           ]
         }
@@ -41500,24 +44007,12 @@
       {
         "patchline": {
           "source": [
-            "obj-699",
-            0
-          ],
-          "destination": [
-            "obj-709",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-709",
-            0
-          ],
-          "destination": [
             "obj-708",
             0
+          ],
+          "destination": [
+            "obj-709",
+            0
           ]
         }
       },
@@ -41528,54 +44023,6 @@
             0
           ],
           "destination": [
-            "obj-701",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-701",
-            0
-          ],
-          "destination": [
-            "obj-702",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-702",
-            0
-          ],
-          "destination": [
-            "obj-703",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-703",
-            0
-          ],
-          "destination": [
-            "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-701",
-            0
-          ],
-          "destination": [
             "obj-710",
             0
           ]
@@ -41588,31 +44035,7 @@
             0
           ],
           "destination": [
-            "obj-711",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-711",
-            0
-          ],
-          "destination": [
             "obj-30",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-40",
-            1
-          ],
-          "destination": [
-            "obj-712",
             0
           ]
         }
@@ -41624,7 +44047,7 @@
             0
           ],
           "destination": [
-            "obj-30",
+            "obj-713",
             0
           ]
         }
@@ -41633,18 +44056,6 @@
         "patchline": {
           "source": [
             "obj-713",
-            1
-          ],
-          "destination": [
-            "obj-714",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-714",
             0
           ],
           "destination": [
@@ -41669,6 +44080,318 @@
         "patchline": {
           "source": [
             "obj-716",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-717",
+            0
+          ],
+          "destination": [
+            "obj-718",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-718",
+            0
+          ],
+          "destination": [
+            "obj-719",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-719",
+            0
+          ],
+          "destination": [
+            "obj-721",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-720",
+            0
+          ],
+          "destination": [
+            "obj-721",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-721",
+            0
+          ],
+          "destination": [
+            "obj-722",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-722",
+            0
+          ],
+          "destination": [
+            "obj-723",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-724",
+            0
+          ],
+          "destination": [
+            "obj-730",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-723",
+            0
+          ],
+          "destination": [
+            "obj-730",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-730",
+            0
+          ],
+          "destination": [
+            "obj-729",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-730",
+            0
+          ],
+          "destination": [
+            "obj-725",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-724",
+            1
+          ],
+          "destination": [
+            "obj-733",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-723",
+            0
+          ],
+          "destination": [
+            "obj-733",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-733",
+            0
+          ],
+          "destination": [
+            "obj-732",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-733",
+            0
+          ],
+          "destination": [
+            "obj-725",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-725",
+            0
+          ],
+          "destination": [
+            "obj-726",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-726",
+            0
+          ],
+          "destination": [
+            "obj-727",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-727",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-725",
+            0
+          ],
+          "destination": [
+            "obj-734",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-734",
+            0
+          ],
+          "destination": [
+            "obj-735",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-735",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-40",
+            1
+          ],
+          "destination": [
+            "obj-736",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-736",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-737",
+            1
+          ],
+          "destination": [
+            "obj-738",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-738",
+            0
+          ],
+          "destination": [
+            "obj-30",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-739",
+            0
+          ],
+          "destination": [
+            "obj-740",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-740",
             0
           ],
           "destination": [
@@ -41708,7 +44431,7 @@
             37
           ],
           "destination": [
-            "obj-696",
+            "obj-720",
             0
           ]
         }
@@ -41716,7 +44439,7 @@
       {
         "patchline": {
           "source": [
-            "obj-698",
+            "obj-722",
             0
           ],
           "destination": [
@@ -41872,11 +44595,347 @@
       {
         "patchline": {
           "source": [
-            "obj-717",
+            "obj-254",
+            52
+          ],
+          "destination": [
+            "obj-156",
+            3
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            6
+          ],
+          "destination": [
+            "obj-255",
+            53
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            53
+          ],
+          "destination": [
+            "obj-156",
+            4
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            7
+          ],
+          "destination": [
+            "obj-255",
+            54
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            54
+          ],
+          "destination": [
+            "obj-156",
+            5
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            8
+          ],
+          "destination": [
+            "obj-255",
+            55
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            55
+          ],
+          "destination": [
+            "obj-156",
+            6
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            9
+          ],
+          "destination": [
+            "obj-255",
+            56
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            56
+          ],
+          "destination": [
+            "obj-156",
+            7
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            10
+          ],
+          "destination": [
+            "obj-255",
+            57
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            57
+          ],
+          "destination": [
+            "obj-156",
+            8
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            11
+          ],
+          "destination": [
+            "obj-255",
+            58
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            58
+          ],
+          "destination": [
+            "obj-156",
+            9
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            12
+          ],
+          "destination": [
+            "obj-255",
+            59
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            59
+          ],
+          "destination": [
+            "obj-156",
+            10
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            13
+          ],
+          "destination": [
+            "obj-255",
+            60
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            60
+          ],
+          "destination": [
+            "obj-156",
+            11
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            14
+          ],
+          "destination": [
+            "obj-255",
+            61
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            61
+          ],
+          "destination": [
+            "obj-156",
+            12
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            15
+          ],
+          "destination": [
+            "obj-255",
+            62
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            62
+          ],
+          "destination": [
+            "obj-156",
+            13
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            16
+          ],
+          "destination": [
+            "obj-255",
+            63
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            63
+          ],
+          "destination": [
+            "obj-156",
+            14
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            17
+          ],
+          "destination": [
+            "obj-255",
+            64
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            64
+          ],
+          "destination": [
+            "obj-156",
+            15
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            18
+          ],
+          "destination": [
+            "obj-255",
+            65
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-254",
+            65
+          ],
+          "destination": [
+            "obj-156",
+            16
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-156",
+            19
+          ],
+          "destination": [
+            "obj-255",
+            66
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-741",
             0
           ],
           "destination": [
-            "obj-718",
+            "obj-742",
             0
           ]
         }
@@ -41884,7 +44943,7 @@
       {
         "patchline": {
           "source": [
-            "obj-718",
+            "obj-742",
             0
           ],
           "destination": [

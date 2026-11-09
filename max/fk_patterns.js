@@ -7,8 +7,10 @@ var SLOT_COUNT = 8;
 var VOICE_COUNT = 4;
 var LFO_COUNT = 8;
 var LEGACY_LFO_COUNT = 3;
-var TARGET_COUNT = 9;
-var GLOBAL_TARGET_COUNT = 8;
+var TARGET_COUNT = 11;
+var GLOBAL_TARGET_COUNT = 22;
+var LEGACY_TARGET_COUNT = 9;
+var LEGACY_GLOBAL_TARGET_COUNT = 8;
 var PITCH_SCALE_COUNT = 7;
 var BANK_FORMAT = "field-kit-patterns";
 var BANK_VERSION = 2;
@@ -474,7 +476,7 @@ function read_bank(path) {
         if (!bank.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, count); })) {
             throw new Error("Invalid bank patterns");
         }
-        var nextSlots = legacy ? bank.slots.map(upgrade_pattern) : bank.slots;
+        var nextSlots = bank.slots.map(function (pattern) { return upgrade_pattern(pattern, count); });
         host.patcher.getnamed("sequence_control").message("stop");
         cancel_recall();
         slots = nextSlots;
@@ -627,6 +629,8 @@ function read_set(path) {
             return;
         }
         if (!valid_set(data)) throw new Error("Invalid set contents");
+        data.current = upgrade_pattern(data.current, LFO_COUNT);
+        data.slots = data.slots.map(function (pattern) { return upgrade_pattern(pattern, LFO_COUNT); });
     } catch (error) {
         set_status("Couldn’t open that Field Kit Set.");
         return;
@@ -720,35 +724,40 @@ function set_source_loaded(ok) {
     set_status("Set opened · " + file_name(activeSetPath));
 }
 
-function upgrade_pattern(pattern) {
+function upgrade_pattern(pattern, lfoCount) {
     if (pattern === null) {
         return null;
     }
-    var defaults = modulation_defaults();
-    var gains = [];
-    var legacyBlock = LEGACY_LFO_COUNT * TARGET_COUNT;
-    var newRoutes = (LFO_COUNT - LEGACY_LFO_COUNT) * TARGET_COUNT;
-    // Routes are grouped by window. Extend each window's block so its old
-    // LFO and destination indices still point to the same controls.
-    for (var window = 0; window < VOICE_COUNT; window++) {
-        var firstRoute = window * legacyBlock;
-        gains = gains.concat(pattern.gains.slice(firstRoute, firstRoute + legacyBlock));
-        for (var route = 0; route < newRoutes; route++) {
-            gains.push(0);
-        }
-    }
-    pattern.gains = gains;
+    pattern.gains = expand_route_rows(pattern.gains, VOICE_COUNT, lfoCount, TARGET_COUNT);
     if (pattern.globalGains) {
-        while (pattern.globalGains.length < LFO_COUNT * GLOBAL_TARGET_COUNT) {
-            pattern.globalGains.push(0);
-        }
+        pattern.globalGains = expand_route_rows(pattern.globalGains, 1, lfoCount, GLOBAL_TARGET_COUNT);
     }
-    pattern.rates = pattern.rates.concat(defaults.rates.slice(LEGACY_LFO_COUNT));
-    pattern.shapes = pattern.shapes.concat(defaults.shapes.slice(LEGACY_LFO_COUNT));
-    pattern.curves = pattern.curves.concat(defaults.curves.slice(LEGACY_LFO_COUNT));
+    if (lfoCount < LFO_COUNT) {
+        var defaults = modulation_defaults();
+        pattern.rates = pattern.rates.concat(defaults.rates.slice(lfoCount));
+        pattern.shapes = pattern.shapes.concat(defaults.shapes.slice(lfoCount));
+        pattern.curves = pattern.curves.concat(defaults.curves.slice(lfoCount));
+    }
     return pattern;
 }
 upgrade_pattern.local = 1;
+
+function expand_route_rows(gains, scopes, lfoCount, targetCount) {
+    var previousWidth = gains.length / (scopes * lfoCount);
+    if (previousWidth === targetCount && lfoCount === LFO_COUNT) return gains;
+    var expanded = [];
+    // Every scope owns one row per LFO. Extend each row before moving to the next one.
+    for (var scope = 0; scope < scopes; scope++) {
+        for (var lfo = 0; lfo < LFO_COUNT; lfo++) {
+            var row = (scope * lfoCount + lfo) * previousWidth;
+            for (var target = 0; target < targetCount; target++) {
+                expanded.push(lfo < lfoCount && target < previousWidth ? gains[row + target] : 0);
+            }
+        }
+    }
+    return expanded;
+}
+expand_route_rows.local = 1;
 
 function read_bank_text(file) {
     var size = file.eof;
@@ -808,17 +817,22 @@ function valid_curve(curve) {
 }
 valid_curve.local = 1;
 
+function route_gains_valid(values, rows, targetCount, legacyTargetCount) {
+    return Array.isArray(values) &&
+        (values.length === rows * targetCount || values.length === rows * legacyTargetCount) &&
+        values.every(function (gain) { return in_range(gain, -100, 100) && gain % 1 === 0; });
+}
+route_gains_valid.local = 1;
+
 function valid_pattern(pattern, lfoCount) {
     return !!pattern && Array.isArray(pattern.windows) && pattern.windows.length === VOICE_COUNT &&
         pattern.windows.every(function (window) {
             return controls_valid(window, VOICE_CONTROLS) && window.direction % 1 === 0 &&
                 LOOP_SENDS.every(function (key) { return window[key] === undefined || in_range(window[key], 0, 100); }) &&
                 numbers_valid(window.region, 2, 0, 100) && window.region[0] < window.region[1];
-        }) && numbers_valid(pattern.gains, VOICE_COUNT * lfoCount * TARGET_COUNT, -100, 100) &&
-        pattern.gains.every(function (gain) { return gain % 1 === 0; }) &&
+        }) && route_gains_valid(pattern.gains, VOICE_COUNT * lfoCount, TARGET_COUNT, LEGACY_TARGET_COUNT) &&
         (pattern.globalGains === undefined ||
-            (numbers_valid(pattern.globalGains, lfoCount * GLOBAL_TARGET_COUNT, -100, 100) &&
-                pattern.globalGains.every(function (gain) { return gain % 1 === 0; }))) &&
+            route_gains_valid(pattern.globalGains, lfoCount, GLOBAL_TARGET_COUNT, LEGACY_GLOBAL_TARGET_COUNT)) &&
         numbers_valid(pattern.rates, lfoCount, 0.01, 20) &&
         numbers_valid(pattern.shapes, lfoCount, 0, 5) &&
         pattern.shapes.every(function (shape) { return shape % 1 === 0; }) &&

@@ -294,6 +294,7 @@ function open_source(path, isDemo) {
     pendingWaveEdits = 0;
     ready = false;
     duration = 0;
+    queuedWindows = isDemo ? 0 : ALL_WINDOWS;
     begin_source_read(path, !!isDemo, activeBuffer, false);
 }
 
@@ -312,10 +313,8 @@ begin_source_read.local = 1;
 
 function read_source() {
     var target = pendingBuffer;
-    if (pendingSet) {
-        // A failed replace must never validate audio left by an earlier load.
-        send(BUFFER_OBJECTS[target], "sizeinsamps", 1);
-    }
+    // A failed replace must never validate audio left by an earlier load.
+    send(BUFFER_OBJECTS[target], "sizeinsamps", 1);
     readStarted = true;
     send(BUFFER_OBJECTS[target], "replace", pendingPath);
     if (readStarted) {

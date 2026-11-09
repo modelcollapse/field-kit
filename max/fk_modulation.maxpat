@@ -401,7 +401,7 @@
             ",",
             "Global"
           ],
-          "hint": "Choose a loop window or route to shared effects, master or input gain."
+          "hint": "Choose a loop window or route to Main FX, Drifting Memory, master or input gain."
         }
       },
       {
@@ -446,7 +446,11 @@
             ",",
             "Level",
             ",",
-            "Pan"
+            "Pan",
+            ",",
+            "Echo send",
+            ",",
+            "Room send"
           ]
         }
       },
@@ -1262,15 +1266,37 @@
           "id": "obj-52",
           "maxclass": "newobj",
           "numinlets": 8,
-          "numoutlets": 45,
+          "numoutlets": 67,
           "patching_rect": [
             0,
             980,
             1052,
             22
           ],
-          "text": "matrix~ 8 44 1. @ramp 20",
+          "text": "matrix~ 8 66 1. @ramp 20",
           "outlettype": [
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
+            "signal",
             "signal",
             "signal",
             "signal",
@@ -4421,7 +4447,7 @@
         "box": {
           "id": "obj-222",
           "maxclass": "newobj",
-          "numinlets": 44,
+          "numinlets": 66,
           "numoutlets": 1,
           "patching_rect": [
             0,
@@ -4429,7 +4455,7 @@
             1052,
             22
           ],
-          "text": "mc.pack~ 44",
+          "text": "mc.pack~ 66",
           "outlettype": [
             "multichannelsignal"
           ]
@@ -4448,7 +4474,7 @@
             30
           ],
           "index": 1,
-          "comment": "44 signed modulation channels"
+          "comment": "66 signed modulation channels"
         }
       },
       {
@@ -8222,6 +8248,270 @@
           "destination": [
             "obj-222",
             43
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            44
+          ],
+          "destination": [
+            "obj-222",
+            44
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            45
+          ],
+          "destination": [
+            "obj-222",
+            45
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            46
+          ],
+          "destination": [
+            "obj-222",
+            46
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            47
+          ],
+          "destination": [
+            "obj-222",
+            47
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            48
+          ],
+          "destination": [
+            "obj-222",
+            48
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            49
+          ],
+          "destination": [
+            "obj-222",
+            49
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            50
+          ],
+          "destination": [
+            "obj-222",
+            50
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            51
+          ],
+          "destination": [
+            "obj-222",
+            51
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            52
+          ],
+          "destination": [
+            "obj-222",
+            52
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            53
+          ],
+          "destination": [
+            "obj-222",
+            53
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            54
+          ],
+          "destination": [
+            "obj-222",
+            54
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            55
+          ],
+          "destination": [
+            "obj-222",
+            55
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            56
+          ],
+          "destination": [
+            "obj-222",
+            56
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            57
+          ],
+          "destination": [
+            "obj-222",
+            57
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            58
+          ],
+          "destination": [
+            "obj-222",
+            58
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            59
+          ],
+          "destination": [
+            "obj-222",
+            59
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            60
+          ],
+          "destination": [
+            "obj-222",
+            60
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            61
+          ],
+          "destination": [
+            "obj-222",
+            61
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            62
+          ],
+          "destination": [
+            "obj-222",
+            62
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            63
+          ],
+          "destination": [
+            "obj-222",
+            63
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            64
+          ],
+          "destination": [
+            "obj-222",
+            64
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-52",
+            65
+          ],
+          "destination": [
+            "obj-222",
+            65
           ]
         }
       },
