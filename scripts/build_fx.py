@@ -368,9 +368,9 @@ def build():
 
     drifting_rect = [188, 0, 116, 20]
     drifting = p.add("live.text", drifting_rect, outs=2, types=["bang", ""], view=drifting_rect,
-                     varname="drifting_delay_open", mode=0, text="Drifting Memory…", texton="Drifting Memory…",
-                     parameter_enable=0, hint="Open the Drifting Memory master effect.")
-    drifting_open = p.add("outlet", [792, 370, 26, 26], index=channels + 2, comment="Open Drifting Memory")
+                     varname="drifting_delay_open", mode=0, text="Drifting Memory", texton="Drifting Memory",
+                     parameter_enable=0, hint="Show Drifting Memory and its advanced controls in Mix.")
+    drifting_open = p.add("outlet", [792, 370, 26, 26], index=channels + 2, comment="Show Drifting Memory in Mix")
     p.cord(drifting, drifting_open)
 
     performance = p.add("inlet", [1080, 172, 26, 26], ins=0, outs=1, types=[""],

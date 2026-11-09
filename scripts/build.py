@@ -8,6 +8,7 @@ import struct
 import wave
 from pathlib import Path
 
+from build_drift_advanced import layout_drift_advanced
 from build_fx import DIALS as FX_DIALS
 from build_master_meter import append_master_meter
 from build_mix_scene_strip import append_mix_scene_strip
@@ -72,6 +73,10 @@ MASTER_ROW_HEIGHT = 38
 WORKSPACE_TOP = MIX_TOP + MIX_HEIGHT + SECTION_GAP
 MODULATION_TOP = WORKSPACE_TOP + ROW + GUTTER
 MODULATION_ROWS = 9
+PERFORMANCE_DRIFT_WIDTH = 600
+PERFORMANCE_RIGHT_OFFSET = 612
+PERFORMANCE_RIGHT_WIDTH = 440
+PERFORMANCE_HEIGHT = 212
 FRAME_WIDTH = 2 * MARGIN + TRACKS * TRACK - GUTTER
 FRAME_HEIGHT = MODULATION_TOP + MODULATION_ROWS * ROW - GUTTER + MARGIN
 SLATE_CANVAS = [20 / 255, 26 / 255, 35 / 255, 1.0]
@@ -507,31 +512,42 @@ def mix_visuals(p):
 
 
 def performance_mix(p):
+    def workspace_panel(name, panel, x, width, inputs, outputs):
+        rect = [x, MODULATION_TOP, width, PERFORMANCE_HEIGHT]
+        p.add(name, "bpatcher", rect, view=rect, ins=inputs, outs=len(outputs), types=outputs, embed=1,
+              border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0, lockeddragscroll=0,
+              clickthrough=0, bgmode=0, patcher=dict(fileversion=1, appversion=VERSION, classnamespace="box",
+                  rect=[0, 0, rect[2], rect[3]], openinpresentation=1, toolbarvisible=0,
+                  locked_bgcolor=SLATE_PANEL, boxes=panel.boxes, lines=panel.lines))
+
     panel = Patch()
     for name, area in (("surface_mix_drift_monitor", [407, 44, 181, 154]),
-                       ("surface_mix_drift", [0, 0, 600, 212]),
-                       ("surface_mix_sends", [612, 0, 440, 212])):
+                       ("surface_mix_drift", [0, 0, PERFORMANCE_DRIFT_WIDTH, PERFORMANCE_HEIGHT])):
         panel.add(name, "panel", area, view=area, outs=0, background=1,
                   ignoreclick=1, border=0, rounded=8, bgcolor=SLATE_PANEL)
     append_drifting_strip(panel, parameter)
-    append_sends_strip(panel, parameter)
-    rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
-    p.add("performance_mix", "bpatcher", rect, view=rect, ins=4, outs=2, types=["", ""], embed=1,
-          border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0, lockeddragscroll=0,
-          clickthrough=0, bgmode=0, patcher=dict(fileversion=1, appversion=VERSION, classnamespace="box",
-              rect=[0, 0, rect[2], rect[3]], title="Performance mix", openinpresentation=1,
-              toolbarvisible=0, locked_bgcolor=SLATE_PANEL, boxes=panel.boxes, lines=panel.lines))
-    p.obj("performance_drift_edit", "route details", 3420, 1770, outs=2, types=["bang", ""])
+    workspace_panel("performance_mix", panel, MARGIN, PERFORMANCE_DRIFT_WIDTH, 3, [""])
+    p.obj("performance_drift_edit", "route advanced", 3420, 1770, outs=2, types=["int", ""])
+    p.obj("performance_drift_advanced", "prepend drift_advanced", 3420, 1800, ins=2)
     p.connect("performance_mix", 0, "performance_drift_edit")
-    p.connect("performance_drift_edit", 0, "drifting_memory_open")
+    p.connect("performance_drift_edit", 0, "performance_drift_advanced")
+    p.connect("performance_drift_advanced", 0, "theme_control")
     p.connect("performance_drift_edit", 1, "drifting_memory", 2)
     for i in range(3):
         p.connect("drifting_memory", 2 + i, "performance_mix", i)
+
+    sends = Patch()
+    area = [0, 0, PERFORMANCE_RIGHT_WIDTH, PERFORMANCE_HEIGHT]
+    sends.add("surface_mix_sends", "panel", area, view=area, outs=0, background=1,
+              ignoreclick=1, border=0, rounded=8, bgcolor=SLATE_PANEL)
+    append_sends_strip(sends, parameter)
+    workspace_panel("performance_sends", sends, MARGIN + PERFORMANCE_RIGHT_OFFSET,
+                    PERFORMANCE_RIGHT_WIDTH, 1, [""])
     p.obj("performance_send_edit", "route " + " ".join(PERFORMANCE_SENDS), 3570, 1780,
           outs=len(PERFORMANCE_SENDS) + 1, types=[""] * (len(PERFORMANCE_SENDS) + 1))
-    p.connect("performance_mix", 1, "performance_send_edit")
+    p.connect("performance_sends", 0, "performance_send_edit")
     p.connect("performance_send_edit", len(PERFORMANCE_SENDS), "mix_fx", 7 + FX_MOD_CHANNELS)
-    p.connect("mix_fx", 4 + FX_MOD_CHANNELS, "performance_mix", 3)
+    p.connect("mix_fx", 4 + FX_MOD_CHANNELS, "performance_sends")
 
 
 def window_controls(p):
@@ -754,20 +770,23 @@ def loop_send_gains(p, voice, y):
         mirror = name + "_performance_sync"
         p.obj(mirror, "prepend " + name, x, y + 145, ins=2)
         p.connect(name, 0, mirror)
-        p.connect(mirror, 0, "performance_mix", 3)
+        p.connect(mirror, 0, "performance_sends")
         p.connect("performance_send_edit", PERFORMANCE_SENDS.index(name), name)
 
 
 def drifting_memory(p):
     panel = json.loads((ROOT / "fk_drifting_delay.maxpat").read_text(encoding="utf-8"))["patcher"]
     append_drifting_taps(panel)
-    p.add("drifting_memory", "newobj", [1410, 1840, 142, 22], ins=3, outs=5,
-          types=["signal"] * 4 + [""], text="p Drifting Memory", patcher=panel)
-    p.add("drifting_memory_open", "message", [1410, 1760, 52, 22], ins=2, text="open")
-    p.obj("drifting_memory_window", "pcontrol", 1410, 1796)
-    p.connect("mix_fx", 3 + FX_MOD_CHANNELS, "drifting_memory_open")
-    p.connect("drifting_memory_open", 0, "drifting_memory_window")
-    p.connect("drifting_memory_window", 0, "drifting_memory")
+    layout_drift_advanced(panel, parameter)
+    view = [MARGIN + PERFORMANCE_RIGHT_OFFSET, MODULATION_TOP, PERFORMANCE_RIGHT_WIDTH, PERFORMANCE_HEIGHT]
+    p.add("drifting_memory", "bpatcher", [1410, 1840, 142, 22], view=view, ins=3, outs=6,
+          types=["signal"] * 4 + ["", ""], patcher=panel, embed=1, hidden=1,
+          border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0, lockeddragscroll=0,
+          clickthrough=0, bgmode=0)
+    p.add("drifting_memory_show", "message", [1410, 1760, 108, 22], ins=2, text="drift_advanced 1")
+    p.connect("mix_fx", 3 + FX_MOD_CHANNELS, "drifting_memory_show")
+    p.connect("drifting_memory_show", 0, "theme_control")
+    p.connect("drifting_memory", 5, "theme_control")
     for channel in range(2):
         p.connect("mix_fx", channel, "drifting_memory", channel)
 

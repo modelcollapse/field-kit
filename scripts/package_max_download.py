@@ -62,7 +62,9 @@ Sets and patterns save the control values, but do not store the gestures.
 In Mix, enable Drifting Memory, play your loops and choose All under Arm capture.
 The default Two Delays / Small mode returns after about 2½ seconds. Memory shows
 the signal in the delay. Wet return shows how much the delay adds to the mix.
-Use Mix to blend it in and Off to stop writing. Details… opens the full controls.
+Use Mix to blend it in and Off to stop writing. Advanced shows Time, Texture, and
+I/O controls beside the delay. Hide advanced brings back Loop sends. The delay
+keeps playing either way. The Main FX shortcut opens the same drawer.
 Hold freezes the current memory. Cut Tail clears it and sets capture to Off while
 the dry mix keeps playing. Release Hold and arm a bank to capture again.
 Mix recording includes Drifting Memory. Click Record mix… below Master to save

@@ -5,6 +5,8 @@ outlets = 0;
 
 var patch = this.patcher;
 var fullScreen = false;
+var activeWorkspace = 0;
+var driftAdvanced = false;
 var windowLayout = [];
 var fitTask = new Task(fit_full_screen, this);
 var schemes = [
@@ -18,7 +20,7 @@ var schemes = [
             effects: "253145", capture: "34384B", master_output: "253A49", workspace: "222B3A",
             modulation: "253247", scenes: "28364B", visuals: "1C293A", mix: "243347",
             mix_scene_strip: "2C3A50",
-            mix_drift: "333448", mix_drift_monitor: "262738", mix_sends: "203746",
+            mix_drift: "333448", mix_drift_monitor: "262738", mix_drift_advanced: "2D374B", mix_sends: "203746",
             fx_tone: "2A394D", fx_echo: "2C344B", fx_room: "253B4C"
         }
     },
@@ -32,7 +34,7 @@ var schemes = [
             effects: "24352B", capture: "353E33", master_output: "284137", workspace: "1F2E27",
             modulation: "26372E", scenes: "2D3B2F", visuals: "1B2C26", mix: "24372C",
             mix_scene_strip: "314538",
-            mix_drift: "384032", mix_drift_monitor: "283126", mix_sends: "233931",
+            mix_drift: "384032", mix_drift_monitor: "283126", mix_drift_advanced: "293D33", mix_sends: "233931",
             fx_tone: "2A4035", fx_echo: "303C30", fx_room: "293C39"
         }
     },
@@ -46,7 +48,7 @@ var schemes = [
             effects: "392923", capture: "43322F", master_output: "493C2F", workspace: "2E2321",
             modulation: "3B2A26", scenes: "402E26", visuals: "2B211F", mix: "372921",
             mix_scene_strip: "48352C",
-            mix_drift: "46302A", mix_drift_monitor: "33221F", mix_sends: "39302D",
+            mix_drift: "46302A", mix_drift_monitor: "33221F", mix_drift_advanced: "3D302B", mix_sends: "39302D",
             fx_tone: "432F29", fx_echo: "472F2F", fx_room: "41332B"
         }
     }
@@ -60,12 +62,35 @@ function loadbang() {
 
 function workspace(view) {
     if (view < 0 || view > 4 || view !== Math.floor(view)) return;
+    activeWorkspace = view;
     patch.getnamed("workspace_view").message("set", view);
-    patch.getnamed("performance_mix").hidden = view !== 0;
+    update_mix_panels();
     patch.getnamed("sequence_panel").hidden = view !== 1;
     patch.getnamed("patchbay").hidden = view !== 2;
     patch.getnamed("visuals_panel").hidden = view !== 3;
     patch.getnamed("surface_modulation").hidden = view === 4;
+}
+
+function drift_advanced(value) {
+    if (value !== 0 && value !== 1) return;
+    driftAdvanced = value === 1;
+    if (driftAdvanced) workspace(0);
+    else update_mix_panels();
+}
+
+function update_mix_panels() {
+    var inMix = activeWorkspace === 0;
+    var mix = patch.getnamed("performance_mix");
+    mix.hidden = !inMix;
+    patch.getnamed("performance_sends").hidden = !inMix || driftAdvanced;
+    patch.getnamed("drifting_memory").hidden = !inMix || !driftAdvanced;
+    mix.subpatcher().getnamed("drift_strip_advanced").message("set", driftAdvanced ? 1 : 0);
+}
+update_mix_panels.local = 1;
+
+function drift_control_visible(name, visible) {
+    var control = patch.getnamed("drifting_memory").subpatcher().getnamed(name);
+    if (control && control.valid) control.hidden = visible !== 1;
 }
 
 function full_screen() {
@@ -74,7 +99,8 @@ function full_screen() {
     if (fullScreen) {
         windowLayout = [];
         remember_rects(patch);
-        ["mix_fx", "recorder", "performance_mix", "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
+        ["mix_fx", "recorder", "performance_mix", "performance_sends", "drifting_memory",
+            "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
             remember_rects(patch.getnamed(name).subpatcher());
         });
         patch.fullscreen(1);
@@ -167,6 +193,7 @@ function msg_int(index) {
     if (performanceMix && performanceMix.valid) {
         paint_patch(performanceMix.subpatcher(), sections.mix, palette, sections);
     }
+    paint_patch(patch.getnamed("performance_sends").subpatcher(), sections.mix, palette, sections);
     var source = patch.getnamed("source_control");
     source.message.apply(source, ["wave_theme"].concat(inset, control, accent, ink));
     send_theme(patch.getnamed("loop_fade_preview"), inset.concat(control, ink, palette[5], accent));
@@ -183,7 +210,7 @@ function msg_int(index) {
         paint_patch(fxWindow, panel, palette);
     }
     paint_patch(patch.getnamed("recorder").subpatcher(), sections.capture, palette);
-    paint_patch(patch.getnamed("drifting_memory").subpatcher(), sections.mix_drift, palette);
+    paint_patch(patch.getnamed("drifting_memory").subpatcher(), sections.mix, palette, sections);
     var modulation = patch.getnamed("patchbay").subpatcher();
     paint_patch(modulation, sections.modulation, palette);
     send_theme(modulation.getnamed("fk_lfo_preview"), inset.concat(control, selection, accent));
@@ -205,7 +232,7 @@ function paint_patch(target, background, palette, sections) {
     target.apply(function (obj) {
         var cls = obj.maxclass;
         if (cls === "comment" || cls === "panel" || cls === "live.text" || cls === "textbutton" || cls === "umenu" ||
-            cls === "live.numbox" || cls === "live.slider" || cls === "live.dial" || cls === "live.tab" ||
+            cls === "live.numbox" || cls === "flonum" || cls === "live.slider" || cls === "live.dial" || cls === "live.tab" ||
             cls === "waveform~" || cls === "scope~" || cls === "spectroscope~" || cls === "function") {
             if (Number(obj.getboxattr("presentation"))) paint(obj, palette, sections);
         }
@@ -245,6 +272,9 @@ function paint(obj, palette, sections) {
         break;
     case "live.numbox":
         colors = { activebgcolor: name === "input_gain" ? control : inset, textcolor: ink };
+        break;
+    case "flonum":
+        colors = { bgcolor: inset, textcolor: ink, trianglecolor: muted };
         break;
     case "live.slider":
         colors = { slidercolor: inset, tricolor: accent, trioncolor: ink };

@@ -37,7 +37,7 @@ def append_drifting_strip(panel, parameter):
         panel.connect(command, 0, "drift_strip_command")
 
     panel.add("drift_strip_command", "outlet", [8, 465, 26, 26], outs=0, index=1,
-              comment="Drifting Memory settings and details launcher")
+              comment="Drifting Memory settings and Advanced toggle")
     panel.add("drift_strip_state", "inlet", [158, 495, 26, 26], ins=0, types=[""], index=3,
               comment="Drifting Memory control and capture status")
 
@@ -46,7 +46,10 @@ def append_drifting_strip(panel, parameter):
     label("record_label", "Arm capture", [190, 44, 199, 18])
     label("capture_help", "Capture Off lets the tail play.", [212, 181, 177, 18])
 
-    action("details", "Details…", [353, 9, 102, 28], "Open the complete Drifting Memory controls.")
+    control("advanced", "live.text", [333, 9, 122, 28], ["int", ""],
+            text="Advanced", texton="Hide advanced", mode=1, parameter_mappable=0,
+            hint="Show or hide advanced Drifting Memory controls beside this strip.",
+            **parameter("Drifting Memory Advanced view", 0, 0, 1, options=["Off", "On"]))
     control("enabled", "live.text", [463, 9, 125, 28], ["int", ""],
             text="Enable effect", texton="Effect on", mode=1, parameter_mappable=0,
             hint="Enable the delay in the main mix. Bypassing it retains the memory.",

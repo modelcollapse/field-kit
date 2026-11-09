@@ -2367,10 +2367,10 @@
           "numoutlets": 2,
           "varname": "drifting_delay_open",
           "mode": 0,
-          "text": "Drifting Memory…",
-          "texton": "Drifting Memory…",
+          "text": "Drifting Memory",
+          "texton": "Drifting Memory",
           "parameter_enable": 0,
-          "hint": "Open the Drifting Memory master effect.",
+          "hint": "Show Drifting Memory and its advanced controls in Mix.",
           "outlettype": [
             "bang",
             ""
@@ -2397,7 +2397,7 @@
           "numinlets": 1,
           "numoutlets": 0,
           "index": 10,
-          "comment": "Open Drifting Memory"
+          "comment": "Show Drifting Memory in Mix"
         }
       },
       {
