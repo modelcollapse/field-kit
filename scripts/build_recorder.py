@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "max"
 WIDTH = 380
-HEIGHT = 116
+HEIGHT = 78
 
 
 def build(output_dir=ROOT):
@@ -26,31 +26,29 @@ def build(output_dir=ROOT):
     def obj(name, text, x, y, width, ins=1, outputs=("",)):
         return box(name, "newobj", [x, y, width, 22], ins, outputs, text=text)
 
-    def label(name, text, col, row, width, **attributes):
-        return box(name, "comment", [48 * col, 24 * row, 48 * width - 4, 20],
-                   visible=True, text=text, **attributes)
+    def label(name, text, rect, **attributes):
+        return box(name, "comment", rect, visible=True, text=text, **attributes)
 
     def connect(source, target, outlet=0, inlet=0):
         lines.append({"patchline": {"source": [source, outlet], "destination": [target, inlet]}})
 
-    def action(name, label_text, col, width, selector, router, hint):
-        x = 48 * col
-        button = box(name, "live.text", [x, 24, 48 * width - 4, 20], outputs=("", ""),
+    def action(name, label_text, x, width, selector, router, hint):
+        button = box(name, "live.text", [x, 21, width, 21], outputs=("", ""),
                      visible=True, mode=0, active=0, parameter_enable=0,
                      text=label_text, texton=label_text, hint=hint)
         message = box(name + "_message", "message", [x, 150, 90, 22], 2, ("",), text=selector)
         connect(button, message)
         connect(message, router)
 
-    label("capture_title", "Mix recording", 0, 0, 3, fontsize=16, fontface=1)
-    label("record_time", "00:00.0", 5, 1, 3, fontsize=16, fontface=1, textjustification=2)
-    label("record_status", "Enable audio to record", 0, 2, 8, fontsize=14, fontface=1)
-    label("record_file", "Choose Record mix… to name your take", 0, 3, 8)
-    label("record_format", "Stereo WAV · 24-bit · final mix", 0, 4, 8)
+    label("capture_title", "Mix recording", [10, 0, 131, 20], fontsize=15, fontface=1)
+    label("record_format", "Stereo WAV · 24-bit", [153, 2, 131, 17], fontsize=11)
+    label("record_time", "00:00.0", [287, 0, 84, 20], fontsize=16, fontface=1, textjustification=2)
+    label("record_status", "Enable audio to record", [10, 44, 361, 17], fontsize=12, fontface=1)
+    label("record_file", "", [10, 61, 361, 16], fontsize=11)
 
     router = obj("rec_controller", "js fk_recorder.js", 240, 216, 120, outputs=())
-    action("record_button", "Record mix…", 0, 3, "choose", router, "Choose where to save a WAV of the final mix.")
-    action("stop_button", "Stop mix", 3, 2, "stop_record", router, "Finish and save the mix recording.")
+    action("record_button", "Record mix…", 10, 135, "choose", router, "Choose where to save a WAV of the final mix.")
+    action("stop_button", "Stop mix", 153, 91, "stop_record", router, "Finish and save the mix recording.")
 
     dialog = obj("save_dialog", "savedialog WAVE", 400, 150, 110, outputs=("", "", "bang"))
     chosen = obj("chosen_path", "prepend start_path", 400, 182, 110, 2)

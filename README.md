@@ -37,6 +37,8 @@ Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header.
 
 Each waveform has a mixer strip with playback, level, pan, mute, solo, and a peak meter. Click or drag the blue fader under a window’s playback button to set its volume, or edit the percentage box for a precise level. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. Mixer performance controls leave the edit selection in place. **Record mix** captures the resulting master mix.
 
+The **L** and **R** meters in the **Master** strip show each output channel. A red **Clip** light shows which channel hit the output ceiling. Lower **Master** if either light comes on. The **Mix recording** panel below has the record and stop controls, timer, status, and take name.
+
 Open **Stereo field…** beside **FX pad…** in the **Main FX** header to place all four loops together. The tabs select which loop's pan and level are shown above the pad. Drag its dot left or right to pan it, and up or down to change its level. If dots overlap, use the tabs to pick one.
 
 To record movement, select a loop, click **Record**, then drag and release its dot. Click **Play** to repeat the movement, **Stop** to hold the current position, or **Clear** to erase the gesture. Each loop keeps one gesture and can play it alongside the others.
@@ -86,6 +88,8 @@ Click **Record**, drag across the FX pad, and release. **Play** loops the gestur
 | ![Stereo field with four loop positions and gesture controls](docs/screenshots/field-kit-stereo-field.png) | ![FX pad with full crosshairs and Echo mix and Room mix assigned to the axes](docs/screenshots/field-kit-fx-pad.png) |
 
 **Drifting Memory** runs at the end of Main FX. In **Mix**, click **Enable effect**, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. The **Memory** meter shows what’s circulating in the delay. **Wet return** shows what the delay adds to the final mix. Use **Mix** to blend it in. **Off** stops capture and lets the tail play. **Details…** opens the original 1.8 controls. Sets and patterns save the effect settings. Captured memory is for the current session.
+
+Use **Hold** to freeze what’s in memory. **Cut Tail** clears the captured audio and turns capture off while the dry mix keeps playing. To capture again, release **Hold** if it’s on and choose a capture bank.
 
 ![Drifting Memory with Granular Delay active and signal on the input, memory, and output meters](docs/screenshots/field-kit-drifting-memory.png)
 

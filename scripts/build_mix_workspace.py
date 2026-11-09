@@ -6,6 +6,7 @@ DRIFT_CONTROLS = (
     ("enabled", "drift_enabled"),
     ("mode", "mode"),
     ("record", "record"),
+    ("hold", "hold"),
     ("mix", "drift_mix"),
     ("feedback", "feedback"),
     ("drift", "drift"),
@@ -26,6 +27,15 @@ def append_drifting_strip(panel, parameter):
         panel.connect(name, 0, command)
         panel.connect(command, 0, "drift_strip_command")
 
+    def action(selector, caption, rect, hint):
+        name = f"drift_strip_{selector}"
+        panel.add(name, "live.text", rect, view=rect, outs=2, types=["bang", ""],
+                  text=caption, texton=caption, mode=0, parameter_enable=0, hint=hint)
+        command = name + "_command"
+        panel.add(command, "message", [rect[0], rect[1] + 230, 76, 22], ins=2, text=selector)
+        panel.connect(name, 0, command)
+        panel.connect(command, 0, "drift_strip_command")
+
     panel.add("drift_strip_command", "outlet", [8, 465, 26, 26], outs=0, index=1,
               comment="Drifting Memory settings and details launcher")
     panel.add("drift_strip_state", "inlet", [158, 495, 26, 26], ins=0, types=[""], index=3,
@@ -34,17 +44,9 @@ def append_drifting_strip(panel, parameter):
     label("heading", "Drifting Memory", [12, 10, 210, 25], size=17, bold=True)
     label("mode_label", "Delay mode", [12, 44, 163, 18])
     label("record_label", "Arm capture", [190, 44, 199, 18])
-    label("capture_help", "Off stops capture while the delay tail plays.", [12, 182, 380, 18])
+    label("capture_help", "Capture Off lets the tail play.", [212, 181, 177, 18])
 
-    details = [353, 9, 102, 28]
-    panel.add("drift_strip_details", "live.text", details, view=details, outs=2,
-              types=["bang", ""], text="Details…", texton="Details…", mode=0,
-              parameter_enable=0, hint="Open the complete Drifting Memory controls.")
-    panel.add("drift_strip_details_command", "message", [353, 238, 65, 22], ins=2,
-              text="details")
-    panel.connect("drift_strip_details", 0, "drift_strip_details_command")
-    panel.connect("drift_strip_details_command", 0, "drift_strip_command")
-
+    action("details", "Details…", [353, 9, 102, 28], "Open the complete Drifting Memory controls.")
     control("enabled", "live.text", [463, 9, 125, 28], ["int", ""],
             text="Enable effect", texton="Effect on", mode=1, parameter_mappable=0,
             hint="Enable the delay in the main mix. Bypassing it retains the memory.",
@@ -66,6 +68,13 @@ def append_drifting_strip(panel, parameter):
                 appearance=3, showname=1, shownumber=1, parameter_mappable=0, hint=hint,
                 **parameter(f"Mix workspace delay {name.lower()}", initial, 0, high,
                             short=name, unit_style=5))
+
+    control("hold", "live.text", [12, 176, 88, 26], ["int", ""],
+            text="Hold", texton="Holding", mode=1, parameter_mappable=0,
+            hint="Pause new capture while the current memory circulates. Release to resume.",
+            **parameter("Mix workspace delay hold", 0, 0, 1, options=["Off", "On"]))
+    action("cut_tail", "Cut Tail", [108, 176, 96, 26],
+           "Clear the delay tail and turn capture Off. Rearm capture to build a new tail.")
 
     label("monitor_heading", "Delay monitor", [419, 50, 156, 19], size=13, bold=True)
     label("capture_clock", "Capture 0.0 s", [419, 163, 156, 23], size=14, bold=True)
@@ -94,9 +103,9 @@ def append_drifting_strip(panel, parameter):
 
 
 def append_drifting_taps(drift):
-    """Expose monitor signals and control changes from the one existing effect."""
-    ids = {entry["box"].get("varname", entry["box"]["id"]): entry["box"]["id"]
-           for entry in drift["boxes"]}
+    """Connect the performance strip to the existing effect."""
+    boxes = {entry["box"].get("varname", entry["box"]["id"]): entry["box"]
+             for entry in drift["boxes"]}
 
     def box(name, cls, rect, ins=1, outputs=(), **attrs):
         ident = f"mix-strip-{name}"
@@ -105,12 +114,12 @@ def append_drifting_taps(drift):
         if outputs:
             value["outlettype"] = list(outputs)
         drift["boxes"].append({"box": value})
-        ids[name] = ident
+        boxes[name] = value
 
     def connect(source, outlet, target, inlet=0):
         drift["lines"].append({"patchline": {
-            "source": [ids[source], outlet],
-            "destination": [ids[target], inlet],
+            "source": [boxes[source]["id"], outlet],
+            "destination": [boxes[target]["id"], inlet],
         }})
 
     box("memory_out", "outlet", [745, 963, 30, 30], index=3,
@@ -136,3 +145,16 @@ def append_drifting_taps(drift):
             text=f"prepend {selector}")
         connect(source, 0, name)
         connect(name, 0, "state_out")
+
+    # Reuse Panic's wet reset, without applying its Hold and Erase resets.
+    remote_route = boxes["remote-route"]
+    cut_tail_outlet = remote_route["numoutlets"] - 1
+    remote_route["text"] += " cut_tail"
+    remote_route["numoutlets"] += 1
+    remote_route["outlettype"].append("")
+    box("cut_tail", "newobj", [830, 325, 50, 22], outputs=("bang", "bang"), text="t b b")
+    box("cut_tail_capture_off", "message", [830, 360, 30, 22], ins=2, outputs=("",), text="0")
+    connect("remote-route", cut_tail_outlet, "cut_tail")
+    connect("cut_tail", 1, "panic_count")
+    connect("cut_tail", 0, "cut_tail_capture_off")
+    connect("cut_tail_capture_off", 0, "record")

@@ -60,8 +60,12 @@ In Mix, enable Drifting Memory, play your loops and choose All under Arm capture
 The default Two Delays / Small mode returns after about 2½ seconds. Memory shows
 the signal in the delay. Wet return shows how much the delay adds to the mix.
 Use Mix to blend it in and Off to stop writing. Details… opens the full controls.
-Mix recording includes Drifting Memory. Click Record mix… beside Master to save
+Hold freezes the current memory. Cut Tail clears it and sets capture to Off while
+the dry mix keeps playing. Release Hold and arm a bank to capture again.
+Mix recording includes Drifting Memory. Click Record mix… below Master to save
 the final stereo output to a WAV, and Stop mix when you finish.
+The L and R master meters show each output channel. A red CLIP light identifies
+the channel that hit the output ceiling. Lower Master if either light comes on.
 
 In the modulation patchbay, choose a window for loop controls or Global for Master,
 Input gain, Tone, Echo, and Room. Any LFO can route to any destination.

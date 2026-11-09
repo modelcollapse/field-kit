@@ -59,7 +59,7 @@ function render() {
         send("record_file", "set", name.length > 56 ? name.slice(0, 48) + "…" + name.slice(-7) : name);
         send("record_file", "hint", currentPath);
     } else {
-        send("record_file", "set", "Choose Record mix… to name your take");
+        send("record_file", "set", "");
         send("record_file", "hint", "The filename of your current or last take");
     }
     renderTime();

@@ -12,7 +12,7 @@ var schemes = [
         colors: ["141A23", "202936", "151E2A", "303F51", "F3F7FC", "B6C5D5", "8FB9F0", "365D88"],
         sections: {
             header: "202B3B", input: "243346", patterns: "2C2C42", playback: "192635",
-            editor: "2B3B4E", effects: "253145", capture: "34384B", workspace: "222B3A",
+            editor: "2B3B4E", effects: "253145", capture: "34384B", master_output: "282D40", workspace: "222B3A",
             modulation: "253247", scenes: "28364B", visuals: "1C293A", mix: "243347",
             mix_scene_strip: "2C3A50",
             mix_drift: "333448", mix_drift_monitor: "262738", mix_sends: "203746",
@@ -23,7 +23,7 @@ var schemes = [
         colors: ["131E1B", "1E2C27", "13231E", "2D4439", "F2F9F3", "B5CBC0", "99D4AE", "325E4B"],
         sections: {
             header: "20312A", input: "29392E", patterns: "343A2B", playback: "192923",
-            editor: "304135", effects: "24352B", capture: "353E33", workspace: "1F2E27",
+            editor: "304135", effects: "24352B", capture: "353E33", master_output: "292F29", workspace: "1F2E27",
             modulation: "26372E", scenes: "2D3B2F", visuals: "1B2C26", mix: "24372C",
             mix_scene_strip: "314538",
             mix_drift: "384032", mix_drift_monitor: "283126", mix_sends: "233931",
@@ -34,7 +34,7 @@ var schemes = [
         colors: ["211915", "30231F", "231914", "46312A", "FCF5EE", "D5BFB1", "F1AB82", "6E4534"],
         sections: {
             header: "352720", input: "3C2A24", patterns: "422C2E", playback: "2A201D",
-            editor: "47332A", effects: "392923", capture: "43322F", workspace: "2E2321",
+            editor: "47332A", effects: "392923", capture: "43322F", master_output: "342725", workspace: "2E2321",
             modulation: "3B2A26", scenes: "402E26", visuals: "2B211F", mix: "372921",
             mix_scene_strip: "48352C",
             mix_drift: "46302A", mix_drift_monitor: "33221F", mix_sends: "39302D",
@@ -214,7 +214,7 @@ function paint(obj, palette, sections) {
         // The input recorder supplies its own white text for the red badge.
         if (name === "input_record_state") return;
         colors = { textcolor: name === "title" ? accent :
-            (/status$|_help$|^help$|wave_heading|source_label/.test(name) ? muted : ink) };
+            (/status$|_help$|^help$|wave_heading|source_label|record_file|record_format/.test(name) ? muted : ink) };
         break;
     case "panel":
         if (/^loop_row_/.test(name)) return;

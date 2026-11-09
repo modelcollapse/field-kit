@@ -13,7 +13,7 @@
       80,
       80,
       380,
-      116
+      78
     ],
     "openinpresentation": 1,
     "description": "FIELD KIT capture. Feed the final stereo mix into inlets 1 and 2.",
@@ -24,21 +24,21 @@
           "varname": "capture_title",
           "maxclass": "comment",
           "patching_rect": [
+            10,
             0,
-            0,
-            140,
+            131,
             20
           ],
           "numinlets": 1,
           "numoutlets": 0,
           "text": "Mix recording",
-          "fontsize": 16,
+          "fontsize": 15,
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
+            10,
             0,
-            0,
-            140,
+            131,
             20
           ]
         }
@@ -46,12 +46,36 @@
       {
         "box": {
           "id": "obj-2",
+          "varname": "record_format",
+          "maxclass": "comment",
+          "patching_rect": [
+            153,
+            2,
+            131,
+            17
+          ],
+          "numinlets": 1,
+          "numoutlets": 0,
+          "text": "Stereo WAV · 24-bit",
+          "fontsize": 11,
+          "presentation": 1,
+          "presentation_rect": [
+            153,
+            2,
+            131,
+            17
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-3",
           "varname": "record_time",
           "maxclass": "comment",
           "patching_rect": [
-            240,
-            24,
-            140,
+            287,
+            0,
+            84,
             20
           ],
           "numinlets": 1,
@@ -62,34 +86,9 @@
           "textjustification": 2,
           "presentation": 1,
           "presentation_rect": [
-            240,
-            24,
-            140,
-            20
-          ]
-        }
-      },
-      {
-        "box": {
-          "id": "obj-3",
-          "varname": "record_status",
-          "maxclass": "comment",
-          "patching_rect": [
+            287,
             0,
-            48,
-            380,
-            20
-          ],
-          "numinlets": 1,
-          "numoutlets": 0,
-          "text": "Enable audio to record",
-          "fontsize": 14,
-          "fontface": 1,
-          "presentation": 1,
-          "presentation_rect": [
-            0,
-            48,
-            380,
+            84,
             20
           ]
         }
@@ -97,46 +96,49 @@
       {
         "box": {
           "id": "obj-4",
-          "varname": "record_file",
+          "varname": "record_status",
           "maxclass": "comment",
           "patching_rect": [
-            0,
-            72,
-            380,
-            20
+            10,
+            44,
+            361,
+            17
           ],
           "numinlets": 1,
           "numoutlets": 0,
-          "text": "Choose Record mix… to name your take",
+          "text": "Enable audio to record",
+          "fontsize": 12,
+          "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
-            0,
-            72,
-            380,
-            20
+            10,
+            44,
+            361,
+            17
           ]
         }
       },
       {
         "box": {
           "id": "obj-5",
-          "varname": "record_format",
+          "varname": "record_file",
           "maxclass": "comment",
           "patching_rect": [
-            0,
-            96,
-            380,
-            20
+            10,
+            61,
+            361,
+            16
           ],
           "numinlets": 1,
           "numoutlets": 0,
-          "text": "Stereo WAV · 24-bit · final mix",
+          "text": "",
+          "fontsize": 11,
           "presentation": 1,
           "presentation_rect": [
-            0,
-            96,
-            380,
-            20
+            10,
+            61,
+            361,
+            16
           ]
         }
       },
@@ -162,10 +164,10 @@
           "varname": "record_button",
           "maxclass": "live.text",
           "patching_rect": [
-            0,
-            24,
-            140,
-            20
+            10,
+            21,
+            135,
+            21
           ],
           "numinlets": 1,
           "numoutlets": 2,
@@ -181,10 +183,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            0,
-            24,
-            140,
-            20
+            10,
+            21,
+            135,
+            21
           ]
         }
       },
@@ -194,7 +196,7 @@
           "varname": "record_button_message",
           "maxclass": "message",
           "patching_rect": [
-            0,
+            10,
             150,
             90,
             22
@@ -213,10 +215,10 @@
           "varname": "stop_button",
           "maxclass": "live.text",
           "patching_rect": [
-            144,
-            24,
-            92,
-            20
+            153,
+            21,
+            91,
+            21
           ],
           "numinlets": 1,
           "numoutlets": 2,
@@ -232,10 +234,10 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            144,
-            24,
-            92,
-            20
+            153,
+            21,
+            91,
+            21
           ]
         }
       },
@@ -245,7 +247,7 @@
           "varname": "stop_button_message",
           "maxclass": "message",
           "patching_rect": [
-            144,
+            153,
             150,
             90,
             22

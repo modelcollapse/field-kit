@@ -9,6 +9,7 @@ import wave
 from pathlib import Path
 
 from build_fx import DIALS as FX_DIALS
+from build_master_meter import append_master_meter
 from build_mix_scene_strip import append_mix_scene_strip
 from build_mix_sends import PERFORMANCE_SENDS, append_sends_strip
 from build_mix_workspace import append_drifting_strip, append_drifting_taps
@@ -61,6 +62,7 @@ EDITOR_HEIGHT = 100
 MIX_TOP = EDITOR_TOP + EDITOR_HEIGHT + SECTION_GAP
 MIX_HEIGHT = 5 * ROW - GUTTER
 MIX_OFFSET = MIX_TOP - (MARGIN + 22 * ROW)
+MASTER_ROW_HEIGHT = 38
 WORKSPACE_TOP = MIX_TOP + MIX_HEIGHT + SECTION_GAP
 MODULATION_TOP = WORKSPACE_TOP + ROW + GUTTER
 MODULATION_ROWS = 9
@@ -755,6 +757,7 @@ def presentation_frame(p):
         ("editor", 8, EDITOR_TOP - 6, FRAME_WIDTH - 16, EDITOR_HEIGHT + 12),
         ("effects", 8, MIX_TOP - 6, SPLIT * TRACK + 4, MIX_HEIGHT + 12),
         ("capture", MARGIN + SPLIT * TRACK - 2, MIX_TOP - 6, RIGHT_TRACKS * TRACK + 6, MIX_HEIGHT + 12),
+        ("master_output", MARGIN + SPLIT * TRACK + 2, MIX_TOP - 3, RIGHT_TRACKS * TRACK - 2, 37),
         ("input", 8, INPUT_TOP - 6, FRAME_WIDTH - 16, INPUT_HEIGHT + 12),
         ("workspace", 8, WORKSPACE_TOP - 6, 622, 28),
         ("modulation", 8, MODULATION_TOP - 6, FRAME_WIDTH - 16, MODULATION_ROWS * ROW + 8),
@@ -826,11 +829,12 @@ def build():
     p.add("open_audio_setup", "message", [1420, 804, 110, 22], ins=2, text="; dsp open")
     p.connect("audio_setup", 0, "open_audio_setup")
 
-    master_label = grid_rect(SPLIT + 3, 22, 1, y_offset=MIX_OFFSET)
-    master_label[0] -= 4
-    master_label[2] += 7
-    p.add("master_label", "comment", master_label, view=master_label, outs=0, text="Master")
-    p.ui("master", "live.numbox", SPLIT + 4, 22, 1, y_offset=MIX_OFFSET, outs=2, types=["float", "float"],
+    capture_left = grid_rect(SPLIT, 22, RIGHT_TRACKS)[0]
+    master_label = [capture_left + 10, MIX_TOP + 6, 65, 22]
+    master_gain_rect = [capture_left + 76, MIX_TOP + 7, 55, 19]
+    p.add("master_label", "comment", master_label, view=master_label, outs=0, text="Master",
+          fontsize=15, fontface=1)
+    p.add("master", "live.numbox", master_gain_rect, view=master_gain_rect, outs=2, types=["float", "float"],
          **parameter("Master", -12, -70, 0, unit_style=4))
     p.ui("audio_switch", "live.text", 16, 0, 3, outs=2, types=["", ""],
          text="Enable audio", texton="Audio on", mode=1,
@@ -840,10 +844,6 @@ def build():
     p.connect("audio_switch", 0, "set_audio")
     p.connect("set_audio", 0, "source_control")
     p.obj("dac", "dac~ 1 2", 360, 1958, ins=2, outs=0)
-    p.ui("mix_meter", "live.meter~", SPLIT + 5, 22, 3, y_offset=MIX_OFFSET, outs=2,
-         types=["float", "int"], orientation=1, hint="Mix recording captures this post-effects master signal.")
-    p.obj("mix_peak", "maximum~", 640, 1958, ins=2, types=["signal"])
-    p.connect("mix_peak", 0, "mix_meter")
     modulated_gain(p, "master", "master_gain", -12, -70, 0, 36, 22, 1840)
     for name, file, col, width, inputs, output_types in (
         ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 8 + FX_MOD_CHANNELS,
@@ -851,6 +851,9 @@ def build():
         ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 2, []),
     ):
         rect = grid_rect(col, 22, width, 5, MIX_OFFSET)
+        if name == "recorder":
+            rect[1] += MASTER_ROW_HEIGHT
+            rect[3] -= MASTER_ROW_HEIGHT
         p.add(name, "bpatcher", rect, ins=inputs, outs=len(output_types), types=output_types, view=rect)
         p.boxes[-1]["box"].update(name=file, args=[], offset=[0.0, 0.0], border=0,
                    clickthrough=int(name == "recorder"),
@@ -870,6 +873,7 @@ def build():
     p.add("normal_fade_done", "message", [1240, 1880, 115, 22], ins=2, text="normal_faded")
     p.connect("normal_blend", 1, "normal_fade_done")
     p.connect("normal_fade_done", 0, "source_control")
+    master_output_ceiling = 0.99
     for channel, suffix in enumerate(("left", "right")):
         mix = "normal_mix_" + suffix[0]
         difference = "normal_difference_" + suffix
@@ -887,8 +891,8 @@ def build():
         p.connect(blend, 0, mix, 1)
         p.obj("master_" + suffix, "*~", 360 + 140 * channel, 1840, ins=2, types=["signal"])
         p.obj("pattern_level_" + suffix, "*~", 360 + 140 * channel, 1862, ins=2, types=["signal"])
-        p.obj("output_" + suffix, "clip~ -0.99 0.99", 360 + 140 * channel, 1880,
-              ins=3, types=["signal"])
+        p.obj("output_" + suffix, f"clip~ {-master_output_ceiling} {master_output_ceiling}",
+              360 + 140 * channel, 1880, ins=3, types=["signal"])
         p.connect(mix, 0, "master_" + suffix)
         p.connect("master_gain", 0, "master_" + suffix, 1)
         p.connect("master_" + suffix, 0, "pattern_level_" + suffix)
@@ -897,9 +901,7 @@ def build():
         p.connect("output_" + suffix, 0, "dac", channel)
         p.connect("output_" + suffix, 0, "recorder", channel)
         p.connect("output_" + suffix, 0, "visuals_panel", channel)
-        p.obj("output_peak_" + suffix, "abs~", 640 + 140 * channel, 1920, types=["signal"])
-        p.connect("output_" + suffix, 0, "output_peak_" + suffix)
-        p.connect("output_peak_" + suffix, 0, "mix_peak", channel)
+    append_master_meter(p, capture_left + 144, MIX_TOP, master_output_ceiling)
 
     performance_mixer(p)
     p.label("row_heading", "Loop waveforms", MIXER_TRACKS, 2, 5, heading=True, y_offset=PLAYBACK_OFFSET)
