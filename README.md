@@ -13,7 +13,7 @@ The v0.7.0 standalone is ad hoc signed and is not notarized by Apple. macOS may 
 
 The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select your audio devices, and **Enable audio** starts the engine without starting playback.
 
-Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header.
+Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header. Each theme uses related background shades to separate source setup, the mixer, loop controls, effects, and recording.
 
 In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to cut lows, or **Flat** to center the filter. Switch between Low-pass and High-pass to keep the same strength, or drag **Filter sweep** for a continuous move through all three. Patterns, Sets, and LFO routes still use each loop’s filter sweep.
 

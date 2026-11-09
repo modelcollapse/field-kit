@@ -35,13 +35,13 @@ DEFAULT_PANS = (-45, -15, 15, 45)
 PITCH_SCALES = ("Off", "Chromatic", "Major", "Natural Minor", "Dorian",
                 "Major Pentatonic", "Minor Pentatonic")
 INSPECTOR_DIALS = {
-    "rate": (294, "Speed ×"),
-    "fade": (352, "Fade ms"),
-    "drive": (410, "Drive %"),
-    "level": (655, "Level %"),
-    "pan": (713, "Pan %"),
-    "echo_send": (771, "Echo %"),
-    "room_send": (829, "Room %"),
+    "rate": (289, 55, "Speed ×"),
+    "fade": (346, 55, "Fade ms"),
+    "drive": (412, 56, "Drive %"),
+    "level": (657, 52, "Level %"),
+    "pan": (713, 52, "Pan %"),
+    "echo_send": (776, 51, "Echo %"),
+    "room_send": (831, 51, "Room %"),
 }
 LOOP_SENDS = ("echo_send", "room_send")
 WINDOW_MOD_CHANNELS = 4 * len(CELLS)
@@ -203,11 +203,6 @@ def source_input(p):
     p.add("input_record_time", "comment", time_rect, outs=0, view=time_rect,
           text="00:00.0", fontface=1, textjustification=2,
           hint="Elapsed audio captured in the current or last input take.")
-    for index, x in enumerate((266, 716)):
-        rect = [x, INPUT_TOP + 10, 1, INPUT_HEIGHT - 20]
-        p.add(f"input_divider_{index}", "panel", rect, outs=0, view=rect, background=1,
-              ignoreclick=1, border=0, rounded=0, bgcolor=[0.29, 0.29, 0.30, 1.0])
-
     button_y = INPUT_TOP + 35
     action(p, "load", "Load audio…", 0, "choose", 3,
            view=[28, button_y, 126, 28])
@@ -578,8 +573,8 @@ def window_controls(p):
                   parameter_mappable=0, hint="Filter sweep in percent. Negative cuts highs; positive cuts lows.",
                   **parameter("Selected filter sweep value", initial, low, high, unit_style=5))
         else:
-            x, short = INSPECTOR_DIALS[key]
-            rect = [x, EDITOR_TOP + 25, 56, 72]
+            x, width, short = INSPECTOR_DIALS[key]
+            rect = [x, EDITOR_TOP + 25, width, 72]
             p.add(name, "live.dial", rect, outs=2, types=["float", "float"], view=rect,
                   appearance=3, showname=1, shownumber=1,
                   **parameter(f"Selected {key}", initial, low, high, short=short,
@@ -601,17 +596,17 @@ def window_controls(p):
     p.connect("edit_inspect_filter_type", 0, "source_control")
 
     for name, text, x, y, width in (
-        ("loop_fx_heading", "Loop FX", 410, 0, 62),
+        ("loop_fx_heading", "Loop FX", 412, 0, 62),
         ("filter_type_heading", "Filter type", 474, 0, 172),
         ("filter_sweep_heading", "Filter sweep", 474, 50, 172),
-        ("loop_mix_heading", "Loop mix", 655, 0, 113),
-        ("send_heading", "Loop sends", 771, 0, 113),
-        ("fade_preview_heading", "Fade preview", 891, 0, 177),
+        ("loop_mix_heading", "Loop mix", 657, 0, 106),
+        ("send_heading", "Loop sends", 776, 0, 104),
+        ("fade_preview_heading", "Fade preview", 893, 0, 175),
         ("pitch_scale_label", "Pitch snap · All loops", 16, 76, 128),
     ):
         rect = [x, EDITOR_TOP + y, width, 20]
         p.add(name, "comment", rect, view=rect, outs=0, text=text)
-    preview = [891, EDITOR_TOP + 25, 177, 72]
+    preview = [893, EDITOR_TOP + 25, 175, 72]
     p.add("loop_fade_preview", "jsui", preview, view=preview, outs=0, border=0,
           filename="fk_loop_fade.js", parameter_enable=0)
     scale_items = [atom for scale in PITCH_SCALES for atom in (scale, ",")][:-1]
@@ -778,26 +773,42 @@ def drifting_memory(p):
 
 
 def presentation_frame(p):
+    # Max puts earlier background objects on top. Let the selected row's
+    # transparent outline sit over both the mixer and waveform surfaces.
+    for voice in range(1, 5):
+        rect = [MARGIN - 4, PLAYBACK_TOP + ROW * (2 * voice - 1) - 2, FRAME_WIDTH - 24, 48]
+        p.add(f"loop_row_{voice}", "panel", rect, outs=0, view=rect, background=1,
+              ignoreclick=1, border=1, rounded=4, bgcolor=[0, 0, 0, 0],
+              bordercolor=SLATE_ACCENT if voice == 1 else [0, 0, 0, 0])
+
+    editor_top = EDITOR_TOP - 6
+    editor_height = EDITOR_HEIGHT + 12
+    capture_left = MARGIN + SPLIT * TRACK - 2
+    capture_width = RIGHT_TRACKS * TRACK + 6
     for name, left, top, width, height in (
-        ("header", 8, 8, FRAME_WIDTH - 16, 68),
+        ("header", 8, 8, capture_left - 12, 68),
+        ("audio", capture_left, 8, capture_width, 68),
+        ("source", 8, INPUT_TOP - 6, 255, INPUT_HEIGHT + 12),
+        ("input", 267, INPUT_TOP - 6, 446, INPUT_HEIGHT + 12),
+        ("input_capture", 717, INPUT_TOP - 6, FRAME_WIDTH - 725, INPUT_HEIGHT + 12),
         ("patterns", 8, PATTERNS_TOP - 6, FRAME_WIDTH - 16, PATTERNS_HEIGHT + 12),
-        ("playback", 8, PLAYBACK_TOP - 6, FRAME_WIDTH - 16, 224),
-        ("editor", 8, EDITOR_TOP - 6, FRAME_WIDTH - 16, EDITOR_HEIGHT + 12),
+        ("mixer", 8, PLAYBACK_TOP - 6, 245, 224),
+        ("playback", 256, PLAYBACK_TOP - 6, FRAME_WIDTH - 264, 224),
+        ("editor_playback", 8, editor_top, 397, editor_height),
+        ("editor_fx", 408, editor_top, 243, editor_height),
+        ("editor_mix", 654, editor_top, 115, editor_height),
+        ("editor_sends", 772, editor_top, 113, editor_height),
+        ("editor_fade", 888, editor_top, FRAME_WIDTH - 896, editor_height),
         ("effects", 8, MIX_TOP - 6, SPLIT * TRACK + 4, MIX_HEIGHT + 12),
-        ("capture", MARGIN + SPLIT * TRACK - 2, MIX_TOP - 6, RIGHT_TRACKS * TRACK + 6, MIX_HEIGHT + 12),
-        ("master_output", MARGIN + SPLIT * TRACK + 2, MIX_TOP - 3, RIGHT_TRACKS * TRACK - 2, 37),
-        ("input", 8, INPUT_TOP - 6, FRAME_WIDTH - 16, INPUT_HEIGHT + 12),
+        ("master_output", capture_left, MIX_TOP - 6, capture_width, MASTER_ROW_HEIGHT),
+        ("capture", capture_left, MIX_TOP + MASTER_ROW_HEIGHT - 2, capture_width,
+         MIX_HEIGHT - MASTER_ROW_HEIGHT + 8),
         ("workspace", 8, WORKSPACE_TOP - 6, 622, 28),
         ("modulation", 8, MODULATION_TOP - 6, FRAME_WIDTH - 16, MODULATION_ROWS * ROW + 8),
     ):
         rect = [left, top, width, height]
         p.add(f"surface_{name}", "panel", rect, outs=0, view=rect, background=1,
               ignoreclick=1, border=0, rounded=8, bgcolor=SLATE_PANEL)
-    for voice in range(1, 5):
-        rect = [MARGIN - 4, PLAYBACK_TOP + ROW * (2 * voice - 1) - 2, FRAME_WIDTH - 24, 48]
-        p.add(f"loop_row_{voice}", "panel", rect, outs=0, view=rect, background=1,
-              ignoreclick=1, border=1, rounded=4, bgcolor=[0, 0, 0, 0],
-              bordercolor=SLATE_ACCENT if voice == 1 else [0, 0, 0, 0])
 
 
 def build():
