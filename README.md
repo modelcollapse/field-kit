@@ -7,9 +7,11 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-The v0.7.0 standalone is ad hoc signed and is not notarized by Apple. macOS may block the first launch of a browser download. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445). [See the standalone running the demo with live Spectrum and Stereo X/Y](docs/screenshots/field-kit-standalone.jpg).
+The v0.8.0 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.7.0](CHANGELOG.md).
+[See what's new in v0.8.0](CHANGELOG.md).
+
+![Field Kit standalone in full screen with four loops playing, the docked loop editor, and live stereo visuals beside the mix recorder](docs/screenshots/field-kit-standalone.jpg)
 
 The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Open **Source, Input & Files** and choose **Load audio…** to load a sample and start its four loops as soon as the file is ready. The same drawer holds audio setup, source recording, and Set files. **Enable audio** starts the engine without starting playback.
 
@@ -17,13 +19,15 @@ Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header. 
 
 In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to cut lows, or **Flat** to center the filter. Switch between Low-pass and High-pass to keep the same strength, or drag **Filter sweep** for a continuous move through all three. Patterns, Sets, and LFO routes still use each loop’s filter sweep.
 
-![Field Kit playing four demo loops, with the selected loop's fade preview above the final mix spectrograms and stereo scope](docs/screenshots/field-kit-overview.png)
+![The windowed Mix workspace with four demo waveforms, the selected loop editor, Main FX, mix recording, and Drifting Memory](docs/screenshots/field-kit-overview.png)
 
 ## Record a source
 
 1. Open **Source, Input & Files**, select your interface in **Audio Setup…**, and click **Enable audio**. In **Input**, choose the left and right channels. Select the same channel on both sides for a mono source.
 2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
 3. Click **Record source** to capture up to 60 seconds. The red **RECORDING** badge and timer show when audio is being captured. **Stop source** loads the take into all four loops. Use **Save source WAV…** before saving a Set that uses the take or replacing the source.
+
+![The expanded Source, Input & Files drawer in the full-screen workspace](docs/screenshots/field-kit-source-drawer.jpg)
 
 ## Play and shape the loops
 
@@ -61,7 +65,7 @@ The scene clock controls when patterns change. Set the tempo and meter before yo
 
 The scene strip at the top, between **Transport** and **Master**, shows the current scene, the next playable scene, and progress through the current scene’s bars. Use **Start** or **Stop** and **Next bar** directly from the strip.
 
-![The scene sequencer running at 112 BPM with four steps lasting four or eight bars each](docs/screenshots/field-kit-scenes.png)
+![The scene sequencer running three four-bar steps at 112 BPM, with the current scene, next scene, and bar shown above the mixer](docs/screenshots/field-kit-scenes.png)
 
 Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Mix recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to collapse the lower panel and focus on the analyzers.
 
@@ -69,13 +73,13 @@ Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**
 
 ## Patch modulation
 
-Choose **LFO 1–8** from the dropdown and set its rate and shape. Choose a loop to modulate its range, speed, direction, crossfade, drive, filter, level, pan, or Echo and Room sends. Choose **Global** for master level, input gain, Main FX, and Drifting Memory. Pick a destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the destination receives while audio is on.
+Each of the eight LFOs can reach any of the 66 destinations. Choose a loop to modulate its range, speed, direction, crossfade, drive, filter, level, pan, or Echo and Room sends. Choose **Global** for master level, input gain, Main FX, and Drifting Memory. Pick a destination, then turn **Depth** or click **Add route** to start at +25%. Negative depth inverts the LFO. The **active routes** menu jumps to a route for the selected LFO. **Applied value** shows what the destination receives while audio is on.
 
 In **Loop sends** mode, the per-loop send routes control which loops feed Echo and Room. In Drifting Memory, the HPF and LPF routes take effect in **Sweep**, and the timing routes take effect in **Rhythmic**. Older Sets and pattern banks keep their existing LFO assignments when opened.
 
 The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Breakpoint** or click **Use curve** to edit that LFO’s custom curve. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO keeps its curve when you switch shapes. The graph on the right shows the live signal when audio is on.
 
-![The modulation patchbay with a sine LFO routed to Loop 1's start and live feedback](docs/screenshots/field-kit-modulation.png)
+![A sine LFO routed to Global Drift mix at +25% depth with a live Applied value and signal graph](docs/screenshots/field-kit-modulation.png)
 
 ## Process and capture
 
@@ -85,7 +89,7 @@ During loop playback, click **Enable FX** to turn on tone, stereo echo, and room
 
 Open **FX pad…** and use the **X** and **Y** menus to pair Tone tilt, Echo mix, or Room mix. X starts on Echo mix and Y starts on Room mix. Picking the other axis’s effect swaps the pair. Drag right or up to increase the assigned value. Tone tilt moves from dark through neutral to bright. The pad and dials stay in sync.
 
-Click **Record**, drag across the FX pad, and release. **Play** loops the gesture using the effect pair you recorded. **Stop** holds the current values and **Clear** erases the gesture. Turn on **Enable FX** in the pad or the Main FX header to hear it. Both buttons control the same Tone, Echo, and Room switch. Gestures in both pads stay available while the patch is open. **Stop all**, resetting, or recalling a pattern stops gesture playback; Sets and patterns save control values but do not store gestures.
+Click **Record**, drag across the FX pad, and release. **Play** loops the gesture using the effect pair you recorded. **Stop** holds the current values and **Clear** erases the gesture. Turn on **Enable FX** in the pad or the Main FX header to hear it. Both buttons control the same Tone, Echo, and Room switch. **Close** hides either pad and lets its gestures keep playing. **Stop all**, resetting, or recalling a pattern stops gesture playback. Sets and patterns save control values. Gestures stay in the current session.
 
 | Stereo field | FX pad |
 | --- | --- |
@@ -96,6 +100,8 @@ Click **Record**, drag across the FX pad, and release. **Play** loops the gestur
 Click **Advanced** to show the **Time**, **Texture**, and **I/O** controls beside Drifting Memory. The **Drifting Memory** shortcut in Main FX opens the same view. Click **Hide advanced** to bring back Loop sends. The delay and its capture continue while you switch views.
 
 Use **Hold** to freeze what’s in memory. **Cut Tail** clears the captured audio and turns capture off while the dry mix keeps playing. To capture again, release **Hold** if it’s on and choose a capture bank.
+
+![Drifting Memory with live Memory and Wet return meters, Hold and Cut Tail, and the Advanced Time page](docs/screenshots/field-kit-drifting-memory.png)
 
 With audio enabled, click **Record mix…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. The recorder writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click **Stop mix** when the take is finished.
 
@@ -109,12 +115,13 @@ To build the standalone app, run `python3 scripts/prepare_max_project.py max bui
 
 See the [release checklist](docs/releasing.md) for building, testing, and publishing both downloads and their screenshots.
 
-Run the playback startup, input recording, pattern bank, curve editing, and Set writer tests with Node.js.
+Run the playback startup, input recording, pattern bank, scene timing, curve editing, and Set writer tests with Node.js.
 
 ```sh
 node tests/source_launch_verify.cjs
 node tests/input_record_verify.cjs
 node tests/pattern_bank_verify.cjs
+node tests/sequence_mix_verify.cjs
 node tests/curve_fade_verify.cjs
 node tests/set_writer_verify.cjs
 ```

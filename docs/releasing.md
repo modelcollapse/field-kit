@@ -30,7 +30,7 @@ Ship the Max 9 patch and the standalone macOS app on the same GitHub release. Bu
    ```sh
    mkdir -p build/standalone-runtime
    cp build/standalone/{patchers,code,media}/* build/standalone-runtime/
-   bash scripts/package_macos_release.sh 0.7.0 \
+   bash scripts/package_macos_release.sh VERSION \
      "/path/to/verified-runtime.zip" "build/Field Kit.mxf" \
      build/standalone-runtime build/field-kit-macos.zip
    ```
@@ -42,12 +42,12 @@ Ship the Max 9 patch and the standalone macOS app on the same GitHub release. Bu
 
 Open **Open FIELD KIT.maxpat** from a clean extraction in Max. Then quit Max and launch **Field Kit.app** from its own clean extraction. Use the bundled demo and a disposable folder for recordings, Sets, and Banks.
 
-- [ ] Both builds launch to the presentation, load the demo, and run without missing files or startup errors. **Play all**, per-loop play/stop, **Play original**, and **Stop all** behave as expected. Verify both audio output channels on the available device, including headphones when present.
+- [ ] Both builds launch to the presentation, load the demo, and run without missing files or startup errors. **Play all**, per-loop play/stop, **Play original**, and **Stop all** behave as expected. Open a different WAV with **Load audio…** and confirm all four loops start when it is ready. Verify both audio output channels on the available device, including headphones when present.
 - [ ] Select a loop from its waveform and strip. Edit its bounds, direction, speed, and fade. Verify the fade preview, pitch snap, direct filter type selection and sweep, mixer level and pan, mute/unmute, and solo/unsolo. Recall a pattern to check that the selected loop shows its saved filter type and strength.
 - [ ] Open and close **Source, Input & Files** in windowed and full screen. Check that Transport, Scenes, and Master stay at the top and the selected loop editor stays beside the waveforms. Use **Audio Setup…** to select a real input, check channel selection, gain and meters, then record a source and save its WAV. Record a stereo mix WAV and check that it matches the separate L/R master meters. Verify that clipping one channel lights only its indicator.
-- [ ] Exercise both Main FX modes. Check that the **Mix** send matrix, loop editor, and Main FX controls agree. Open Drifting Memory's **Advanced** drawer from Mix and from Main FX. Check its three pages, pattern recall, and the return to Loop sends while delay audio continues. Check that **Hold** preserves memory and **Cut Tail** clears the wet signal and turns capture off while dry audio continues. Open **Stereo field** and **FX pad** and verify manual movement, FX axis selection, and record/play/stop/clear on both pads.
+- [ ] Exercise both Main FX modes. Check that the **Mix** send matrix, loop editor, and Main FX controls agree. Open Drifting Memory's **Advanced** drawer from Mix and from Main FX. Check its three pages, pattern recall, and the return to Loop sends while delay audio continues. Check that **Hold** preserves memory and **Cut Tail** clears the wet signal and turns capture off while dry audio continues. Open **Stereo field** and **FX pad** and verify manual movement, FX axis selection, and record/play/stop/clear on both pads. Enable FX in the pad and confirm Main FX stays in sync after closing and reopening it.
 - [ ] Store and recall patterns. Run a scene sequence with different bar lengths, **Next bar**, and **Repeat**. Confirm that the scene strip in Mix shows the same current scene, next scene, and bar count and can control the sequence. Save and reopen a Set and a Bank, and check an older fixture if available.
-- [ ] Route an LFO and confirm the target responds. Check Mix, Scenes, Modulation, Visuals, Hide, the section shades in all three themes, and entering and exiting full screen. Confirm Master and Mix recording have visibly separate backgrounds and the selected loop stands out across the mixer and waveform. Check live signal in both History and Spectrum and on the stereo scope.
+- [ ] Route LFOs to a loop, a loop send, Main FX, and Drifting Memory and confirm the effective value and audio respond. Check Mix, Scenes, Modulation, Visuals, Hide, the section shades in all three themes, and entering and exiting full screen. Confirm Master and Mix recording have visibly separate backgrounds and the selected loop stands out across the mixer and waveform. Check live signal in both History and Spectrum and on the stereo scope.
 - [ ] Record which macOS version, chip, and audio devices were tested and any limits of the verification. Resolve regressions before publishing.
 
 ## Review screenshots and publish

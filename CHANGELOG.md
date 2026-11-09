@@ -1,6 +1,17 @@
-# Field Kit v0.7.0
+# Field Kit changelog
 
-## What’s new
+## v0.8.0
+
+- The loop editor sits beside the waveforms. Transport, scene cues, and Master stay at the top, and Source, Input & Files opens as a drawer. Slate, Moss, and Ember use distinct shades for each section.
+- On wide displays, full screen moves the mix recorder, both channel visuals, and the square stereo scope to the right. Master shows independent left and right meters and clip lights.
+- Drifting Memory sits in Mix with live Memory and Wet return meters, Hold, Cut Tail, and an Advanced drawer. Edit per-loop Echo and Room sends in the Mix matrix or the selected loop editor.
+- Choose Low-pass, Flat, or High-pass in the loop editor. Loading a new audio file starts all four loops as soon as it is ready.
+- Enable Main FX directly in the FX pad. Both gesture pads have a Close button and can continue playing gestures while closed.
+- Eight LFOs reach 66 destinations, including eight per-loop sends and 14 Drifting Memory controls. Older Sets and Banks keep their saved assignments.
+
+## v0.7.0
+
+### What’s new
 
 - **Performance workspace.** Switch between Scenes, Modulation, and Visuals, or choose Hide to collapse the lower panel. Use Full screen to fit the workspace to the display. Slate, Moss, and Ember are available from the Theme menu.
 - **Scene sequencer.** Arrange up to eight stored patterns with a tempo, beats per bar, and a length for each step. Next bar advances at the next bar line, and Repeat loops the sequence.
@@ -10,7 +21,7 @@
 - **Gesture pads.** Record and repeat pan and level movement for each loop in Stereo field. In FX pad, assign Tone tilt, Echo mix, or Room mix to the two axes and record the movement of that pair.
 - **Source and mix recording.** Record source captures an input take for the four loops. Record mix writes the final stereo output as a 24-bit WAV.
 
-## Get started
+### Get started
 
 Unzip the Max download and open **Open FIELD KIT.maxpat** in Max 9. Keep the Support folder and companion patches beside the launcher. Click **Play all** to hear the demo.
 
