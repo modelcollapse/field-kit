@@ -38,6 +38,9 @@ saving a Set with the take or replacing it with a different source.
 
 Click a loop number or waveform to focus Editing Loop. Drag the waveform to set
 the range. Fade preview shows how the outgoing and incoming audio overlap.
+Choose Low-pass, Flat, or High-pass directly under Filter type. Switch between
+Low-pass and High-pass to keep the same strength, or drag Filter sweep to move
+continuously through all three.
 
 Click Stereo field… beside FX pad… in the Main FX header. Each dot is one loop.
 Drag left or right to pan, and up or down to set level.

@@ -15,6 +15,8 @@ The eight-second demo loads on startup. Click **Play all** to turn on audio and 
 
 Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header.
 
+In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to cut lows, or **Flat** to center the filter. Switch between Low-pass and High-pass to keep the same strength, or drag **Filter sweep** for a continuous move through all three. Patterns, Sets, and LFO routes still use each loop’s filter sweep.
+
 ![Field Kit playing four demo loops, with the selected loop's fade preview above the final mix spectrograms and stereo scope](docs/screenshots/field-kit-overview.png)
 
 ## Record a source

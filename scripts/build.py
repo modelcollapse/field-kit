@@ -34,9 +34,15 @@ DIRECTIONS = ["Forward", "Reverse", "Ping-pong"]
 DEFAULT_PANS = (-45, -15, 15, 45)
 PITCH_SCALES = ("Off", "Chromatic", "Major", "Natural Minor", "Dorian",
                 "Major Pentatonic", "Minor Pentatonic")
-DIALS = ("rate", "fade", "drive", "filter", "level", "pan", "echo_send", "room_send")
-DIAL_LABELS = ("Speed ×", "Fade ms", "Drive %", "Filter", "Level %", "Pan %",
-               "Echo send", "Room send")
+INSPECTOR_DIALS = {
+    "rate": (294, "Speed ×"),
+    "fade": (352, "Fade ms"),
+    "drive": (410, "Drive %"),
+    "level": (655, "Level %"),
+    "pan": (713, "Pan %"),
+    "echo_send": (771, "Echo %"),
+    "room_send": (829, "Room %"),
+}
 LOOP_SENDS = ("echo_send", "room_send")
 WINDOW_MOD_CHANNELS = 4 * len(CELLS)
 FX_MOD_CHANNELS = len(FX_DIALS)
@@ -561,13 +567,22 @@ def window_controls(p):
             else:
                 p.add(name, "live.numbox", rect, view=rect, outs=2, types=["float", "float"],
                       **parameter(f"Selected {key}", initial, low, high, units="%.2f"))
+        elif key == "filter":
+            rect = [474, EDITOR_TOP + 73, 110, 22]
+            p.add(name, "live.slider", rect, outs=2, types=["float", "float"], view=rect,
+                  orientation=1, relative=0, showname=0, shownumber=0, parameter_mappable=0,
+                  hint="Sweep left to cut highs, through Flat in the center, or right to cut lows.",
+                  **parameter("Selected filter", initial, low, high, unit_style=5))
+            rect = [590, EDITOR_TOP + 74, 56, 21]
+            p.add("inspect_filter_value", "live.numbox", rect, outs=2, types=["float", "float"], view=rect,
+                  parameter_mappable=0, hint="Filter sweep in percent. Negative cuts highs; positive cuts lows.",
+                  **parameter("Selected filter sweep value", initial, low, high, unit_style=5))
         else:
-            dial_index = DIALS.index(key)
-            rect = [294 + dial_index * 64, EDITOR_TOP + 25, 60, 72]
+            x, short = INSPECTOR_DIALS[key]
+            rect = [x, EDITOR_TOP + 25, 56, 72]
             p.add(name, "live.dial", rect, outs=2, types=["float", "float"], view=rect,
                   appearance=3, showname=1, shownumber=1,
-                  **({"hint": "Turn left to cut highs, or right to cut lows."} if key == "filter" else {}),
-                  **parameter(f"Selected {key}", initial, low, high, short=DIAL_LABELS[dial_index],
+                  **parameter(f"Selected {key}", initial, low, high, short=short,
                               unit_style=5 if key.endswith("_send") else 0,
                               units="%.2f" if key == "rate" else None))
         message = f"edit_inspect_{key}"
@@ -575,15 +590,28 @@ def window_controls(p):
         p.connect(name, 0, message)
         p.connect(message, 0, "source_control")
 
+    p.connect("inspect_filter_value", 0, "edit_inspect_filter")
+    rect = [474, EDITOR_TOP + 23, 172, 24]
+    p.add("inspect_filter_type", "live.tab", rect, view=rect, outs=3, types=["int", "", "float"],
+          fontsize=10, multiline=0, num_lines_patching=1, num_lines_presentation=1, parameter_mappable=0,
+          hint="Choose the filter for this loop. Low-pass cuts highs. High-pass cuts lows. Flat centers the sweep.",
+          **parameter("Selected filter type", 1, 0, 2, options=["Low-pass", "Flat", "High-pass"]))
+    p.obj("edit_inspect_filter_type", "prepend inspector_filter_type", 1760, 684, ins=2)
+    p.connect("inspect_filter_type", 0, "edit_inspect_filter_type")
+    p.connect("edit_inspect_filter_type", 0, "source_control")
+
     for name, text, x, y, width in (
-        ("loop_fx_heading", "Loop FX", 422, 0, 124),
-        ("send_heading", "Loop sends", 678, 0, 124),
-        ("fade_preview_heading", "Fade preview", 824, 0, 244),
+        ("loop_fx_heading", "Loop FX", 410, 0, 62),
+        ("filter_type_heading", "Filter type", 474, 0, 172),
+        ("filter_sweep_heading", "Filter sweep", 474, 50, 172),
+        ("loop_mix_heading", "Loop mix", 655, 0, 113),
+        ("send_heading", "Loop sends", 771, 0, 113),
+        ("fade_preview_heading", "Fade preview", 891, 0, 177),
         ("pitch_scale_label", "Pitch snap · All loops", 16, 76, 128),
     ):
         rect = [x, EDITOR_TOP + y, width, 20]
         p.add(name, "comment", rect, view=rect, outs=0, text=text)
-    preview = [824, EDITOR_TOP + 25, 244, 72]
+    preview = [891, EDITOR_TOP + 25, 177, 72]
     p.add("loop_fade_preview", "jsui", preview, view=preview, outs=0, border=0,
           filename="fk_loop_fade.js", parameter_enable=0)
     scale_items = [atom for scale in PITCH_SCALES for atom in (scale, ",")][:-1]

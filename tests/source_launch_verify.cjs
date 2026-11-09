@@ -333,4 +333,57 @@ assert.equal(host.get_set_source().kind, 'demo');
 assert(sent('voice_4', 'source', 'field-kit-source-1'));
 assert(sent('pattern_control', 'set_source_loaded', 1));
 
-console.log('PASS normal transport, staged Set source commit/rollback, descriptor tracking, and concurrent loads');
+// A filter change in Max updates the voice control, then feeds the inspector sync route.
+const filters = [0, 0, 0, 0];
+const getnamed = host.patcher.getnamed;
+host.patcher.getnamed = name => {
+    const target = getnamed(name);
+    const match = /^filter_([1-4])$/.exec(name);
+    if (!match) return target;
+    const voice = Number(match[1]);
+    return {
+        getvalueof: () => [filters[voice - 1]],
+        message: value => {
+            target.message(value);
+            filters[voice - 1] = value;
+            host.inspector_sync(voice, 'filter', value);
+        },
+    };
+};
+function filterEditorShows(value, type) {
+    assert(sent('inspect_filter', 'set', value));
+    assert(sent('inspect_filter_value', 'set', value));
+    assert(sent('inspect_filter_type', 'set', type));
+    trace.length = 0;
+}
+
+trace.length = 0;
+host.inspect_window(0);
+filterEditorShows(0, 1);
+host.inspector_filter_type(0);
+filterEditorShows(-40, 0);
+host.inspector_edit('filter', -27.5);
+filterEditorShows(-27.5, 0);
+host.inspector_filter_type(2);
+filterEditorShows(27.5, 2);
+
+host.inspect_window(1);
+filterEditorShows(0, 1);
+host.inspector_filter_type(2);
+filterEditorShows(40, 2);
+host.inspector_filter_type(1);
+filterEditorShows(0, 1);
+assert.deepEqual(filters, [27.5, 0, 0, 0]);
+
+// Scene recall writes each filter even when its loop is outside the editor.
+host.patcher.getnamed('filter_1').message(-18);
+assert(!trace.some(([target]) => target.startsWith('inspect_filter')));
+trace.length = 0;
+host.inspect_window(0);
+filterEditorShows(-18, 0);
+host.patcher.getnamed('filter_1').message(55);
+filterEditorShows(55, 2);
+host.inspector_edit('filter', 0);
+filterEditorShows(0, 1);
+
+console.log('PASS normal transport, staged Set source commit/rollback, descriptor tracking, concurrent loads, and filter selection');

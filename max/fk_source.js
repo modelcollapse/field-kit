@@ -129,7 +129,7 @@ function inspect_window(index) {
         var control = host.patcher.getnamed(key + "_" + inspectedWindow);
         if (control && control.getvalueof) {
             var value = control.getvalueof();
-            send("inspect_" + key, "set", Array.isArray(value) ? value[0] : value);
+            set_inspector_value(key, Array.isArray(value) ? value[0] : value);
         }
     });
     update_fade_preview();
@@ -141,9 +141,28 @@ function inspector_edit(key, value) {
     }
 }
 
+function inspector_filter_type(index) {
+    if (index !== 0 && index !== 1 && index !== 2) return;
+    var control = host.patcher.getnamed("filter_" + inspectedWindow);
+    if (!control || !control.getvalueof) return;
+    var value = control.getvalueof();
+    if (Array.isArray(value)) value = value[0];
+    var strength = typeof value === "number" && isFinite(value) && value !== 0 ? Math.abs(value) : 40;
+    inspector_edit("filter", (index - 1) * strength);
+}
+
+function set_inspector_value(key, value) {
+    send("inspect_" + key, "set", value);
+    if (key === "filter") {
+        send("inspect_filter_value", "set", value);
+        send("inspect_filter_type", "set", value < 0 ? 0 : value > 0 ? 2 : 1);
+    }
+}
+set_inspector_value.local = 1;
+
 function inspector_sync(voice, key, value) {
     if (voice === inspectedWindow && typeof value === "number" && isFinite(value)) {
-        send("inspect_" + key, "set", value);
+        set_inspector_value(key, value);
         if (key === "rate" || key === "fade") update_fade_preview();
     }
 }
