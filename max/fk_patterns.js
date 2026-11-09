@@ -46,6 +46,20 @@ var FX_CONTROLS = [
     ["fx_space", 0, 100, 18],
     ["fx_decay", 0.25, 5, 1.7]
 ];
+var LOOP_SENDS = ["echo_send", "room_send"];
+var DRIFT_CONTROLS = [
+    ["drift_mix", 0, 100, 35], ["mode", 0, 4, 0, 1], ["size", 0, 2, 0, 1],
+    ["reverse", 0, 1, 0, 1], ["half_speed", 0, 1, 0, 1], ["feedback", 0, 110, 82],
+    ["blur", 0, 100, 32], ["drift", 0, 100, 45], ["drive", 0, 100, 0],
+    ["dynamics", -100, 100, 0], ["hpf", 0, 4, 0, 1], ["lpf", 0, 4, 0, 1],
+    ["input_trim", -24, 12, 0], ["output_trim", -24, 6, 0],
+    ["input_gate", 0, 2, 1, 1], ["mono_input", 0, 1, 0, 1],
+    ["width", 0, 200, 100], ["pitch", -12, 0, 0],
+    ["hpf_hz", 20, 2000, 65], ["lpf_hz", 200, 20000, 5600],
+    ["rhythm_style", 0, 6, 0, 1], ["rhythm_free", 0, 1, 0, 1],
+    ["tempo", 20, 400, 120], ["beats_per_bar", 0.5, 32, 4],
+    ["drift_enabled", 0, 1, 0, 1]
+];
 
 var host = this;
 var slots = [];
@@ -67,6 +81,18 @@ function loadbang() {
     set_armed(false);
     render_slots();
     bank_status(PATTERN_HINT);
+}
+
+function theme() {
+    var colors = arrayfromargs(arguments);
+    if (colors.length !== 20) return;
+    EMPTY_BUTTON = colors.slice(0, 4);
+    STORED_BUTTON = colors.slice(4, 8);
+    SELECTED_BUTTON = colors.slice(8, 12);
+    LIGHT_TEXT = colors.slice(12, 16);
+    DARK_TEXT = colors.slice(16, 20);
+    set_armed(armed);
+    render_slots();
 }
 
 function status(text, showDirty) {
@@ -146,6 +172,7 @@ function slot(number, shift) {
         set_armed(false);
         bank_status("Pattern " + number + (replacing ? " replaced." : " stored."));
     } else if (slots[index]) {
+        host.patcher.getnamed("sequence_control").message("stop");
         request_recall(index);
         return;
     } else {
@@ -153,6 +180,14 @@ function slot(number, shift) {
         return;
     }
     render_slots();
+}
+
+function sequence_has_slot(number) {
+    return in_range(number, 1, SLOT_COUNT) && number % 1 === 0 && slots[number - 1] !== null;
+}
+
+function sequence_recall(number) {
+    if (sequence_has_slot(number)) request_recall(number - 1);
 }
 
 function value_of(object) {
@@ -166,6 +201,7 @@ function capture_pattern() {
     var source = patch.getnamed("source_control").js;
     var router = patch.getnamed("patchbay").subpatcher().getnamed("fk_router").js;
     var fx = patch.getnamed("mix_fx").subpatcher();
+    var drifting = patch.getnamed("drifting_memory").subpatcher();
     var mixer = patch.getnamed("mixer_control").js;
     var windows = [];
     for (var i = 0; i < VOICE_COUNT; i++) {
@@ -173,11 +209,19 @@ function capture_pattern() {
         VOICE_CONTROLS.forEach(function (spec) {
             window[spec[0]] = value_of(patch.getnamed(spec[0] + "_" + (i + 1)));
         });
+        LOOP_SENDS.forEach(function (key) {
+            window[key] = value_of(patch.getnamed(key + "_" + (i + 1)));
+        });
         windows.push(window);
     }
     var effects = {};
     FX_CONTROLS.forEach(function (spec) {
         effects[spec[0]] = value_of(fx.getnamed(spec[0]));
+    });
+    effects.fx_mode = value_of(fx.getnamed("fx_mode"));
+    var drift = {};
+    DRIFT_CONTROLS.forEach(function (spec) {
+        drift[spec[0]] = value_of(drifting.getnamed(spec[0]));
     });
     var selection = { window: router.selected, lfo: router.currentLfo, target: router.targetIndex };
     if (router.selected === VOICE_COUNT) {
@@ -194,6 +238,7 @@ function capture_pattern() {
         curves: router.curves.map(function (curve) { return curve.slice(); }),
         selection: selection,
         effects: effects,
+        drifting: drift,
         mixerMutes: mixer.mutes.slice(),
         pitchScale: value_of(patch.getnamed("pitch_scale")),
         master: value_of(patch.getnamed("master"))
@@ -257,6 +302,8 @@ function apply_pattern(pattern) {
     var source = patch.getnamed("source_control");
     var router = patch.getnamed("patchbay").subpatcher().getnamed("fk_router");
     var fx = patch.getnamed("mix_fx").subpatcher();
+    var drifting = patch.getnamed("drifting_memory").subpatcher();
+    source.message("stop_pad_motion");
     source.message("exit_normal");
     // Banks written before Pitch Snap was added omit this field.
     patch.getnamed("pitch_scale").message(pattern.pitchScale === undefined ? 0 : pattern.pitchScale);
@@ -266,10 +313,17 @@ function apply_pattern(pattern) {
         VOICE_CONTROLS.forEach(function (spec) {
             patch.getnamed(spec[0] + "_" + voice).message(window[spec[0]]);
         });
+        LOOP_SENDS.forEach(function (key) {
+            patch.getnamed(key + "_" + voice).message(window[key] === undefined ? 0 : window[key]);
+        });
     });
     patch.getnamed("master").message(pattern.master);
     FX_CONTROLS.forEach(function (spec) {
         fx.getnamed(spec[0]).message(pattern.effects[spec[0]]);
+    });
+    fx.getnamed("fx_mode").message(pattern.effects.fx_mode === undefined ? 0 : pattern.effects.fx_mode);
+    DRIFT_CONTROLS.forEach(function (spec) {
+        drifting.getnamed(spec[0]).message(pattern.drifting ? pattern.drifting[spec[0]] : spec[3]);
     });
 
     for (var i = 0; i < LFO_COUNT; i++) {
@@ -322,6 +376,7 @@ modulation_defaults.local = 1;
 
 function reset() {
     var patch = host.patcher;
+    patch.getnamed("sequence_control").message("stop");
     patch.getnamed("source_control").message("stop_all");
     cancel_recall();
     var windows = [];
@@ -418,8 +473,10 @@ function read_bank(path) {
         if (!bank.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, count); })) {
             throw new Error("Invalid bank patterns");
         }
+        var nextSlots = legacy ? bank.slots.map(upgrade_pattern) : bank.slots;
+        host.patcher.getnamed("sequence_control").message("stop");
         cancel_recall();
-        slots = legacy ? bank.slots.map(upgrade_pattern) : bank.slots;
+        slots = nextSlots;
         lastSlot = -1;
         bankDirty = false;
         set_armed(false);
@@ -480,7 +537,8 @@ function write_set(path) {
     var snapshot = slots.slice();
     var data = {
         format: SET_FORMAT, version: SET_VERSION, source: source,
-        slots: snapshot, current: current, selectedSlot: lastSlot
+        slots: snapshot, current: current, selectedSlot: lastSlot,
+        sequence: host.patcher.getnamed("sequence_control").js.sequence_snapshot()
     };
     var stage = folder + ".field-kit-" + Date.now() + "-" + Math.floor(Math.random() * 1e9) + ".tmp";
     try {
@@ -604,6 +662,7 @@ function valid_set(data) {
         !data.source || !valid_pattern(data.current, LFO_COUNT) ||
         !Array.isArray(data.slots) || data.slots.length !== SLOT_COUNT ||
         !data.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, LFO_COUNT); }) ||
+        (data.sequence !== undefined && !host.patcher.getnamed("sequence_control").js.sequence_valid(data.sequence)) ||
         (data.selectedSlot !== -1 &&
             (!index_valid(data.selectedSlot, SLOT_COUNT) || !data.slots[data.selectedSlot]))) return false;
     var source = data.source;
@@ -652,6 +711,7 @@ function set_source_loaded(ok) {
     lastSlot = opened.data.selectedSlot;
     activeSetPath = opened.path;
     bankDirty = false;
+    host.patcher.getnamed("sequence_control").js.restore_sequence(opened.data.sequence);
     set_armed(false);
     render_slots();
     status(PATTERN_HINT);
@@ -729,7 +789,8 @@ numbers_valid.local = 1;
 
 function controls_valid(values, controls) {
     return values && controls.every(function (spec) {
-        return in_range(values[spec[0]], spec[1], spec[2]);
+        var value = values[spec[0]];
+        return in_range(value, spec[1], spec[2]) && (!spec[4] || value % 1 === 0);
     });
 }
 controls_valid.local = 1;
@@ -749,6 +810,7 @@ function valid_pattern(pattern, lfoCount) {
     return !!pattern && Array.isArray(pattern.windows) && pattern.windows.length === VOICE_COUNT &&
         pattern.windows.every(function (window) {
             return controls_valid(window, VOICE_CONTROLS) && window.direction % 1 === 0 &&
+                LOOP_SENDS.every(function (key) { return window[key] === undefined || in_range(window[key], 0, 100); }) &&
                 numbers_valid(window.region, 2, 0, 100) && window.region[0] < window.region[1];
         }) && numbers_valid(pattern.gains, VOICE_COUNT * lfoCount * TARGET_COUNT, -100, 100) &&
         pattern.gains.every(function (gain) { return gain % 1 === 0; }) &&
@@ -764,6 +826,8 @@ function valid_pattern(pattern, lfoCount) {
         (pattern.selection.globalTarget === undefined || index_valid(pattern.selection.globalTarget, GLOBAL_TARGET_COUNT)) &&
         index_valid(pattern.selection.target, TARGET_COUNT) && controls_valid(pattern.effects, FX_CONTROLS) &&
         pattern.effects.fx_enabled % 1 === 0 && in_range(pattern.master, -70, 0) &&
+        (pattern.effects.fx_mode === undefined || index_valid(pattern.effects.fx_mode, 2)) &&
+        (pattern.drifting === undefined || controls_valid(pattern.drifting, DRIFT_CONTROLS)) &&
         (pattern.pitchScale === undefined || index_valid(pattern.pitchScale, PITCH_SCALE_COUNT)) &&
         (pattern.mixerMutes === undefined ||
             (Array.isArray(pattern.mixerMutes) && pattern.mixerMutes.length === VOICE_COUNT &&

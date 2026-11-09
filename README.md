@@ -5,43 +5,59 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 ## Start here
 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
-- **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**.
+- **[Download the standalone macOS app (v0.6.0)](https://github.com/modelcollapse/field-kit/releases/download/v0.6.0/field-kit-macos.zip).** The standalone app is on the previous release. For the current features, use the Max patch above.
+
+[See what's new in v0.7.0](CHANGELOG.md).
 
 The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Choose **Load audio…** to use your own sample. **Audio Setup…** lets you select your audio devices, and **Enable audio** starts the engine without starting playback.
 
-![FIELD KIT playing four loops with wide blue volume faders, two soloed tracks, and stereo echo set to 575 ms](docs/screenshots/field-kit-overview.png)
+Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header.
+
+![Field Kit playing four demo loops, with the selected loop's fade preview above the final mix spectrograms and stereo scope](docs/screenshots/field-kit-overview.png)
 
 ## Record a source
 
-1. Select your interface in **Audio Setup…** and click **Enable audio**. In the **Input recording** section, choose the left and right channels. Select the same channel on both sides for a mono source.
+1. Select your interface in **Audio Setup…** and click **Enable audio**. In **Source**, directly below transport, choose the left and right channels. Select the same channel on both sides for a mono source.
 2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
-3. Click **Record input** to capture up to 60 seconds. The red **RECORDING** badge and timer show when audio is being captured. **Stop input** loads the take into all four loops. Use **Save input WAV…** before saving a Set that uses the take or replacing the source.
+3. Click **Record source** to capture up to 60 seconds. The red **RECORDING** badge and timer show when audio is being captured. **Stop source** loads the take into all four loops. Use **Save source WAV…** before saving a Set that uses the take or replacing the source.
 
 ## Play and shape the loops
 
-1. Drag across a waveform to preview a loop range, then release to apply it. If the window is playing, it fades briefly as it switches to the new range. The moving line shows playback position.
-2. Use **Window 1–4** to pick the window you want to edit. **In %** and **Out %** let you enter the bounds precisely.
-3. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials. **Fade ms** blends each pass into the next. **Filter** is flat at zero. Turn left to cut highs or right to cut lows. The filter works independently of the mix effects switch.
+1. Click a loop number or waveform to select it. **Editing Loop** below the waveform shows the selected loop's settings. Drag across a waveform and release to change its range. The moving line shows playback position.
+2. Use **In %** and **Out %** to enter the bounds precisely. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials.
+3. **Fade ms** blends each pass into the next. **Fade preview** shows the two gain curves and the overlap duration. The live duration reflects short-loop limits, speed, and modulation. **Filter** is flat at zero. Turn left to cut highs or right to cut lows.
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 
-**Play normal** plays the original sample once at its original speed, with the window mixer and effects bypassed. Switching between normal playback and the loop mix uses a short crossfade. **Stop all** stops playback. **Reset** also restores the default loop, mixer, modulation, and effects settings. It keeps the current sample and stored patterns.
+**Play original** plays the original sample once at its original speed, with the window mixer and effects bypassed. Switching between original playback and the loop mix uses a short crossfade. **Stop all** stops playback. **Reset** also restores the default loop, mixer, modulation, and effects settings. It keeps the current sample and stored patterns.
 
 ## Mix the four windows
 
-Each waveform has a mixer strip with playback, level, pan, mute, solo, and a peak meter. Click or drag the blue fader under a window’s playback button to set its volume, or edit the percentage box for a precise level. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. The meters show what each window sends into the shared effects, and **Capture** records the resulting master mix.
+Each waveform has a mixer strip with playback, level, pan, mute, solo, and a peak meter. Click or drag the blue fader under a window’s playback button to set its volume, or edit the percentage box for a precise level. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. Mixer performance controls leave the edit selection in place. **Record mix** captures the resulting master mix.
 
-Open **Stereo field…** in the **Mixer** header to place all four loops together. Drag a loop left or right to pan it, and up or down to change its level. If dots overlap, click the loop number to select one.
+Open **Stereo field…** beside **FX pad…** in the **Main FX** header to place all four loops together. The tabs select which loop's pan and level are shown above the pad. Drag its dot left or right to pan it, and up or down to change its level. If dots overlap, use the tabs to pick one.
+
+To record movement, select a loop, click **Record**, then drag and release its dot. Click **Play** to repeat the movement, **Stop** to hold the current position, or **Clear** to erase the gesture. Each loop keeps one gesture and can play it alongside the others.
 
 ## Store patterns
 
 Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. During playback, the output briefly fades down and back up around the switch. Recall clears active solos. Click **Cancel store** to exit store mode.
 
-Use **Save Set…** in **Set files** to save the source file location, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
+Use **Save Set…** in the **Set files…** menu at the top to save the source file location, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
 
 Open **Banks…** to load or save a bank of patterns.
 
 Banks from the three-LFO version still open. Their settings are restored on LFOs 1–3. LFOs 4–8 start at their defaults with no routes.
+
+Open **Scene sequencer…** beside **Banks…** to show the Scenes workspace and chain up to eight stored patterns. Set **BPM** and **Beats/bar**, then choose a scene and duration in bars for each step. **Start** starts with the first available scene, and **Next bar** advances early at the next bar line. **Repeat** loops the sequence. **Stop** holds the current scene and lets the loops continue. **Stop all** stops the sequencer and the loops. Selecting a pattern by hand stops the sequence and recalls that pattern.
+
+The scene clock controls when patterns change. Set the tempo and meter before you start. Loop speed still follows each loop's **Speed ×** setting. **Save Set…** saves the sequence, tempo, and meter with the patterns. **Open Set…** restores them ready to start.
+
+![The scene sequencer running at 112 BPM with four steps lasting four or eight bars each](docs/screenshots/field-kit-scenes.png)
+
+Use the workspace selector to switch between **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Full screen** expands the workspace for performance.
+
+**Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. The stereo scope plots left against right. Matching left and right signals trace a rising diagonal.
 
 ## Patch modulation
 
@@ -49,13 +65,23 @@ Choose **LFO 1–8** from the dropdown and set its rate and shape. Choose a wind
 
 The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Breakpoint** or click **Use curve** to edit that LFO’s custom curve. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO keeps its curve when you switch shapes. The graph on the right shows the live signal when audio is on.
 
-![Close-up of LFO 8 modulating Window 4 pan at 55 percent, with its breakpoint curve and live feedback](docs/screenshots/field-kit-modulation.png)
-
 ## Process and capture
 
 During loop playback, click **Enable FX** to turn on tone, stereo echo, and room reverb. Set an effect's **Mix %** to zero to remove it from the mix. Tone is neutral at zero, and echo time ranges from 45 to 850 ms.
 
-With audio enabled, click **Record…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. Capture writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click **Stop** in Capture when the take is finished.
+**Full mix** applies Echo and Room to the combined loops. To give each loop its own amount, select **Loop sends** in Main FX and set **Echo send** and **Room send** in the loop editor. The two **Mix %** dials then control the shared return levels. Sets and patterns remember the mode and the send amounts.
+
+Open **FX pad…** and use the **X** and **Y** menus to pair Tone tilt, Echo mix, or Room mix. X starts on Echo mix and Y starts on Room mix. Picking the other axis’s effect swaps the pair. Drag right or up to increase the assigned value. Tone tilt moves from dark through neutral to bright. The pad and dials stay in sync.
+
+Click **Record**, drag across the FX pad, and release. **Play** loops the gesture using the effect pair you recorded. **Stop** holds the current values and **Clear** erases the gesture. Turn on **Enable FX** to hear it. Gestures in both pads stay available while the patch is open. **Stop all**, resetting, or recalling a pattern stops gesture playback; Sets and patterns save control values but do not store gestures.
+
+| Stereo field | FX pad |
+| --- | --- |
+| ![Stereo field with four loop positions and gesture controls](docs/screenshots/field-kit-stereo-field.png) | ![FX pad with full crosshairs and Echo mix and Room mix assigned to the axes](docs/screenshots/field-kit-fx-pad.png) |
+
+**Drifting Memory…** opens the original 1.8 engine at the end of Main FX. Click **Enable effect**, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. Use **Mix** to blend it into the main signal. **Off** stops capture and lets the tail play. Sets and patterns save the effect settings. Captured memory is for the current session.
+
+With audio enabled, click **Record mix…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. The recorder writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click **Stop mix** when the take is finished.
 
 ## Build and test
 

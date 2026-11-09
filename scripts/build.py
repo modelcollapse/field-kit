@@ -9,6 +9,7 @@ import wave
 from pathlib import Path
 
 from build_fx import DIALS as FX_DIALS
+from build_visuals import build as build_visuals
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent / "max"
@@ -29,8 +30,10 @@ DIRECTIONS = ["Forward", "Reverse", "Ping-pong"]
 DEFAULT_PANS = (-45, -15, 15, 45)
 PITCH_SCALES = ("Off", "Chromatic", "Major", "Natural Minor", "Dorian",
                 "Major Pentatonic", "Minor Pentatonic")
-DIALS = ("rate", "fade", "drive", "filter", "level", "pan")
-DIAL_LABELS = ("Speed ×", "Fade ms", "Drive %", "Filter", "Level %", "Pan %")
+DIALS = ("rate", "fade", "drive", "filter", "level", "pan", "echo_send", "room_send")
+DIAL_LABELS = ("Speed ×", "Fade ms", "Drive %", "Filter", "Level %", "Pan %",
+               "Echo send", "Room send")
+LOOP_SENDS = ("echo_send", "room_send")
 WINDOW_MOD_CHANNELS = 4 * len(CELLS)
 FX_MOD_CHANNELS = len(FX_DIALS)
 MOD_CHANNELS = WINDOW_MOD_CHANNELS + 2 + FX_MOD_CHANNELS
@@ -44,16 +47,27 @@ TRACKS = 22
 SPLIT = 14
 MIXER_TRACKS = 5
 RIGHT_TRACKS = TRACKS - SPLIT
-INPUT_TOP = 80
+INPUT_TOP = 86
 INPUT_HEIGHT = 74
 PATTERNS_TOP = INPUT_TOP + INPUT_HEIGHT + SECTION_GAP
-PLAYBACK_TOP = PATTERNS_TOP + 2 * ROW - GUTTER + SECTION_GAP
+PATTERNS_HEIGHT = 34
+PLAYBACK_TOP = PATTERNS_TOP + PATTERNS_HEIGHT + SECTION_GAP
 PLAYBACK_OFFSET = PLAYBACK_TOP - (MARGIN + 2 * ROW)
-MODULATION_TOP = PLAYBACK_TOP + 9 * ROW - GUTTER + SECTION_GAP
+EDITOR_TOP = PLAYBACK_TOP + 9 * ROW - GUTTER + SECTION_GAP
+EDITOR_HEIGHT = 100
+MIX_TOP = EDITOR_TOP + EDITOR_HEIGHT + SECTION_GAP
+MIX_HEIGHT = 5 * ROW - GUTTER
+MIX_OFFSET = MIX_TOP - (MARGIN + 22 * ROW)
+WORKSPACE_TOP = MIX_TOP + MIX_HEIGHT + SECTION_GAP
+MODULATION_TOP = WORKSPACE_TOP + ROW + GUTTER
 MODULATION_ROWS = 9
-FOOTER_TOP = MODULATION_TOP + MODULATION_ROWS * ROW - GUTTER + SECTION_GAP
-FOOTER_OFFSET = FOOTER_TOP - (MARGIN + 22 * ROW)
-FRAME_HEIGHT = FOOTER_TOP + 5 * ROW - GUTTER + MARGIN
+FRAME_WIDTH = 2 * MARGIN + TRACKS * TRACK - GUTTER
+FRAME_HEIGHT = MODULATION_TOP + MODULATION_ROWS * ROW - GUTTER + MARGIN
+SLATE_CANVAS = [20 / 255, 26 / 255, 35 / 255, 1.0]
+SLATE_PANEL = [32 / 255, 41 / 255, 54 / 255, 1.0]
+SLATE_CONTROL = [48 / 255, 63 / 255, 81 / 255, 1.0]
+SLATE_INK = [243 / 255, 247 / 255, 252 / 255, 1.0]
+SLATE_ACCENT = [143 / 255, 185 / 255, 240 / 255, 1.0]
 
 
 def grid_rect(col, row, width, height=1, y_offset=0):
@@ -101,7 +115,9 @@ class Patch:
 
     def save(self):
         patch = dict(fileversion=1, appversion=VERSION, classnamespace="box",
-                     rect=[60, 70, 2 * MARGIN + TRACKS * TRACK - GUTTER, FRAME_HEIGHT], openinpresentation=1,
+                     rect=[60, 70, FRAME_WIDTH, FRAME_HEIGHT], openinpresentation=1,
+                     toolbarvisible=0,
+                     locked_bgcolor=SLATE_CANVAS,
                      gridsize=[8, 8], isolateaudio=1, description="Four-window sample instrument with modulation, mix effects and stereo capture",
                      boxes=self.boxes, lines=self.lines)
         (ROOT / "Field Kit.maxpat").write_text(
@@ -109,9 +125,10 @@ class Patch:
         )
 
 
-def parameter(name, initial, low, high, *, options=None, unit_style=0, short=None, units=None):
+def parameter(name, initial, low, high, *, options=None, unit_style=0, short=None, units=None,
+              integer=False):
     value = dict(parameter_longname=name, parameter_shortname=short or name,
-                 parameter_type=0, parameter_mmin=low, parameter_mmax=high,
+                 parameter_type=1 if integer else 0, parameter_mmin=low, parameter_mmax=high,
                  parameter_initial=[initial], parameter_initial_enable=1,
                  parameter_unitstyle=unit_style)
     if units:
@@ -142,10 +159,10 @@ def modulated_gain(p, control, output, initial, low, high, depth, x, y):
 
 
 def action(patch, name, label, column, selector, width=2, target="source_control", hint=None,
-           *, row=1, y_offset=0, routing_y=728):
+           *, row=1, y_offset=0, routing_y=728, view=None):
     rect = grid_rect(column, row, width, y_offset=y_offset)
     rect[3] = 32
-    control = patch.add(name, "live.text", rect, view=rect, outs=2, types=["", ""],
+    control = patch.add(name, "live.text", rect, view=view or rect, outs=2, types=["", ""],
                         mode=0, text=label, texton=label, parameter_enable=0,
                         **({"hint": hint} if hint else {}))
     patch.obj(name + "_click", "sel bang", 24 + column * 110, routing_y, outs=2,
@@ -159,48 +176,48 @@ def action(patch, name, label, column, selector, width=2, target="source_control
 
 
 def source_input(p):
-    band = [MARGIN, INPUT_TOP, TRACKS * TRACK - GUTTER, INPUT_HEIGHT]
-    p.add("input_panel", "panel", band, outs=0, view=band, background=1, ignoreclick=1,
-          border=0, rounded=6, bgcolor=[0.175, 0.175, 0.18, 1.0])
     for name, text, x, width in (
-        ("input_heading", "Input recording", 28, 248),
-        ("input_gain_label", "Input gain", 312, 104),
-        ("input_level_label", "Input level · after gain", 456, 230),
+        ("input_heading", "Source", 28, 225),
+        ("input_gain_label", "Input gain", 434, 83),
+        ("input_level_label", "Input level · after gain", 532, 171),
     ):
         heading = name == "input_heading"
-        rect = [x, INPUT_TOP + (8 if heading else 11), width, 22]
+        rect = [x, INPUT_TOP + (8 if heading else 10), width, 20]
         p.add(name, "comment", rect, outs=0, view=rect, text=text,
               **({"fontsize": 16, "fontface": 1} if heading else {}))
-    state_rect = [736, INPUT_TOP + 10, 145, 20]
+    state_rect = [736, INPUT_TOP + 10, 206, 20]
     p.add("input_record_state", "comment", state_rect, outs=0, view=state_rect,
           text="Enable audio to record", fontface=1, textcolor=[0.96, 0.96, 0.97, 1.0])
     time_rect = [946, INPUT_TOP + 10, 74, 20]
     p.add("input_record_time", "comment", time_rect, outs=0, view=time_rect,
           text="00:00.0", fontface=1, textjustification=2,
           hint="Elapsed audio captured in the current or last input take.")
-    for index, x in enumerate((292, 716)):
+    for index, x in enumerate((266, 716)):
         rect = [x, INPUT_TOP + 10, 1, INPUT_HEIGHT - 20]
         p.add(f"input_divider_{index}", "panel", rect, outs=0, view=rect, background=1,
               ignoreclick=1, border=0, rounded=0, bgcolor=[0.29, 0.29, 0.30, 1.0])
 
-    button_row = 2
-    button_offset = INPUT_TOP + 33 - (MARGIN + ROW * button_row)
+    button_y = INPUT_TOP + 35
+    action(p, "load", "Load audio…", 0, "choose", 3,
+           view=[28, button_y, 126, 28])
+    action(p, "demo", "Load demo", 3, "load_demo",
+           view=[160, button_y, 94, 28])
     for name, text, column, command, hint in (
-        ("input_record_button", "Record input", 15, "toggle_input_record",
+        ("input_record_button", "Record source", 15, "toggle_input_record",
          "Record the selected inputs as a new source for all four loops."),
-        ("input_save_button", "Save input WAV…", 18, "choose_input_save",
+        ("input_save_button", "Save source WAV…", 18, "choose_input_save",
          "Save the current input take so a Set can reopen it."),
     ):
         control = action(p, name, text, column, command, 3, hint=hint,
-                         row=button_row, y_offset=button_offset, routing_y=2230)
+                         routing_y=2230, view=[MARGIN + column * TRACK, button_y, 140, 28])
         control["active"] = 0
 
-    for outlet, side, short, x in ((1, "left", "L", 28), (2, "right", "R", 158)):
+    for outlet, side, short, x in ((1, "left", "L", 280), (2, "right", "R", 356)):
         name = "input_" + side
-        label_rect = [x, INPUT_TOP + 38, 48, 20]
+        label_rect = [x, INPUT_TOP + 10, 64, 20]
         p.add(name + "_label", "comment", label_rect, outs=0, view=label_rect,
               text="Input " + short)
-        menu_rect = [x + 52, INPUT_TOP + 37, 64, 22]
+        menu_rect = [x, INPUT_TOP + 37, 64, 24]
         p.add(name, "umenu", menu_rect, view=menu_rect, outs=3, types=["int", "", ""],
               items=["—"], allowdrag=0, parameter_enable=0,
               hint=f"Select the {side} channel from your Audio Setup device. Choose the same input on both sides for mono.")
@@ -209,9 +226,9 @@ def source_input(p):
         p.connect(name, 0, name + "_message")
         p.connect(name + "_message", 0, "source_control")
 
-    gain_rect = [312, INPUT_TOP + 36, 104, 24]
+    gain_rect = [434, INPUT_TOP + 37, 83, 24]
     p.add("input_gain", "live.numbox", gain_rect, view=gain_rect, outs=2, types=["float", "float"],
-          hint="Adjust both inputs before metering and recording. 0 dB leaves their level unchanged.",
+          hint="Drag or type to adjust both inputs before metering and recording.",
           **parameter("Input gain", 0, -60, 18, unit_style=4))
     modulated_gain(p, "input_gain", "input_gain_signal", 0, -60, 18, 24, 2750, 691)
 
@@ -221,8 +238,8 @@ def source_input(p):
     p.obj("input_progress_message", "prepend input_record_progress", 2260, 896, ins=2)
     for channel, side in enumerate(("L", "R")):
         y = INPUT_TOP + 34 + 17 * channel
-        label_rect = [456, y - 2, 20, 18]
-        meter_rect = [478, y, 216, 12]
+        label_rect = [532, y - 1, 16, 16]
+        meter_rect = [552, y, 152, 12]
         p.add(f"input_meter_label_{side}", "comment", label_rect, outs=0, view=label_rect,
               text=side, fontsize=11)
         meter = f"input_meter_{side}"
@@ -263,10 +280,6 @@ def pattern_controls(p):
     row = 3
     y_offset = PATTERNS_TOP - (MARGIN + row * ROW)
     p.label("pattern_heading", "Patterns", 0, row, 2, heading=True, y_offset=y_offset + 4)
-    p.label("set_heading", "Set files", SPLIT, row, 2, heading=True, y_offset=y_offset + 4)
-    divider = [MARGIN + TRACK * SPLIT - 7, PATTERNS_TOP, 1, 48]
-    p.add("set_divider", "panel", divider, outs=0, view=divider, background=1,
-          border=0, rounded=0, bgcolor=[0.37, 0.37, 0.37, 1.0])
 
     def control_rect(col, width):
         rect = grid_rect(col, row, width, y_offset=y_offset)
@@ -316,10 +329,22 @@ def pattern_controls(p):
     p.connect("pattern_store", 0, "pattern_store_click")
     p.connect("pattern_store_click", 0, "pattern_toggle_store")
     p.connect("pattern_toggle_store", 0, "pattern_control")
-    p.label("pattern_status", "Click to recall. Shift-click to store.",
-            0, row + 1, SPLIT, y_offset=y_offset + 8)
-    p.label("set_status", "Saves the sample location, patterns, and current mix.",
-            SPLIT, row + 1, RIGHT_TRACKS, y_offset=y_offset + 8)
+    pattern_status = [820, PATTERNS_TOP + 6, 248, 20]
+    p.add("pattern_status", "comment", pattern_status, view=pattern_status, outs=0,
+          text="Click to recall. Shift-click to store.")
+    p.label("set_status", "Source, patterns, and current mix",
+            9, 1, 5, y_offset=6)
+
+    p.ui("set_menu", "umenu", 9, 0, 2, y_offset=2, outs=3, types=["int", "", ""],
+         items=["Set files…", ",", "Open Set…", ",", "Save Set…"], allowdrag=0,
+         parameter_enable=0, hint="Open or save the source location, patterns, and current mix.")
+    p.obj("set_menu_action", "t i b", 1955, 1920, outs=2, types=["int", "bang"])
+    p.add("set_menu_label", "message", [2050, 1950, 58, 22], ins=2, text="set 0")
+    p.obj("set_menu_choice", "sel 1 2", 1955, 1950, outs=3, types=["bang", "bang", ""])
+    p.connect("set_menu", 0, "set_menu_action")
+    p.connect("set_menu_action", 1, "set_menu_label")
+    p.connect("set_menu_label", 0, "set_menu")
+    p.connect("set_menu_action", 0, "set_menu_choice")
 
     rect = control_rect(12, 2)
     rect[1] += 4
@@ -336,24 +361,18 @@ def pattern_controls(p):
     p.connect("pattern_bank_label", 0, "pattern_banks")
     p.connect("pattern_bank_action", 0, "pattern_bank_choice")
 
-    for offset, (name, label, command, result, dialog, outputs) in enumerate((
-        ("set_open", "Open Set…", "open_set", "read_set", "opendialog JSON", ["", "bang"]),
-        ("set_save", "Save Set…", "save_set", "write_set", "savedialog JSON", ["", "", "bang"]),
-        ("pattern_load", "Load Bank…", "load_bank", "read_bank", "opendialog JSON", ["", "bang"]),
-        ("pattern_save", "Save Bank…", "save_bank", "write_bank", "savedialog JSON", ["", "", "bang"]),
+    for offset, (name, command, result, dialog, outputs) in enumerate((
+        ("set_open", "open_set", "read_set", "opendialog JSON", ["", "bang"]),
+        ("set_save", "save_set", "write_set", "savedialog JSON", ["", "", "bang"]),
+        ("pattern_load", "load_bank", "read_bank", "opendialog JSON", ["", "bang"]),
+        ("pattern_save", "save_bank", "write_bank", "savedialog JSON", ["", "", "bang"]),
     )):
-        if offset < 2:
-            rect = control_rect(SPLIT + 2 + offset * 3, 3)
-            p.add(name, "live.text", rect, view=rect, outs=2, types=["", ""],
-                  mode=0, text=label, texton=label, parameter_enable=0)
         x = 1520 + 145 * offset
         p.add(name + "_message", "message", [x, 2090, 80, 22], ins=2, text=command)
         p.obj(name + "_dialog", dialog, x, 2125, outs=len(outputs), types=outputs)
         p.obj(name + "_result", "prepend " + result, x, 2160, ins=2)
-        if offset < 2:
-            p.connect(name, 0, name + "_message")
-        else:
-            p.connect("pattern_bank_choice", offset - 2, name + "_message")
+        choice = "set_menu_choice" if offset < 2 else "pattern_bank_choice"
+        p.connect(choice, offset % 2, name + "_message")
         p.connect(name + "_message", 0, "pattern_control")
         p.connect(name + "_dialog", 0, name + "_result")
         p.connect(name + "_result", 0, "pattern_control")
@@ -367,53 +386,177 @@ def pattern_controls(p):
     p.connect("set_relink_cancel", 0, "pattern_control")
     p.obj("set_writer", "node.script fk_set_writer.js @autostart 1", 2425, 2125, outs=2)
     p.connect("set_writer", 0, "pattern_control")
+    sequence_controls(p)
+
+
+def sequence_controls(p):
+    panel = Patch()
+    panel.add("sequence_commands", "outlet", [8, 320, 26, 26], outs=0, index=1)
+
+    def control(name, cls, rect, selector, types, **attrs):
+        panel.add(name, cls, rect, view=rect, outs=len(types), types=types, **attrs)
+        route = name + "_command"
+        x, y = rect[:2]
+        panel.obj(route, "prepend " + selector, x, y + 214, ins=2)
+        panel.connect(name, 0, route)
+        panel.connect(route, 0, "sequence_commands")
+
+    for name, text, rect in (
+        ("seq_title", "Scene sequencer", [8, 2, 208, 24]),
+        ("seq_help", "Each scene recalls its numbered pattern slot. Skip omits the step.", [224, 5, 820, 20]),
+        ("seq_bpm_label", "BPM", [8, 38, 34, 18]),
+        ("seq_beats_label", "Beats / bar", [124, 38, 65, 18]),
+        ("seq_status", "Stopped", [650, 38, 394, 20]),
+    ):
+        panel.add(name, "comment", rect, view=rect, outs=0, text=text, textcolor=SLATE_INK,
+                  **({"fontsize": 18, "fontface": 1} if name == "seq_title" else {}))
+
+    control("seq_bpm", "live.numbox", [46, 34, 70, 26], "set_bpm", ["float", "float"],
+            parameter_mappable=0, **parameter("Sequence BPM", 120, 20, 300, units="%.1f"))
+    control("seq_beats", "live.numbox", [191, 34, 54, 26], "set_beats", ["float", "float"],
+            parameter_mappable=0, **parameter("Sequence beats per bar", 4, 1, 12, integer=True))
+    control("seq_repeat", "live.text", [255, 34, 110, 26], "set_repeat", ["int", ""],
+            mode=1, text="Repeat off", texton="Repeat on", parameter_mappable=0,
+            **parameter("Sequence repeat", 1, 0, 1, options=["Off", "On"]))
+
+    for command, label, hint, rect in (
+        ("start", "Start", "Start at the first step with a stored scene.", [376, 34, 76, 26]),
+        ("stop", "Stop", "Stop scene changes and keep the current pattern.", [460, 34, 76, 26]),
+        ("next", "Next bar", "Advance to the next scene at the next bar.", [544, 34, 96, 26]),
+    ):
+        name = "seq_" + command
+        panel.add(name, "live.text", rect, view=rect, outs=2, types=["bang", ""], mode=0,
+                  text=label, texton=label, parameter_enable=0, hint=hint)
+        message = name + "_command"
+        panel.add(message, "message", [rect[0], rect[1] + 214, 56, 22], ins=2, text=command)
+        panel.connect(name, 0, message)
+        panel.connect(message, 0, "sequence_commands")
+
+    scenes = ["Skip"] + [f"Scene {slot}" for slot in range(1, 9)]
+    scene_items = [atom for scene in scenes for atom in (scene, ",")][:-1]
+    for index in range(8):
+        x = 8 + 130 * index
+        rect = [x, 83, 124, 22]
+        panel.add(f"seq_step_label_{index}", "comment", rect, view=rect, outs=0,
+                  text=str(index + 1), textcolor=SLATE_INK, fontface=1, textjustification=1)
+        control(f"seq_slot_{index}", "umenu", [x, 109, 124, 26], f"set_step {index}", ["int", "", ""],
+                items=scene_items, allowdrag=0, parameter_enable=0,
+                hint="Choose the stored pattern slot to recall at this step.")
+        rect = [x, 147, 36, 20]
+        panel.add(f"seq_bars_label_{index}", "comment", rect, view=rect, outs=0,
+                  text="Bars", textcolor=SLATE_INK)
+        control(f"seq_bars_{index}", "live.numbox", [x + 40, 143, 84, 26], f"set_bars {index}", ["float", "float"],
+                parameter_mappable=0, **parameter(f"Step {index + 1} bars", 4, 1, 32, integer=True))
+
+    launcher = [688, PATTERNS_TOP + 1, 124, 28]
+    p.add("sequence_open", "live.text", launcher, view=launcher, outs=2, types=["bang", ""], mode=0,
+          text="Scene sequencer…", texton="Scene sequencer…", parameter_enable=0,
+          hint="Show the scene sequencer in the lower workspace.")
+    p.add("sequence_open_message", "message", [2710, 2300, 94, 22], ins=2, text="workspace 0")
+    rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
+    p.add("sequence_panel", "bpatcher", rect, view=rect, ins=0, types=[""],
+          embed=1, hidden=1, border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0,
+          lockeddragscroll=0, clickthrough=0, bgmode=0,
+          patcher=dict(fileversion=1, appversion=VERSION, classnamespace="box",
+                       rect=[0, 0, rect[2], rect[3]], title="Scene sequencer", openinpresentation=1,
+                       toolbarvisible=0, locked_bgcolor=SLATE_PANEL,
+                       boxes=panel.boxes, lines=panel.lines))
+    p.obj("sequence_control", "js fk_sequence.js", 2710, 2402, outs=0)
+    p.connect("sequence_open", 0, "sequence_open_message")
+    p.connect("sequence_open_message", 0, "theme_control")
+    p.connect("sequence_panel", 0, "sequence_control")
+
+    label = [MARGIN, WORKSPACE_TOP, 136, 20]
+    p.add("workspace_label", "comment", label, view=label, outs=0,
+          text="Workspace", fontsize=16, fontface=1)
+    view = [314, WORKSPACE_TOP, 376, 20]
+    p.add("workspace_view", "live.tab", view, view=view, outs=3, types=["int", "", "float"],
+          parameter_mappable=0,
+          **parameter("Lower workspace", 1, 0, 3, options=["Scenes", "Modulation", "Visuals", "Hide"]))
+    p.obj("workspace_view_command", "prepend workspace", 2820, 2300, ins=2)
+    p.connect("workspace_view", 0, "workspace_view_command")
+    p.connect("workspace_view_command", 0, "theme_control")
+    view = [160, WORKSPACE_TOP, 140, 20]
+    p.add("fullscreen_toggle", "textbutton", view, view=view, outs=3, types=["bang", "", ""],
+          mode=0, outputmode=1, rounded=9, usegradient=0, fontface=1, fontsize=12,
+          text="Full screen", texton="Full screen", parameter_enable=0,
+          hint="Toggle the full-screen performance workspace.")
+    p.add("fullscreen_toggle_command", "message", [2970, 2300, 90, 22], ins=2, text="full_screen")
+    p.connect("fullscreen_toggle", 0, "fullscreen_toggle_command")
+    p.connect("fullscreen_toggle_command", 0, "theme_control")
+    p.obj("workspace_key", "key", 3070, 2300, outs=4)
+    p.obj("fullscreen_escape", "sel 27", 3070, 2330, outs=2, types=["bang", ""])
+    p.add("fullscreen_exit_command", "message", [3070, 2360, 102, 22], ins=2, text="exit_full_screen")
+    p.connect("workspace_key", 0, "fullscreen_escape")
+    p.connect("fullscreen_escape", 0, "fullscreen_exit_command")
+    p.connect("fullscreen_exit_command", 0, "theme_control")
+
+
+def mix_visuals(p):
+    rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
+    p.add("visuals_panel", "bpatcher", rect, view=rect, ins=2, outs=0, embed=1, hidden=1,
+          border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0,
+          lockeddragscroll=0, clickthrough=0, bgmode=0, patcher=build_visuals())
 
 
 def window_controls(p):
-    p.label("inspector_title", "Window controls", SPLIT, 2, RIGHT_TRACKS,
-            heading=True, y_offset=PLAYBACK_OFFSET)
-    p.ui("inspector_tabs", "live.tab", SPLIT, 3, RIGHT_TRACKS, y_offset=PLAYBACK_OFFSET,
-         outs=3, types=["int", "", "float"],
-         **parameter("Edit window", 0, 0, 3, options=[f"Window {i}" for i in range(1, 5)]))
+    p.label("inspector_title", "Editing Loop 1", 0, 0, 5,
+            heading=True, y_offset=EDITOR_TOP - MARGIN)
+    p.add("inspector_tabs", "live.tab", [1500, 776, 180, 20],
+          outs=3, types=["int", "", "float"],
+          **parameter("Edit window", 0, 0, 3, options=[f"Loop {i}" for i in range(1, 5)]))
     p.obj("choose_window", "prepend inspect_window", 1500, 808, ins=2)
     p.connect("inspector_tabs", 0, "choose_window")
     p.connect("choose_window", 0, "source_control")
 
-    for col, width, text in ((SPLIT, 2, "In %"), (SPLIT + 2, 2, "Out %"), (SPLIT + 4, 4, "Direction")):
-        p.label(f"inspector_label_{col}", text, col, 4, width, y_offset=PLAYBACK_OFFSET)
+    ranges = {"start": (16, 64), "end": (85, 64), "direction": (154, 124)}
+    for key, text in (("start", "In %"), ("end", "Out %"), ("direction", "Direction")):
+        x, width = ranges[key]
+        rect = [x, EDITOR_TOP + 23, width, 20]
+        p.add(f"inspector_label_{key}", "comment", rect, view=rect, outs=0, text=text)
 
-    for index, (key, low, high, initial, _, _) in enumerate(CELLS):
+    controls = CELLS + (("echo_send", 0, 100, 0, 0, 1), ("room_send", 0, 100, 0, 0, 1))
+    for index, (key, low, high, initial, _, _) in enumerate(controls):
         name = f"inspect_{key}"
-        if key in ("start", "end"):
-            p.ui(name, "live.numbox", SPLIT if key == "start" else SPLIT + 2, 5, 2,
-                 y_offset=PLAYBACK_OFFSET,
-                 outs=2, types=["float", "float"],
-                 **parameter(f"Selected {key}", initial, low, high, units="%.2f"))
-        elif key == "direction":
-            p.ui(name, "umenu", SPLIT + 4, 5, 4, y_offset=PLAYBACK_OFFSET, outs=3, types=["int", "", ""],
-                 items=["Forward", ",", "Reverse", ",", "Ping-pong"])
+        if key in ranges:
+            x, width = ranges[key]
+            rect = [x, EDITOR_TOP + 44, width, 24]
+            if key == "direction":
+                p.add(name, "umenu", rect, view=rect, outs=3, types=["int", "", ""],
+                      items=["Forward", ",", "Reverse", ",", "Ping-pong"])
+            else:
+                p.add(name, "live.numbox", rect, view=rect, outs=2, types=["float", "float"],
+                      **parameter(f"Selected {key}", initial, low, high, units="%.2f"))
         else:
             dial_index = DIALS.index(key)
-            dial_label = DIAL_LABELS[dial_index]
-            dial_track = TRACK * RIGHT_TRACKS // len(DIALS)
-            rect = [MARGIN + TRACK * SPLIT + dial_index * dial_track, PLAYBACK_TOP + 100,
-                    dial_track - GUTTER, 4 * ROW - 8]
+            rect = [294 + dial_index * 64, EDITOR_TOP + 25, 60, 72]
             p.add(name, "live.dial", rect, outs=2, types=["float", "float"], view=rect,
                   appearance=3, showname=1, shownumber=1,
-                  **parameter(f"Selected {key}", initial, low, high, short=dial_label,
+                  **({"hint": "Turn left to cut highs, or right to cut lows."} if key == "filter" else {}),
+                  **parameter(f"Selected {key}", initial, low, high, short=DIAL_LABELS[dial_index],
+                              unit_style=5 if key.endswith("_send") else 0,
                               units="%.2f" if key == "rate" else None))
         message = f"edit_inspect_{key}"
         p.obj(message, f"prepend inspector_edit {key}", 1600, 510 + index * 29, ins=2)
         p.connect(name, 0, message)
         p.connect(message, 0, "source_control")
-    p.label("filter_help", "Filter: LP ← 0 → HP", SPLIT, 10, 3,
-            y_offset=PLAYBACK_OFFSET)
-    p.label("pitch_scale_label", "Pitch snap · All", SPLIT + 3, 10, 2,
-            y_offset=PLAYBACK_OFFSET)
+
+    for name, text, x, y, width in (
+        ("loop_fx_heading", "Loop FX", 422, 0, 124),
+        ("send_heading", "Loop sends", 678, 0, 124),
+        ("fade_preview_heading", "Fade preview", 824, 0, 244),
+        ("pitch_scale_label", "Pitch snap · All loops", 16, 76, 128),
+    ):
+        rect = [x, EDITOR_TOP + y, width, 20]
+        p.add(name, "comment", rect, view=rect, outs=0, text=text)
+    preview = [824, EDITOR_TOP + 25, 244, 72]
+    p.add("loop_fade_preview", "jsui", preview, view=preview, outs=0, border=0,
+          filename="fk_loop_fade.js", parameter_enable=0)
     scale_items = [atom for scale in PITCH_SCALES for atom in (scale, ",")][:-1]
-    p.ui("pitch_scale", "umenu", SPLIT + 5, 10, 3, y_offset=PLAYBACK_OFFSET,
-         outs=3, types=["int", "", ""], items=scale_items, pattrmode=0,
-         hint="Snap the speed of all four windows to a scale. The original sample at 1× is the tonic.")
+    rect = [146, EDITOR_TOP + 75, 132, 22]
+    p.add("pitch_scale", "umenu", rect, view=rect, outs=3, types=["int", "", ""],
+          items=scale_items, pattrmode=0,
+          hint="Snap the speed of all four windows to a scale. The original sample at 1× is the tonic.")
     p.obj("pitch_scale_default", "loadmess 0", 2280, 805, types=["int"])
     p.obj("pitch_scale_signal", "sig~ 0.", 2280, 845, types=["signal"])
     p.connect("pitch_scale_default", 0, "pitch_scale")
@@ -435,30 +578,30 @@ def performance_mixer(p):
 
 def stereo_field(p):
     field = Patch()
-    field.add("input", "inlet", [20, 320, 30, 30], ins=0, index=1)
-    field.add("output", "outlet", [20, 365, 30, 30], outs=0, index=1)
-    canvas_rect = [12, 12, 480, 244]
+    field.add("input", "inlet", [20, 396, 30, 30], ins=0, index=1)
+    field.add("output", "outlet", [20, 441, 30, 30], outs=0, index=1)
+    canvas_rect = [12, 12, 480, 346]
     field.add("canvas", "jsui", canvas_rect, view=canvas_rect,
               filename="fk_stereo_field.js", border=0, parameter_enable=0, types=[""])
-    help_rect = [12, 266, 480, 22]
+    help_rect = [12, 368, 480, 22]
     field.add("help", "comment", help_rect, outs=0, view=help_rect, fontsize=12,
-              text="Drag left or right to pan, up or down to set level.")
+              text="Select a loop, then drag its dot. X = pan. Y = level.")
     field.connect("input", 0, "canvas")
     field.connect("canvas", 0, "output")
 
-    p.ui("stereo_field_open", "live.text", 2, 2, 2, y_offset=PLAYBACK_OFFSET,
-         outs=2, types=["bang", ""], mode=0, text="Stereo field…", texton="Stereo field…",
-         parameter_enable=0, hint="Open stereo placement and level for the four loops.")
     p.add("stereo_field_open_message", "message", [3040, 1880, 52, 22], ins=2, text="open")
     p.obj("stereo_field_window", "pcontrol", 3040, 1910)
     p.add("stereo_field_panel", "newobj", [3040, 1940, 122, 22],
           text="p Stereo field", types=[""], patcher=dict(
               fileversion=1, appversion=VERSION, classnamespace="box",
-              rect=[570, 152, 506, 298], title="Stereo field", openinpresentation=1,
+              rect=[570, 152, 506, 400], title="Stereo field", openinpresentation=1,
               boxes=field.boxes, lines=field.lines))
-    p.connect("stereo_field_open", 0, "stereo_field_open_message")
+    p.connect("mix_fx", 2 + FX_MOD_CHANNELS, "stereo_field_open_message")
     p.connect("stereo_field_open_message", 0, "stereo_field_window")
     p.connect("stereo_field_window", 0, "stereo_field_panel")
+    p.add("pad_motion_stop", "message", [3210, 1880, 104, 22], ins=2, text="stop_motion")
+    p.connect("pad_motion_stop", 0, "stereo_field_panel")
+    p.connect("pad_motion_stop", 0, "mix_fx", 2 + FX_MOD_CHANNELS)
 
     p.obj("stereo_field_position", "route position", 3040, 1970, outs=2)
     p.obj("stereo_field_voice", "route 1 2 3 4", 3040, 2000, outs=5)
@@ -483,14 +626,30 @@ def stereo_field(p):
 
 
 def mixer_strip(p, voice, row, y):
+    select = f"loop_edit_{voice}"
+    select_rect = grid_rect(0, row, 1, y_offset=PLAYBACK_OFFSET)
+    select_rect[2] = 28
+    p.add(select, "live.text", select_rect, view=select_rect, outs=2, types=["int", ""],
+          mode=1, text=str(voice), texton=str(voice), parameter_enable=0,
+          activebgcolor=SLATE_CONTROL, activebgoncolor=SLATE_ACCENT,
+          activetextcolor=SLATE_INK, activetextoncolor=SLATE_CANVAS,
+          hint=f"Select loop {voice} for editing without changing playback.")
+    p.obj(select + "_trigger", "t b", 2795, y - 29, types=["bang"])
+    p.add(select + "_message", "message", [2840, y - 29, 118, 22],
+          ins=2, text=f"inspect_window {voice - 1}")
+    p.connect(select, 0, select + "_trigger")
+    p.connect(select + "_trigger", 0, select + "_message")
+    p.connect(select + "_message", 0, "source_control")
+
     for column, key in ((2, "mute"), (3, "solo")):
         name = f"mixer_{key}_{voice}"
         hint = ("Mute this window without stopping the loop." if key == "mute" else
                 "Listen to soloed windows. Mute still silences a window.")
         p.ui(name, "live.text", column, row, y_offset=PLAYBACK_OFFSET, outs=2,
-             types=["int", ""], mode=1, text=key.capitalize(), texton=key.capitalize(),
+             types=["bang", ""], mode=0, text=key.capitalize(), texton=key.capitalize(),
              parameter_enable=0, hint=hint)
-        p.obj(name + "_msg", f"prepend {key} {voice}", 2680, y + (column - 2) * 30, ins=2)
+        p.add(name + "_msg", "message", [2680, y + (column - 2) * 30, 72, 22],
+              ins=2, text=f"{key} {voice}")
         p.connect(name, 0, name + "_msg")
         p.connect(name + "_msg", 0, "mixer_control")
 
@@ -499,7 +658,6 @@ def mixer_strip(p, voice, row, y):
          **parameter(f"Mixer pan {voice}", DEFAULT_PANS[voice - 1], -100, 100, unit_style=6))
     p.ui(f"mixer_level_{voice}", "live.slider", 0, row + 1, 3, y_offset=PLAYBACK_OFFSET,
          outs=2, types=["float", "float"], orientation=1, showname=0, shownumber=0, relative=0,
-         tricolor=[0.56, 0.71, 0.96, 1.0], trioncolor=[0.68, 0.80, 0.99, 1.0],
          hint=f"Window {voice} volume. Click or drag to set it directly.",
          **parameter(f"Mixer level {voice}", 70, 0, 100, unit_style=5))
     level_value = f"mixer_level_value_{voice}"
@@ -521,12 +679,70 @@ def mixer_strip(p, voice, row, y):
     p.connect(f"mixer_level_{voice}_sync", 0, level_value)
 
 
+def loop_send_gains(p, voice, y):
+    for index, key in enumerate(LOOP_SENDS):
+        x = 3200 + 135 * index
+        name = f"{key}_{voice}"
+        p.add(name, "live.numbox", [x, y, 110, 20], outs=2, types=["float", "float"],
+              **parameter(f"Loop {voice} {key.replace('_', ' ')}", 0, 0, 100, unit_style=5))
+        p.obj(name + "_percent", "* 0.01", x, y + 28, ins=2)
+        p.obj(name + "_ramp", "pack 0. 20.", x, y + 56, ins=2)
+        p.obj(name + "_gain", "line~ 0.", x, y + 84, ins=2, outs=2, types=["signal", "bang"])
+        p.obj(name + "_sync", f"prepend inspector_sync {voice} {key}", x, y + 114, ins=2)
+        p.connect(name, 0, name + "_percent")
+        p.connect(name + "_percent", 0, name + "_ramp")
+        p.connect(name + "_ramp", 0, name + "_gain")
+        p.connect(name, 0, name + "_sync")
+        p.connect(name + "_sync", 0, "source_control")
+
+
+def drifting_memory(p):
+    panel = json.loads((ROOT / "fk_drifting_delay.maxpat").read_text(encoding="utf-8"))["patcher"]
+    p.add("drifting_memory", "newobj", [1410, 1840, 142, 22], ins=3, outs=2,
+          types=["signal", "signal"], text="p Drifting Memory", patcher=panel)
+    p.add("drifting_memory_open", "message", [1410, 1760, 52, 22], ins=2, text="open")
+    p.obj("drifting_memory_window", "pcontrol", 1410, 1796)
+    p.connect("mix_fx", 3 + FX_MOD_CHANNELS, "drifting_memory_open")
+    p.connect("drifting_memory_open", 0, "drifting_memory_window")
+    p.connect("drifting_memory_window", 0, "drifting_memory")
+    for channel in range(2):
+        p.connect("mix_fx", channel, "drifting_memory", channel)
+
+
+def presentation_frame(p):
+    for name, left, top, width, height in (
+        ("header", 8, 8, FRAME_WIDTH - 16, 68),
+        ("patterns", 8, PATTERNS_TOP - 6, FRAME_WIDTH - 16, PATTERNS_HEIGHT + 12),
+        ("playback", 8, PLAYBACK_TOP - 6, FRAME_WIDTH - 16, 224),
+        ("editor", 8, EDITOR_TOP - 6, FRAME_WIDTH - 16, EDITOR_HEIGHT + 12),
+        ("effects", 8, MIX_TOP - 6, SPLIT * TRACK + 4, MIX_HEIGHT + 12),
+        ("capture", MARGIN + SPLIT * TRACK - 2, MIX_TOP - 6, RIGHT_TRACKS * TRACK + 6, MIX_HEIGHT + 12),
+        ("input", 8, INPUT_TOP - 6, FRAME_WIDTH - 16, INPUT_HEIGHT + 12),
+        ("workspace", 8, WORKSPACE_TOP - 6, FRAME_WIDTH - 16, 28),
+        ("modulation", 8, MODULATION_TOP - 6, FRAME_WIDTH - 16, MODULATION_ROWS * ROW + 8),
+    ):
+        rect = [left, top, width, height]
+        p.add(f"surface_{name}", "panel", rect, outs=0, view=rect, background=1,
+              ignoreclick=1, border=0, rounded=8, bgcolor=SLATE_PANEL)
+    for voice in range(1, 5):
+        rect = [MARGIN - 4, PLAYBACK_TOP + ROW * (2 * voice - 1) - 2, FRAME_WIDTH - 24, 48]
+        p.add(f"loop_row_{voice}", "panel", rect, outs=0, view=rect, background=1,
+              ignoreclick=1, border=1, rounded=4, bgcolor=[0, 0, 0, 0],
+              bordercolor=SLATE_ACCENT if voice == 1 else [0, 0, 0, 0])
+
+
 def build():
     p = Patch()
-    p.label("title", "FIELD KIT", 0, 0, 3, heading=True)
-    p.label("source_label", "Loading demo…", 3, 0, SPLIT - 3, y_offset=4)
-    p.label("output_heading", "Audio I/O", SPLIT, 0, 2)
+    presentation_frame(p)
+    p.ui("title", "comment", 0, 0, 3, outs=0, text="FIELD KIT", fontsize=19, fontface=1)
+    p.label("source_label", "Loading demo…", 3, 0, 6, y_offset=3)
+    p.label("output_heading", "Audio", SPLIT, 0, 2, y_offset=3)
     p.label("status", "Loading the demo…", SPLIT, 1, RIGHT_TRACKS, y_offset=6)
+    p.ui("theme_choice", "umenu", SPLIT - 3, 0, 3, y_offset=2, outs=3, types=["int", "", ""],
+         items=["Theme · Slate", ",", "Theme · Moss", ",", "Theme · Ember"],
+         allowdrag=0, parameter_enable=0, hint="Change the interface color scheme.")
+    p.obj("theme_control", "js fk_theme.js", 3235, 1825, outs=0)
+    p.connect("theme_choice", 0, "theme_control")
     p.obj("standalone", "standalone @bundleidentifier audio.poeticstate.fieldkit @preffilename FieldKit @gensupport 1 @cefsupport 0", 30, 2080, outs=0)
 
     p.obj("source_control", "js fk_source.js", 24, 808, outs=4, types=["list"] * 4)
@@ -557,16 +773,14 @@ def build():
     p.obj("source_rate", "sig~ 0.", 880, 846, types=["signal"])
 
     for name, label, col, selector, width in (
-        ("load", "Load audio…", 0, "choose", 3),
-        ("demo", "Load demo", 3, "load_demo", 2),
-        ("play", "▶  Play all", 5, "play_all", 3),
-        ("stop", "■  Stop all", 8, "stop_all", 2),
-        ("normal", "Play normal", 10, "play_normal", 2),
+        ("play", "▶  Play all", 0, "play_all", 3),
+        ("stop", "■  Stop all", 3, "stop_all", 2),
+        ("normal", "Play original", 5, "play_normal", 2),
     ):
         action(p, name, label, col, selector, width,
                hint="Play the original sample once at normal speed with effects bypassed." if name == "normal" else None)
     pattern_controls(p)
-    action(p, "reset", "Reset", 12, "reset", 2, target="pattern_control",
+    action(p, "reset", "Reset", 7, "reset", 2, target="pattern_control",
            hint="Stop and restore the default loop, modulation and effects settings. Saved patterns stay in their squares.")
 
     p.ui("audio_setup", "live.text", 19, 0, 3, outs=2, types=["", ""],
@@ -574,8 +788,8 @@ def build():
     p.add("open_audio_setup", "message", [1420, 804, 110, 22], ins=2, text="; dsp open")
     p.connect("audio_setup", 0, "open_audio_setup")
 
-    p.ui("master_label", "comment", SPLIT + 2, 22, 2, y_offset=FOOTER_OFFSET, outs=0, text="Master")
-    p.ui("master", "live.numbox", SPLIT + 4, 22, 1, y_offset=FOOTER_OFFSET, outs=2, types=["float", "float"],
+    p.ui("master_label", "comment", SPLIT + 3, 22, 1, y_offset=MIX_OFFSET, outs=0, text="Master")
+    p.ui("master", "live.numbox", SPLIT + 4, 22, 1, y_offset=MIX_OFFSET, outs=2, types=["float", "float"],
          **parameter("Master", -12, -70, 0, unit_style=4))
     p.ui("audio_switch", "live.text", 16, 0, 3, outs=2, types=["", ""],
          text="Enable audio", texton="Audio on", mode=1,
@@ -585,20 +799,23 @@ def build():
     p.connect("audio_switch", 0, "set_audio")
     p.connect("set_audio", 0, "source_control")
     p.obj("dac", "dac~ 1 2", 360, 1958, ins=2, outs=0)
-    p.ui("mix_meter", "live.meter~", SPLIT + 5, 22, 3, y_offset=FOOTER_OFFSET, outs=2,
-         types=["float", "int"], orientation=1, hint="Post-effects master peak. Capture records this signal.")
+    p.ui("mix_meter", "live.meter~", SPLIT + 5, 22, 3, y_offset=MIX_OFFSET, outs=2,
+         types=["float", "int"], orientation=1, hint="Mix recording captures this post-effects master signal.")
     p.obj("mix_peak", "maximum~", 640, 1958, ins=2, types=["signal"])
     p.connect("mix_peak", 0, "mix_meter")
     modulated_gain(p, "master", "master_gain", -12, -70, 0, 36, 22, 1840)
-    for name, file, col, width, inputs, outputs in (
-        ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 2 + FX_MOD_CHANNELS, 2 + FX_MOD_CHANNELS),
-        ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 2, 0),
+    for name, file, col, width, inputs, output_types in (
+        ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 7 + FX_MOD_CHANNELS,
+         ["signal"] * (2 + FX_MOD_CHANNELS) + ["bang", "bang"]),
+        ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 2, []),
     ):
-        rect = grid_rect(col, 22, width, 5, FOOTER_OFFSET)
-        p.add(name, "bpatcher", rect, ins=inputs, outs=outputs, types=["signal"] * outputs,
-              view=rect)
-        p.boxes[-1]["box"].update(name=file, args=[], offset=[0.0, 0.0], border=0, clickthrough=0,
+        rect = grid_rect(col, 22, width, 5, MIX_OFFSET)
+        p.add(name, "bpatcher", rect, ins=inputs, outs=len(output_types), types=output_types, view=rect)
+        p.boxes[-1]["box"].update(name=file, args=[], offset=[0.0, 0.0], border=0,
+                   clickthrough=int(name == "recorder"),
                    enablehscroll=0, enablevscroll=0, lockeddragscroll=0)
+    drifting_memory(p)
+    mix_visuals(p)
     p.obj("normal_voice", "play~ fk-unbound 2", 1100, 1800, outs=3,
           types=["signal", "signal", "bang"])
     p.add("normal_done", "message", [1240, 1840, 115, 22], ins=2, text="normal_finished")
@@ -621,10 +838,10 @@ def build():
         p.obj(blend, "*~", x, 1880, ins=2, types=["signal"])
         p.obj(mix, "+~", x, 1920, ins=2, types=["signal"])
         p.connect("normal_voice" if channel == 0 else "normal_right_channel", 0, difference)
-        p.connect("mix_fx", channel, difference, 1)
+        p.connect("drifting_memory", channel, difference, 1)
         p.connect(difference, 0, blend)
         p.connect("normal_blend", 0, blend, 1)
-        p.connect("mix_fx", channel, mix)
+        p.connect("drifting_memory", channel, mix)
         p.connect(blend, 0, mix, 1)
         p.obj("master_" + suffix, "*~", 360 + 140 * channel, 1840, ins=2, types=["signal"])
         p.obj("pattern_level_" + suffix, "*~", 360 + 140 * channel, 1862, ins=2, types=["signal"])
@@ -637,14 +854,20 @@ def build():
         p.connect("pattern_level_" + suffix, 0, "output_" + suffix)
         p.connect("output_" + suffix, 0, "dac", channel)
         p.connect("output_" + suffix, 0, "recorder", channel)
+        p.connect("output_" + suffix, 0, "visuals_panel", channel)
         p.obj("output_peak_" + suffix, "abs~", 640 + 140 * channel, 1920, types=["signal"])
         p.connect("output_" + suffix, 0, "output_peak_" + suffix)
         p.connect("output_peak_" + suffix, 0, "mix_peak", channel)
 
     performance_mixer(p)
-    p.label("row_heading", "Playback windows", MIXER_TRACKS, 2, 4, heading=True, y_offset=PLAYBACK_OFFSET)
-    p.label("wave_heading", "Drag a range, release to set the loop", 9, 2, SPLIT - 9, y_offset=PLAYBACK_OFFSET + 4)
+    p.label("row_heading", "Loop waveforms", MIXER_TRACKS, 2, 5, heading=True, y_offset=PLAYBACK_OFFSET)
+    p.label("wave_heading", "Click to select · Drag to set the loop range", 10, 2, TRACKS - 10,
+            y_offset=PLAYBACK_OFFSET + 4)
     window_controls(p)
+    p.obj("loop_fade_voice", "selector~ 4 1", 3460, 821, ins=5, types=["signal"])
+    p.obj("loop_fade_sample", "snapshot~ 90", 3460, 851, ins=2, types=["float"])
+    p.connect("loop_fade_voice", 0, "loop_fade_sample")
+    p.connect("loop_fade_sample", 0, "loop_fade_preview")
 
     mod_rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
     p.add("patchbay", "bpatcher", mod_rect, ins=1, outs=2,
@@ -669,10 +892,13 @@ def build():
 
     for voice in range(1, 5):
         row = 3 + 2 * (voice - 1)
-        p.ui(f"play_{voice}", "live.text", 0, row, 2, y_offset=PLAYBACK_OFFSET, outs=2, types=["", ""],
-             text=f"{voice:02} Stopped", texton=f"{voice:02} Playing", mode=1,
-             **parameter(f"Window {voice} Play", 0, 0, 1, options=["Off", "On"]))
-        p.ui(f"wave_{voice}", "waveform~", MIXER_TRACKS, row, SPLIT - MIXER_TRACKS, 2,
+        play_rect = grid_rect(0, row, 2, y_offset=PLAYBACK_OFFSET)
+        play_rect[0] += 32
+        play_rect[2] -= 32
+        p.add(f"play_{voice}", "live.text", play_rect, view=play_rect, outs=2, types=["", ""],
+              text="▶ Play", texton="■ Stop", mode=1,
+              **parameter(f"Window {voice} Play", 0, 0, 1, options=["Off", "On"]))
+        p.ui(f"wave_{voice}", "waveform~", MIXER_TRACKS, row, TRACKS - MIXER_TRACKS, 2,
              y_offset=PLAYBACK_OFFSET, ins=5, outs=6,
              types=["float", "float", "float", "float", "list", "list"], setmode=1)
         p.connect("source_control", voice - 1, f"wave_{voice}", 2)
@@ -686,6 +912,7 @@ def build():
         p.connect("source_rate", 0, f"voice_{voice}", 10)
         p.connect("pitch_scale_signal", 0, f"voice_{voice}", 11)
         p.connect(f"wave_edit_revision_{voice}", 0, f"voice_{voice}", 12)
+        p.connect(f"voice_{voice}", 7, "loop_fade_voice", voice)
 
         for i, (key, low, high, default, depth, unit) in enumerate(CELLS):
             control = f"{key}_{voice}"
@@ -733,6 +960,7 @@ def build():
                 p.connect(control, 0, sync)
                 p.connect(sync, 0, "source_control")
         mixer_strip(p, voice, row, y)
+        loop_send_gains(p, voice, y)
         p.obj(f"mixer_gain_{voice}", "line~ 1.", 2680, y + 94, ins=2, outs=2, types=["signal", "bang"])
         p.obj(f"peak_{voice}", "maximum~", 920, y + 170, ins=2, types=["signal"])
         p.connect(f"peak_{voice}", 0, f"meter_{voice}")
@@ -742,6 +970,13 @@ def build():
             p.connect(f"voice_{voice}", outlet, mix_channel)
             p.connect(f"mixer_gain_{voice}", 0, mix_channel, 1)
             p.connect(mix_channel, 0, "mix_fx", outlet)
+            for send_index, send_key in enumerate(LOOP_SENDS):
+                send_channel = f"{send_key}_{suffix}_{voice}"
+                x = 3510 + 100 * (2 * send_index + outlet)
+                p.obj(send_channel, "*~", x, y + 124, ins=2, types=["signal"])
+                p.connect(mix_channel, 0, send_channel)
+                p.connect(f"{send_key}_{voice}_gain", 0, send_channel, 1)
+                p.connect(send_channel, 0, "mix_fx", 3 + FX_MOD_CHANNELS + 2 * send_index + outlet)
             rect_x = 780 + outlet * 100
             p.obj(f"abs_{suffix}_{voice}", "abs~", rect_x, y + 132, types=["signal"])
             p.connect(mix_channel, 0, f"abs_{suffix}_{voice}")

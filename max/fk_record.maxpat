@@ -26,19 +26,19 @@
           "patching_rect": [
             0,
             0,
-            92,
+            140,
             20
           ],
           "numinlets": 1,
           "numoutlets": 0,
-          "text": "Capture",
+          "text": "Mix recording",
           "fontsize": 16,
           "fontface": 1,
           "presentation": 1,
           "presentation_rect": [
             0,
             0,
-            92,
+            140,
             20
           ]
         }
@@ -107,7 +107,7 @@
           ],
           "numinlets": 1,
           "numoutlets": 0,
-          "text": "Choose Record… to name your take",
+          "text": "Choose Record mix… to name your take",
           "presentation": 1,
           "presentation_rect": [
             0,
@@ -172,8 +172,8 @@
           "mode": 0,
           "active": 0,
           "parameter_enable": 0,
-          "text": "Record…",
-          "texton": "Record…",
+          "text": "Record mix…",
+          "texton": "Record mix…",
           "hint": "Choose where to save a WAV of the final mix.",
           "outlettype": [
             "",
@@ -223,9 +223,9 @@
           "mode": 0,
           "active": 0,
           "parameter_enable": 0,
-          "text": "■ Stop",
-          "texton": "■ Stop",
-          "hint": "Finish and save this recording.",
+          "text": "Stop mix",
+          "texton": "Stop mix",
+          "hint": "Finish and save the mix recording.",
           "outlettype": [
             "",
             ""

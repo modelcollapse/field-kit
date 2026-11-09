@@ -42,15 +42,15 @@ def build(output_dir=ROOT):
         connect(button, message)
         connect(message, router)
 
-    label("capture_title", "Capture", 0, 0, 2, fontsize=16, fontface=1)
+    label("capture_title", "Mix recording", 0, 0, 3, fontsize=16, fontface=1)
     label("record_time", "00:00.0", 5, 1, 3, fontsize=16, fontface=1, textjustification=2)
     label("record_status", "Enable audio to record", 0, 2, 8, fontsize=14, fontface=1)
-    label("record_file", "Choose Record… to name your take", 0, 3, 8)
+    label("record_file", "Choose Record mix… to name your take", 0, 3, 8)
     label("record_format", "Stereo WAV · 24-bit · final mix", 0, 4, 8)
 
     router = obj("rec_controller", "js fk_recorder.js", 240, 216, 120, outputs=())
-    action("record_button", "Record…", 0, 3, "choose", router, "Choose where to save a WAV of the final mix.")
-    action("stop_button", "■ Stop", 3, 2, "stop_record", router, "Finish and save this recording.")
+    action("record_button", "Record mix…", 0, 3, "choose", router, "Choose where to save a WAV of the final mix.")
+    action("stop_button", "Stop mix", 3, 2, "stop_record", router, "Finish and save the mix recording.")
 
     dialog = obj("save_dialog", "savedialog WAVE", 400, 150, 110, outputs=("", "", "bang"))
     chosen = obj("chosen_path", "prepend start_path", 400, 182, 110, 2)

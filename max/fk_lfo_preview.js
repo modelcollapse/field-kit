@@ -42,6 +42,16 @@ function phase(value) {
     if (currentShape < 4) mgraphics.redraw();
 }
 
+function theme() {
+    var colors = arrayfromargs(arguments);
+    if (colors.length !== 16) return;
+    background = colors.slice(0, 4);
+    grid = colors.slice(4, 8);
+    zeroLine = colors.slice(8, 12);
+    waveform = colors.slice(12, 16);
+    mgraphics.redraw();
+}
+
 function colour(value) {
     mgraphics.set_source_rgba(value[0], value[1], value[2], value[3]);
 }

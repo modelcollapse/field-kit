@@ -6,7 +6,7 @@ outlets = 4;
 var WINDOWS = 4;
 var ALL_WINDOWS = (1 << WINDOWS) - 1;
 var DEFAULT_POSITIONS = [[0, 25], [25, 50], [50, 75], [75, 100]];
-var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "filter", "level", "pan"];
+var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "filter", "level", "pan", "echo_send", "room_send"];
 var BUFFER_OBJECTS = ["buffer", "set_buffer"];
 var INFO_OBJECTS = ["source_info", "set_source_info"];
 var INPUT_LIMIT_SECONDS = 60;
@@ -45,6 +45,10 @@ var drawing = false;
 var inspectedWindow = 1;
 var positions = DEFAULT_POSITIONS.map(function (range) { return range.slice(); });
 var waveRanges = DEFAULT_POSITIONS.map(function (range) { return range.slice(); });
+var wavePressX = [null, null, null, null];
+var waveDragged = [false, false, false, false];
+var WAVE_DRAG_THRESHOLD = 0.0025;
+var waveTheme = null;
 var waveRevisions = [0, 0, 0, 0];
 var pendingWaveEdits = 0;
 var playing = [false, false, false, false];
@@ -115,13 +119,20 @@ function inspect_window(index) {
     }
     inspectedWindow = index + 1;
     send("inspector_tabs", "set", index);
+    label("inspector_title", "Editing Loop " + inspectedWindow);
+    for (var voice = 1; voice <= WINDOWS; voice++) {
+        send("loop_edit_" + voice, "set", voice === inspectedWindow ? 1 : 0);
+    }
+    paint_wave_selection();
+    send("loop_fade_voice", inspectedWindow);
     INSPECTOR_FIELDS.forEach(function (key) {
         var control = host.patcher.getnamed(key + "_" + inspectedWindow);
         if (control && control.getvalueof) {
             var value = control.getvalueof();
-            inspector_sync(inspectedWindow, key, Array.isArray(value) ? value[0] : value);
+            send("inspect_" + key, "set", Array.isArray(value) ? value[0] : value);
         }
     });
+    update_fade_preview();
 }
 
 function inspector_edit(key, value) {
@@ -133,8 +144,52 @@ function inspector_edit(key, value) {
 function inspector_sync(voice, key, value) {
     if (voice === inspectedWindow && typeof value === "number" && isFinite(value)) {
         send("inspect_" + key, "set", value);
+        if (key === "rate" || key === "fade") update_fade_preview();
     }
 }
+
+function wave_theme() {
+    var colors = arrayfromargs(arguments);
+    if (colors.length !== 16) return;
+    waveTheme = [colors.slice(0, 4), colors.slice(4, 8), colors.slice(8, 12), colors.slice(12, 16)];
+    paint_wave_selection();
+}
+
+function paint_wave_selection() {
+    if (!waveTheme) return;
+    for (var voice = 1; voice <= WINDOWS; voice++) {
+        var selected = voice === inspectedWindow;
+        var target = host.patcher.getnamed("wave_" + voice);
+        target.message.apply(target, ["bgcolor"].concat(waveTheme[selected ? 1 : 0]));
+        var row = host.patcher.getnamed("loop_row_" + voice);
+        row.message.apply(row, ["bordercolor"].concat(selected ? waveTheme[2] : [0, 0, 0, 0]));
+        var button = host.patcher.getnamed("loop_edit_" + voice);
+        var background = waveTheme[selected ? 2 : 1];
+        var foreground = waveTheme[selected ? 0 : 3];
+        button.message.apply(button, ["activebgcolor"].concat(background));
+        button.message.apply(button, ["activebgoncolor"].concat(background));
+        button.message.apply(button, ["activetextcolor"].concat(foreground));
+        button.message.apply(button, ["activetextoncolor"].concat(foreground));
+    }
+}
+paint_wave_selection.local = 1;
+
+function control_value(name, fallback) {
+    var control = host.patcher.getnamed(name);
+    if (!control || !control.getvalueof) return fallback;
+    var value = control.getvalueof();
+    return Number(Array.isArray(value) ? value[0] : value);
+}
+control_value.local = 1;
+
+function update_fade_preview() {
+    var range = positions[inspectedWindow - 1];
+    var fade = control_value("fade_" + inspectedWindow, 30);
+    var rate = control_value("rate_" + inspectedWindow, 1);
+    var estimate = Math.min(fade, 0.45 * duration * (range[1] - range[0]) * 0.01 / rate);
+    send("loop_fade_preview", "preview", estimate, ready ? 1 : 0);
+}
+update_fade_preview.local = 1;
 
 function choose() {
     if (bufferName && !pendingPath && !inputTake && !inputWritePath) {
@@ -362,6 +417,7 @@ function read_timeout() {
     }
     label("source_label", sourceLabel);
     label("status", "Couldn’t load audio. Try another file.");
+    update_fade_preview();
 }
 read_timeout.local = 1;
 
@@ -384,7 +440,7 @@ function update_status() {
     } else {
         send("input_record_state", "bgcolor", 0, 0, 0, 0);
     }
-    var inputButton = recording ? "Stop input" : "Record input";
+    var inputButton = recording ? "Stop source" : "Record source";
     send("input_record_button", "text", inputButton);
     send("input_record_button", "texton", inputButton);
     send("input_record_button", "active", recording || (audioOn && !audioStarting &&
@@ -396,9 +452,9 @@ function update_status() {
     });
     var count = playing.filter(function (state) { return state; }).length;
     if (inputTake) {
-        label("status", recording ? "● Recording · Click Stop input." : "Preparing recorded input…");
+        label("status", recording ? "● Recording source · Click Stop source." : "Preparing recorded source…");
     } else if (inputWritePath) {
-        label("status", "Saving recorded input…");
+        label("status", "Saving recorded source…");
     } else if (pendingPath) {
         label("status", (queuedWindows || queuedNormal) ? "Loading audio… Playback queued." : "Loading audio…");
     } else if (audioStarting) {
@@ -563,7 +619,7 @@ commit_input_record.local = 1;
 
 function choose_input_save() {
     if (!ready || sourceIsDemo || sourcePath || pendingPath || inputTake || inputWritePath) return;
-    send("input_save_dialog", "name", "Field Kit Input.wav");
+    send("input_save_dialog", "name", "Field Kit Source.wav");
     send("input_save_dialog", "bang");
 }
 
@@ -589,7 +645,7 @@ function finish_input_save() {
     sourceLabel = sourcePath.split("/").pop() + "   ·   " + (duration / 1000).toFixed(2) + " s   ·   stereo";
     label("source_label", sourceLabel);
     update_status();
-    label("status", "Saved input WAV · Ready for Save Set.");
+    label("status", "Saved source WAV · Ready for Save Set.");
 }
 finish_input_save.local = 1;
 
@@ -619,13 +675,14 @@ function input_save_failed() {
     inputSaveTimeout.cancel();
     inputWritePath = "";
     update_status();
-    label("status", "Couldn’t save input WAV. Try another location.");
+    label("status", "Couldn’t save source WAV. Try another location.");
 }
 input_save_failed.local = 1;
 
 function dsp_enabled(state) {
     var wasAudioOn = audioOn;
     audioOn = !!state;
+    if (audioOn !== wasAudioOn) send("loop_fade_preview", "running", audioOn ? 1 : 0);
     if (audioOn) send("input_device_channels", "bang");
     if (audioStarting) {
         // Core Audio can report on, off, on while Max rebuilds its DSP graph.
@@ -820,7 +877,13 @@ function exit_normal() {
     update_status();
 }
 
+function stop_pad_motion() {
+    send("pad_motion_stop", "bang");
+}
+
 function stop_all() {
+    send("sequence_control", "stop");
+    stop_pad_motion();
     queuedWindows = 0;
     stop_normal();
     for (var voice = 1; voice <= WINDOWS; voice++) {
@@ -851,19 +914,27 @@ function draw_region(voice) {
     var range = positions[index];
     waveRanges[index] = range.slice();
     pendingWaveEdits &= ~(1 << index);
+    wavePressX[index] = null;
+    waveDragged[index] = false;
     send("base_start_" + voice, range[0]);
     send("base_end_" + voice, range[1]);
     send("start_" + voice, "set", range[0]);
     send("end_" + voice, "set", range[1]);
     inspector_sync(voice, "start", range[0]);
     inspector_sync(voice, "end", range[1]);
+    if (voice === inspectedWindow) update_fade_preview();
+    draw_wave_selection(voice, range);
+}
+draw_region.local = 1;
+
+function draw_wave_selection(voice, range) {
     if (ready) {
         drawing = true;
         outlet(voice - 1, [range[0] * duration * 0.01, range[1] * duration * 0.01]);
         drawing = false;
     }
 }
-draw_region.local = 1;
+draw_wave_selection.local = 1;
 
 function edit_start(voice, value) {
     if (voice >= 1 && voice <= WINDOWS && voice % 1 === 0 && typeof value === "number" && isFinite(value)) {
@@ -914,10 +985,20 @@ function wave_mouse(voice, x, y, phase) {
     if (!ready || voice < 1 || voice > WINDOWS) {
         return;
     }
-    var bit = 1 << (voice - 1);
+    var index = voice - 1;
+    var bit = 1 << index;
     if (phase === 1) {
         pendingWaveEdits &= ~bit;
-    } else if (phase === 0) {
+        wavePressX[index] = x;
+        waveDragged[index] = false;
+        inspect_window(index);
+        return;
+    }
+    if (wavePressX[index] !== null && Math.abs(x - wavePressX[index]) >= WAVE_DRAG_THRESHOLD) {
+        waveDragged[index] = true;
+    }
+    if (phase === 0) {
+        wavePressX[index] = null;
         pendingWaveEdits |= bit;
         // Let waveform~ finish emitting its selection for this mouse event.
         commitWave.schedule(0);
@@ -933,14 +1014,18 @@ function commit_wave_edits() {
         }
         var range = positions[index];
         var next = waveRanges[index];
+        var dragged = waveDragged[index];
+        waveDragged[index] = false;
+        if (!dragged) {
+            waveRanges[index] = range.slice();
+            draw_wave_selection(index + 1, range);
+            continue;
+        }
         if (Math.abs(range[0] - next[0]) < 0.00001 && Math.abs(range[1] - next[1]) < 0.00001) {
             continue;
         }
         var voice = index + 1;
         set_region(voice, next[0], next[1]);
-        if (voice !== inspectedWindow) {
-            inspect_window(index);
-        }
     }
 }
 commit_wave_edits.local = 1;

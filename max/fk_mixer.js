@@ -13,16 +13,24 @@ var SOLO_COLOR = [0.38, 0.73, 0.96, 1];
 var LIGHT_TEXT = [0.88, 0.88, 0.88, 1];
 var DARK_TEXT = [0.09, 0.09, 0.09, 1];
 
+function theme() {
+    var colors = arrayfromargs(arguments);
+    if (colors.length !== 8) return;
+    OFF_COLOR = colors.slice(0, 4);
+    LIGHT_TEXT = colors.slice(4, 8);
+    update_mix();
+}
+
 function mute(voice, value) {
     if (valid_voice(voice)) {
-        mutes[voice - 1] = value ? 1 : 0;
+        mutes[voice - 1] = value === undefined ? 1 - mutes[voice - 1] : (value ? 1 : 0);
         update_mix();
     }
 }
 
 function solo(voice, value) {
     if (valid_voice(voice)) {
-        solos[voice - 1] = value ? 1 : 0;
+        solos[voice - 1] = value === undefined ? 1 - solos[voice - 1] : (value ? 1 : 0);
         update_mix();
     }
 }
@@ -54,7 +62,6 @@ function paint_button(name, enabled, label, color) {
     var button = patch.getnamed(name);
     var background = enabled ? color : OFF_COLOR;
     var foreground = enabled ? DARK_TEXT : LIGHT_TEXT;
-    button.message("set", enabled);
     button.message("text", label);
     button.message("texton", label);
     button.message.apply(button, ["activebgcolor"].concat(background));

@@ -16,6 +16,32 @@ const sourceState = {
 };
 const recorderState = { state: 'idle' };
 let requestedSource;
+const blankSequence = { bpm: 120, beats: 4, repeat: 1, steps: Array.from({ length: 8 }, () => ({ slot: 0, bars: 1 })) };
+const programmedSequence = structuredClone(blankSequence);
+programmedSequence.bpm = 132.5;
+programmedSequence.steps[0] = { slot: 1, bars: 2 };
+programmedSequence.steps[1] = { slot: 2, bars: 3 };
+const changedSequence = { ...programmedSequence, bpm: 150 };
+const sequenceState = { data: structuredClone(blankSequence), running: false, validations: [], restores: [] };
+const sequencer = {
+    js: {
+        sequence_snapshot() { return structuredClone(sequenceState.data); },
+        sequence_valid(data) {
+            sequenceState.validations.push(structuredClone(data));
+            return !!data && data.bpm >= 20 && data.bpm <= 300;
+        },
+        restore_sequence(data) {
+            sequenceState.restores.push({ data: structuredClone(data), pan: controls.pan_1.value,
+                                          slot3: host.sequence_has_slot(3) });
+            sequenceState.data = structuredClone(data ?? blankSequence);
+            sequenceState.running = false;
+        },
+    },
+    message(selector) {
+        assert.equal(selector, 'stop');
+        sequenceState.running = false;
+    },
+};
 const defaultCurve = [0, 0, 0.25, 1, 0.5, 0, 0.75, -1, 1, 0];
 const defaultRates = [0.12, 0.31, 0.73, 0.18, 0.43, 0.67, 1.1, 1.7];
 const defaultShapes = [0, 1, 2, 0, 1, 0, 1, 0];
@@ -97,12 +123,13 @@ function addControl(name, initial) {
     };
 }
 for (let voice = 1; voice <= 4; voice++) {
-    for (const [name, value] of Object.entries({ rate: 0.5, direction: 1, fade: 120, drive: 10, filter: -22, level: 55, pan: 5 })) {
+    for (const [name, value] of Object.entries({ rate: 0.5, direction: 1, fade: 120, drive: 10, filter: -22, level: 55, pan: 5,
+                                                echo_send: voice * 10, room_send: voice * 5 })) {
         addControl(name + '_' + voice, value);
     }
 }
 for (const [name, value] of Object.entries({
-    fx_enabled: 1, fx_tone: -8, fx_echo: 60, fx_time_ms: 500, fx_repeats: 77, fx_space: 12, fx_decay: 3.2,
+    fx_enabled: 1, fx_mode: 1, fx_tone: -8, fx_echo: 60, fx_time_ms: 500, fx_repeats: 77, fx_space: 12, fx_decay: 3.2,
     pitch_scale: 5, master: -5,
 })) addControl(name, value);
 for (let i = 1; i <= 8; i++) addControl('pattern_' + i, 0);
@@ -111,8 +138,10 @@ for (const name of ['pattern_store', 'pattern_status', 'set_status', 'pattern_sa
                     'pattern_gain', 'pattern_gain_sample']) addControl(name, 0);
 const named = name => {
     if (name === 'source_control') return source;
+    if (name === 'sequence_control') return sequencer;
     if (name === 'patchbay') return { subpatcher: () => ({ getnamed: () => router }) };
     if (name === 'mix_fx') return { subpatcher: () => ({ getnamed: key => controls[key] }) };
+    if (name === 'drifting_memory') return { subpatcher: () => ({ getnamed: key => controls['drifting.' + key] }) };
     if (name === 'mixer_control') return mixer;
     if (name === 'recorder') return { subpatcher: () => ({ getnamed: () => ({ js: recorderState }) }) };
     if (controls[name]) return controls[name];
@@ -143,13 +172,20 @@ function File(path, mode) {
 const host = vm.createContext({ patcher: { getnamed: named }, File,
     Task: function () { this.schedule = () => {}; this.cancel = () => {}; } });
 vm.runInContext(readFileSync(join(__dirname, '..', 'max', 'fk_patterns.js'), 'utf8'), host);
+for (const [key, , , initial] of host.DRIFT_CONTROLS) addControl('drifting.' + key, initial);
+controls['drifting.drift_enabled'].value = 1;
+controls['drifting.drift_mix'].value = 48;
+controls['drifting.feedback'].value = 91;
 
 host.loadbang();
 assert.equal(controls.pattern_2.text, '2');
 assert.equal(controls.pattern_store.text, 'Store pattern');
 assert.equal(host.bankDirty, false);
+assert.equal(host.sequence_has_slot(2), false);
+sequenceState.running = true;
 host.slot(2);
 assert.match(controls.pattern_status.value, /empty/);
+assert.equal(sequenceState.running, true);
 host.toggle_store();
 assert.equal(controls.pattern_store.text, 'Cancel store');
 host.toggle_store();
@@ -159,6 +195,11 @@ assert.equal(controls.pattern_2.text, '2');
 host.toggle_store();
 host.slot(2);
 assert.equal(controls.pattern_2.text, '2 •');
+assert.equal(host.sequence_has_slot(2), true);
+assert.equal(host.sequence_has_slot('2'), false);
+assert.equal(host.sequence_has_slot(2.5), false);
+assert.equal(host.sequence_has_slot(0), false);
+assert.equal(sequenceState.running, true);
 assert.equal(controls.pattern_store.text, 'Store pattern');
 assert.equal(host.bankDirty, true);
 assert.equal(controls.pattern_status.value, 'Pattern 2 stored · bank unsaved');
@@ -172,7 +213,12 @@ const bank = JSON.parse(files.get('/test/bank.json'));
 assert.equal(bank.format, 'field-kit-patterns');
 assert.equal(bank.version, 2);
 assert.equal(bank.slots.length, 8);
+assert.equal(Object.hasOwn(bank, 'sequence'), false);
 assert.equal(bank.slots[1].windows[1].rate, 0.5);
+assert.equal(bank.slots[1].windows[1].echo_send, 20);
+assert.equal(bank.slots[1].windows[1].room_send, 10);
+assert.equal(bank.slots[1].effects.fx_mode, 1);
+assert.equal(bank.slots[1].drifting.feedback, 91);
 assert.equal(bank.slots[1].pitchScale, 5);
 assert.deepEqual(bank.slots[1].mixerMutes, [0, 1, 0, 1]);
 assert.equal(bank.slots[1].mixerSolos, undefined);
@@ -195,9 +241,15 @@ modState.targetIndex = 0;
 controls.rate_2.value = 2;
 controls.master.value = -40;
 controls.fx_echo.value = 1;
+controls.fx_mode.value = 0;
+controls.echo_send_2.value = 1;
+controls.room_send_2.value = 3;
+controls['drifting.feedback'].value = 20;
+controls['drifting.drift_enabled'].value = 0;
 controls.pitch_scale.value = 0;
 sourceState.normalPlaying = true;
 host.slot(2);
+assert.equal(sequenceState.running, false);
 assert.deepEqual(sourceState.positions[1], [19, 37]);
 assert.deepEqual(sourceState.playing, [true, false, true, false]);
 assert.equal(sourceState.normalPlaying, false);
@@ -216,20 +268,40 @@ assert.equal(modState.targetIndex, 7);
 assert.equal(controls.rate_2.value, 0.5);
 assert.equal(controls.master.value, -5);
 assert.equal(controls.fx_echo.value, 60);
+assert.equal(controls.fx_mode.value, 1);
+assert.equal(controls.echo_send_2.value, 20);
+assert.equal(controls.room_send_2.value, 10);
+assert.equal(controls['drifting.drift_enabled'].value, 1);
+assert.equal(controls['drifting.feedback'].value, 91);
 assert.equal(controls.pitch_scale.value, 5);
 assert.deepEqual(mixerState.mutes, [0, 1, 0, 1]);
 assert.deepEqual(mixerState.solos, [0, 0, 0, 0]);
 host.slot(2);
 assert.equal(controls.pattern_2.text, '2 •');
 assert.deepEqual(controls.pattern_2.background, selectedBackground);
+sequenceState.running = true;
+controls.rate_2.value = 2;
+host.sequence_recall(1);
+assert.equal(controls.rate_2.value, 2);
+host.sequence_recall(2);
+assert.equal(controls.rate_2.value, 0.5);
+assert.equal(sequenceState.running, true);
 
 mixerState.solos[0] = 1;
+sequenceState.data = structuredClone(programmedSequence);
 host.reset();
+assert.equal(sequenceState.running, false);
+assert.deepEqual(sequenceState.data, programmedSequence);
 assert.deepEqual(sourceState.positions, [[0, 25], [25, 50], [50, 75], [75, 100]]);
 assert.deepEqual(sourceState.playing, [false, false, false, false]);
 assert.equal(sourceState.path, '/test/audio.wav');
 assert.equal(controls.rate_2.value, 1);
 assert.equal(controls.fx_enabled.value, 0);
+assert.equal(controls.fx_mode.value, 0);
+assert.equal(controls.echo_send_2.value, 0);
+assert.equal(controls.room_send_2.value, 0);
+assert.equal(controls['drifting.drift_enabled'].value, 0);
+assert.equal(controls['drifting.drift_mix'].value, 35);
 assert.equal(controls.fx_echo.value, 20);
 assert.equal(controls.master.value, -12);
 assert.equal(controls.pitch_scale.value, 0);
@@ -257,6 +329,7 @@ host.slot(4, 0);
 assert.equal(controls.rate_2.value, 0.75);
 assert.equal(controls.pattern_status.value, 'Pattern 4 recalled · bank unsaved');
 controls.rate_2.value = 1;
+sequenceState.running = true;
 files.set('/test/invalid.json', JSON.stringify({ ...bank, version: 100 }));
 host.read_bank('/test/invalid.json');
 assert.match(controls.pattern_status.value, /Couldn’t open/);
@@ -281,8 +354,11 @@ for (const mixerMutes of [null, [0, 1, 0], [0, 0.5, 0, 1], [0, 2, 0, 1], [0, '1'
 }
 host.load_bank();
 assert.deepEqual(messages.at(-1), ['pattern_load_dialog', 'bang']);
+assert.equal(sequenceState.running, true);
 failTextRead = true;
 host.read_bank('/test/bank.json');
+assert.equal(sequenceState.running, false);
+assert.deepEqual(sequenceState.data, programmedSequence);
 assert.equal(controls.pattern_4.text, '4');
 assert.equal(controls.pattern_2.text, '2 •');
 assert.equal(controls.rate_2.value, 1);
@@ -299,6 +375,10 @@ const oldV2Pattern = { ...bank.slots[1] };
 delete oldV2Pattern.pitchScale;
 delete oldV2Pattern.mixerMutes;
 delete oldV2Pattern.globalGains;
+delete oldV2Pattern.drifting;
+oldV2Pattern.effects = { ...oldV2Pattern.effects };
+delete oldV2Pattern.effects.fx_mode;
+oldV2Pattern.windows = oldV2Pattern.windows.map(({ echo_send, room_send, ...window }) => window);
 const oldV2Slots = bank.slots.slice();
 oldV2Slots[1] = oldV2Pattern;
 files.set('/test/old-v2.json', JSON.stringify({ ...bank, slots: oldV2Slots }));
@@ -306,6 +386,11 @@ host.read_bank('/test/old-v2.json');
 assert.match(controls.pattern_status.value, /Bank loaded/);
 host.slot(2);
 assert.equal(controls.pitch_scale.value, 0);
+assert.equal(controls.fx_mode.value, 0);
+assert.equal(controls.echo_send_2.value, 0);
+assert.equal(controls.room_send_2.value, 0);
+assert.equal(controls['drifting.drift_enabled'].value, 0);
+assert.equal(controls['drifting.drift_mix'].value, 35);
 assert.deepEqual(mixerState.mutes, [0, 0, 0, 0]);
 assert(modState.globalGains.every(value => value === 0));
 
@@ -380,7 +465,9 @@ sourceState.path = '/test/sets/Écho.wav';
 controls.pan_1.value = -62;
 host.slot(1, 1);
 controls.pan_1.value = 37;
+sequenceState.running = true;
 host.write_set('/test/sets/First.json');
+assert.equal(sequenceState.running, true);
 const [, , stage, destination] = messages.at(-1);
 assert.equal(controls.pattern_status.value, 'Pattern 1 stored · bank unsaved');
 assert.equal(controls.set_status.value, 'Saving First.json…');
@@ -389,6 +476,7 @@ assert.equal(set.source.path, sourceState.path);
 assert.equal(set.source.relative, 'Écho.wav');
 assert.equal(set.slots[0].windows[0].pan, -62);
 assert.equal(set.current.windows[0].pan, 37);
+assert.deepEqual(set.sequence, programmedSequence);
 assert.equal(set.current.globalGains[63], -75);
 assert.equal(set.current.selection.globalTarget, 7);
 files.set(destination, files.get(stage));
@@ -413,8 +501,22 @@ host.set_written(1, concurrentStage);
 assert.equal(controls.pattern_status.value, 'Pattern 3 stored · bank unsaved');
 assert.equal(controls.set_status.value, 'Set saved · Concurrent.json');
 assert.equal(host.bankDirty, true);
+sequenceState.data = structuredClone(changedSequence);
+sequenceState.running = true;
+for (const invalid of [null, { ...programmedSequence, bpm: 0 }]) {
+    const previousSource = requestedSource;
+    files.set('/relocated/Invalid.json', JSON.stringify({ ...set, sequence: invalid }));
+    host.read_set('/relocated/Invalid.json');
+    assert.equal(requestedSource, previousSource);
+    assert.deepEqual(sequenceState.validations.at(-1), invalid);
+    assert.match(controls.set_status.value, /Couldn’t open/);
+    assert.equal(sequenceState.running, true);
+}
 host.read_set('/relocated/First.json');
 assert.equal(requestedSource, '/relocated/Écho.wav');
+assert.deepEqual(sequenceState.validations.at(-1), programmedSequence);
+assert.deepEqual(sequenceState.data, changedSequence);
+assert.equal(sequenceState.restores.length, 0);
 assert.equal(controls.pan_1.value, 9);
 assert.equal(controls.set_status.value, 'Opening First.json…');
 host.set_source_loaded(0);
@@ -422,8 +524,14 @@ assert.equal(controls.pattern_3.text, '3 •');
 assert.equal(controls.pan_1.value, 9);
 assert.equal(controls.pattern_status.value, 'Pattern 3 stored · bank unsaved');
 assert.match(controls.set_status.value, /Couldn’t load/);
+assert.deepEqual(sequenceState.data, changedSequence);
+assert.equal(sequenceState.running, true);
+assert.equal(sequenceState.restores.length, 0);
 host.read_set('/relocated/First.json');
 host.set_source_loaded(1);
+assert.deepEqual(sequenceState.restores, [{ data: programmedSequence, pan: 37, slot3: false }]);
+assert.deepEqual(sequenceState.data, programmedSequence);
+assert.equal(sequenceState.running, false);
 assert.equal(controls.pattern_3.text, '3');
 assert.equal(controls.pan_1.value, 37);
 assert.equal(controls.pattern_status.value, 'Click to recall. Shift-click to store.');
@@ -433,20 +541,37 @@ assert.equal(controls.pan_1.value, -62);
 assert.equal(controls.set_status.value, 'Set opened · First.json');
 
 files.delete('/relocated/Écho.wav');
+sequenceState.data = structuredClone(changedSequence);
+sequenceState.running = true;
 host.read_set('/relocated/First.json');
 assert.deepEqual(messages.at(-1), ['set_relink_dialog', 'bang']);
 host.cancel_relink();
 assert.equal(controls.pan_1.value, -62);
 assert.equal(controls.set_status.value, 'Open Set canceled.');
+assert.deepEqual(sequenceState.data, changedSequence);
+assert.equal(sequenceState.running, true);
 host.read_set('/relocated/First.json');
 host.relink_set('/test/replacement.wav');
 assert.equal(requestedSource, '/test/replacement.wav');
 host.set_source_loaded(1);
 assert.equal(controls.pan_1.value, 37);
+assert.deepEqual(sequenceState.data, programmedSequence);
+assert.equal(sequenceState.running, false);
+const { sequence: ignoredSequence, ...olderSet } = set;
+files.set('/test/sets/Older.json', JSON.stringify(olderSet));
+files.set('/test/sets/Écho.wav', 'sample');
+const validatedSequences = sequenceState.validations.length;
+host.read_set('/test/sets/Older.json');
+assert.equal(sequenceState.validations.length, validatedSequences);
+assert.deepEqual(sequenceState.data, programmedSequence);
+host.set_source_loaded(1);
+assert.equal(sequenceState.restores.at(-1).data, undefined);
+assert.deepEqual(sequenceState.data, blankSequence);
+assert.equal(sequenceState.running, false);
 recorderState.state = 'recording';
 host.open_set();
 assert.match(controls.set_status.value, /Stop recording/);
-console.log('PASS set captures unslotted edits, restores after decode, and handles relocation, relink and cancel');
+console.log('PASS Set round-trip, transactional sequence restore, older Sets, relocation, relink and cancel');
 
 sourceState.audioOn = true;
 controls.pan_1.value = 13;
@@ -458,7 +583,9 @@ assert.deepEqual(messages.slice(-2), [
     ['pattern_gain', 'list', 0, 20],
     ['pattern_gain_sample', 'start'],
 ]);
-host.slot(2);
+sequenceState.running = true;
+host.sequence_recall(2);
+assert.equal(sequenceState.running, true);
 assert.equal(controls.pan_1.value, 37);
 host.recall_silent();
 assert.equal(controls.pan_1.value, 13);
@@ -470,4 +597,4 @@ host.recall_dsp(0);
 assert.equal(controls.pan_1.value, -62);
 host.recall_silent();
 assert.equal(controls.pan_1.value, -62);
-console.log('PASS live recall waits for silence, coalesces rapid selection and recovers if DSP stops');
+console.log('PASS live recall waits for silence, coalesces manual and sequenced recalls and recovers if DSP stops');

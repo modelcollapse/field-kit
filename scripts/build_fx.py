@@ -13,10 +13,12 @@ DIALS = (
     ("space", "Room mix", "Mix %", 18, 0, 100, "Amount of room reverb."),
     ("decay", "Room decay", "Decay s", 1.7, 0.25, 5, "Reverb tail length in seconds."),
 )
+SEND_INPUTS = ("Echo send left", "Echo send right", "Room send left", "Room send right")
 
 # Turn-on defaults match the parameters in the native controls. Gen handles
 # smoothing so moving a dial or switching bypass does not jump the audio.
 CODE = """Param enabled(0);
+Param send_mode(0);
 Param tone(0);
 Param echo(20);
 Param time_ms(310);
@@ -25,6 +27,7 @@ Param space(18);
 Param decay(1.7);
 
 History fxMix(0);
+History sendBlend(0);
 History toneMix(0);
 History echoMix(0.20);
 History echoTime(310);
@@ -57,6 +60,8 @@ timeRamp = 1 - exp(-1 / (0.060 * samplerate));
 samplesPerMs = samplerate * 0.001;
 bypassStep = 1 / (0.020 * samplerate);
 fxMix = clamp(clamp(enabled, 0, 1), fxMix - bypassStep, fxMix + bypassStep);
+sendBlend = clamp(clamp(send_mode, 0, 1), sendBlend - bypassStep, sendBlend + bypassStep);
+fullMix = 1 - sendBlend;
 toneMix = mix(toneMix, clamp(tone * 0.01 + in3, -1, 1), controlRamp);
 echoMix = mix(echoMix, clamp(echo * 0.01 + in4, 0, 1), controlRamp);
 // Changing the knob or recalling a pattern switches between two fixed taps.
@@ -98,20 +103,27 @@ echoTapR = mix(oldTapR, newTapR, echoWeight);
 echoCutoff = 1 - exp(-28274.33388 / samplerate);
 echoLowL = mix(echoLowL, echoTapL, echoCutoff);
 echoLowR = mix(echoLowR, echoTapR, echoCutoff);
-echoLineL.write(toneL + echoRepeats * mix(echoLowL, echoLowR, 0.25));
-echoLineR.write(toneR + echoRepeats * mix(echoLowR, echoLowL, 0.25));
+// Move the effect inputs between the serial mix and the independent sends.
+// The existing delay histories keep ringing through a mode change.
+echoInputL = mix(toneL, in9, sendBlend);
+echoInputR = mix(toneR, in10, sendBlend);
+echoLineL.write(echoInputL + echoRepeats * mix(echoLowL, echoLowR, 0.25));
+echoLineR.write(echoInputR + echoRepeats * mix(echoLowR, echoLowL, 0.25));
 echoWet = echoMix * 0.52;
 echoTrim = 1 - echoRepeats * 0.75;
-echoL = toneL * (1 - 0.35 * echoWet) + echoTapL * echoWet * echoTrim;
-echoR = toneR * (1 - 0.35 * echoWet) + echoTapR * echoWet * echoTrim;
+echoDry = 1 - 0.35 * echoWet * fullMix;
+echoL = toneL * echoDry + echoTapL * echoWet * echoTrim;
+echoR = toneR * echoDry + echoTapR * echoWet * echoTrim;
 
 // Decorrelate the stereo input before it reaches the four-line room network.
+roomInputL = mix(echoL, in11, sendBlend);
+roomInputR = mix(echoR, in12, sendBlend);
 diffTapL = roomDiffuserL.read(clamp(6.7 * samplesPerMs, 1, 4093));
 diffTapR = roomDiffuserR.read(clamp(9.1 * samplesPerMs, 1, 4093));
-diffL = diffTapL - 0.55 * echoL;
-diffR = diffTapR - 0.55 * echoR;
-roomDiffuserL.write(echoL + 0.55 * diffL);
-roomDiffuserR.write(echoR + 0.55 * diffR);
+diffL = diffTapL - 0.55 * roomInputL;
+diffR = diffTapR - 0.55 * roomInputR;
+roomDiffuserL.write(roomInputL + 0.55 * diffL);
+roomDiffuserR.write(roomInputR + 0.55 * diffR);
 
 roomTapA = roomLineA.read(clamp(29.7 * samplesPerMs, 1, 32765));
 roomTapB = roomLineB.read(clamp(37.1 * samplesPerMs, 1, 32765));
@@ -136,8 +148,10 @@ roomLineC.write(diffL * 0.24 + feedC * exp(41.1 * roomLoss));
 roomLineD.write(-diffR * 0.24 + feedD * exp(53.9 * roomLoss));
 roomL = (roomTapA - roomTapB + roomTapC + roomTapD) * 0.5;
 roomR = (roomTapA + roomTapB - roomTapC + roomTapD) * 0.5;
-wetL = echoL * (1 - 0.18 * spaceMix) + roomL * spaceMix * 0.70;
-wetR = echoR * (1 - 0.18 * spaceMix) + roomR * spaceMix * 0.70;
+// In Loop sends mode neither return attenuates the main signal.
+roomDry = 1 - 0.18 * spaceMix * fullMix;
+wetL = echoL * roomDry + roomL * spaceMix * 0.70;
+wetR = echoR * roomDry + roomR * spaceMix * 0.70;
 
 // The bypass branch has no filter, gain, or delay.
 out1 = mix(in1, wetL, fxMix);
@@ -187,15 +201,18 @@ class Patch:
 def gen_patcher():
     p = Patch()
     channels = 2 + len(DIALS)
-    code = p.add("codebox", [40, 86, 600, 420], ins=channels, outs=channels,
+    inputs = channels + len(SEND_INPUTS)
+    code = p.add("codebox", [40, 86, 600, 420], ins=inputs, outs=channels,
                  types=[""] * channels, code=CODE)
-    for i in range(channels):
+    for i in range(inputs):
         x = 40 + i * 70
         source = p.obj(f"in {i + 1}", x, 32, 48, ins=0, types=[""])
-        target = p.obj(f"out {i + 1}", x, 545, 48, outs=0)
         p.cord(source, code, inlet=i)
+    for i in range(channels):
+        x = 40 + i * 70
+        target = p.obj(f"out {i + 1}", x, 545, 48, outs=0)
         p.cord(code, target, outlet=i)
-    return p.patcher(rect=[0, 0, 680, 600], namespace="dsp.gen",
+    return p.patcher(rect=[0, 0, 880, 600], namespace="dsp.gen",
                      description="Tone tilt, crossfed stereo echo, and a damped stereo room")
 
 
@@ -210,11 +227,67 @@ def parameter(name, label, initial, low, high, *, options=None, units=None, inte
     return dict(parameter_enable=1, saved_attribute_attributes={"valueof": value})
 
 
+def effects_pad(p, enabled, tone, echo, room):
+    panel = Patch()
+    source = panel.add("inlet", [16, 390, 26, 26], ins=0, outs=1, index=1)
+    destination = panel.add("outlet", [16, 478, 26, 26], index=1)
+    canvas = [0, 0, 440, 372]
+    pad = panel.add("jsui", canvas, outs=1, types=[""], view=canvas, background=1,
+                    filename="fk_fx_pad.js", varname="fx_pad_canvas", border=0, parameter_enable=0)
+    menu_feedback = panel.obj("route xmenu ymenu", 16, 434, 127, outs=3, types=["", "", ""])
+    panel.cord(source, pad)
+    panel.cord(pad, menu_feedback)
+    panel.cord(menu_feedback, destination, outlet=2)
+
+    choices = ["Tone tilt", ",", "Echo mix", ",", "Room mix"]
+    for axis, (label, view) in enumerate((("x", [50, 49, 152, 24]), ("y", [244, 49, 172, 24]))):
+        x = 165 + axis * 128
+        menu = panel.add("umenu", [x, 434, 112, 22], outs=3, types=["int", "", ""],
+                         view=view, items=choices, varname=f"fx_pad_{label}", parameter_enable=0)
+        assign = panel.obj(f"prepend assign {axis}", x, 478, 118, ins=2)
+        select = panel.obj("prepend set", x, 516, 90, ins=2)
+        default = panel.obj(f"loadmess {axis + 1}", x, 554, 85, types=["int"])
+        panel.cord(menu, assign)
+        panel.cord(assign, pad)
+        panel.cord(menu_feedback, select, outlet=axis)
+        panel.cord(default, select)
+        panel.cord(select, menu)
+
+    button_rect = [428, 0, 96, 20]
+    button = p.add("live.text", button_rect, outs=2, types=["bang", ""], view=button_rect,
+                   varname="fx_pad_open", mode=0, text="FX pad…", texton="FX pad…",
+                   parameter_enable=0, hint="Blend two effects and record pad movements.")
+    open_message = p.add("message", [0, 424, 52, 22], ins=2, outs=1, types=[""], text="open")
+    window = p.obj("pcontrol", 0, 456, 62)
+    subpatch = p.obj("p Effects pad", 0, 488, 102, types=[""], varname="fx_pad_panel",
+                     patcher=panel.patcher(rect=[570, 152, 440, 372], title="Effects pad",
+                                           openinpresentation=1, toolbarvisible=0))
+    motion = p.add("inlet", [720, 172, 26, 26], ins=0, outs=1, types=[""],
+                   index=3 + len(DIALS), comment="Stop pad motion")
+    p.cord(button, open_message)
+    p.cord(open_message, window)
+    p.cord(window, subpatch)
+    p.cord(motion, subpatch)
+
+    edit = p.obj("route tone echo space", 0, 520, 144, outs=4, types=["", "", "", ""])
+    state = p.obj("pak 0 20 18", 164, 424, 82, ins=3, types=["list"])
+    state_message = p.obj("prepend source", 164, 456, 105, ins=2)
+    bypass_message = p.obj("prepend enabled", 294, 456, 114, ins=2)
+    p.cord(subpatch, edit)
+    for index, dial in enumerate((tone, echo, room)):
+        p.cord(edit, dial, outlet=index)
+        p.cord(dial, state, inlet=index)
+    p.cord(state, state_message)
+    p.cord(state_message, subpatch)
+    p.cord(enabled, bypass_message)
+    p.cord(bypass_message, subpatch)
+
+
 def build():
     p = Patch()
     dial_pitch = 112
     gutter = 4
-    p.label("Mix effects", 0, 0, 188, heading=True)
+    p.label("Main FX", 0, 0, 82, heading=True)
     p.label("Tone", 0, 24, dial_pitch - gutter)
     p.label("Stereo echo", dial_pitch, 24, 3 * dial_pitch - gutter)
     p.label("Room reverb", 4 * dial_pitch, 24, 2 * dial_pitch - gutter)
@@ -224,7 +297,7 @@ def build():
     right = p.add("inlet", [144, 172, 26, 26], ins=0, outs=1, types=["signal"], index=2,
                   comment="Mix right")
     channels = 2 + len(DIALS)
-    gen = p.obj("gen~", 0, 320, 105, ins=channels, outs=channels, types=["signal"] * channels,
+    gen = p.obj("gen~", 0, 320, 105, ins=channels + len(SEND_INPUTS), outs=channels, types=["signal"] * channels,
                 patcher=gen_patcher(), varname="fk_fx_dsp")
     output_left = p.add("outlet", [0, 370, 26, 26], types=[], index=1, comment="Effects left")
     output_right = p.add("outlet", [144, 370, 26, 26], types=[], index=2, comment="Effects right")
@@ -232,16 +305,31 @@ def build():
     p.cord(right, gen, inlet=1)
     p.cord(gen, output_left)
     p.cord(gen, output_right, outlet=1)
+    for offset, name in enumerate(SEND_INPUTS):
+        send = p.add("inlet", [792 + 72 * offset, 172, 26, 26], ins=0, outs=1, types=["signal"],
+                     index=channels + 2 + offset, comment=name)
+        p.cord(send, gen, inlet=channels + offset)
 
-    switch = [528, 0, 140, 20]
+    mode_rect = [86, 0, 94, 20]
+    mode = p.add("umenu", mode_rect, view=mode_rect, outs=3, types=["int", "", ""],
+                 varname="fx_mode", items=["Full mix", ",", "Loop sends"], parameter_enable=0,
+                 hint="Feed Echo and Room from the full mix or the individual loop sends.")
+    default_mode = p.obj("loadmess 0", 198, 210, 85, types=["int"])
+    set_mode = p.obj("prepend send_mode", 198, 240, 134, ins=2)
+    p.cord(default_mode, mode)
+    p.cord(mode, set_mode)
+    p.cord(set_mode, gen)
+
+    switch = [532, 0, 136, 20]
     enabled = p.add("live.text", switch, view=switch, outs=2, types=["", ""],
                     mode=1, text="Enable FX", texton="FX on", varname="fx_enabled",
-                    hint="Switch the entire mix effects chain in or out.",
+                    hint="Switch Tone, Echo and Room in or out. Drifting Memory has its own switch.",
                     **parameter("FX enabled", "FX", 0, 0, 1, options=("Off", "On")))
     prefix = p.obj("prepend enabled", 0, 265, 108, ins=2)
     p.cord(enabled, prefix)
     p.cord(prefix, gen)
 
+    dials = {}
     for slot, (key, title, label, initial, low, high, hint) in enumerate(DIALS):
         index = slot + 3
         x = 288 + slot * 72
@@ -261,8 +349,25 @@ def build():
         prefix = p.obj("prepend " + key, slot * 118 + 122, 265, 108, ins=2)
         p.cord(dial, prefix)
         p.cord(prefix, gen)
+        dials[key] = dial
 
-    patch = p.patcher(rect=[0, 0, 740, 425], openinpresentation=1, gridsize=[8, 8],
+    effects_pad(p, enabled, dials["tone"], dials["echo"], dials["space"])
+
+    stereo_rect = [312, 0, 108, 20]
+    stereo_button = p.add("live.text", stereo_rect, outs=2, types=["bang", ""], view=stereo_rect,
+                          varname="stereo_field_open", mode=0, text="Stereo field…", texton="Stereo field…",
+                          parameter_enable=0, hint="Place and record the pan and level of each loop.")
+    stereo_open = p.add("outlet", [720, 370, 26, 26], index=channels + 1, comment="Open Stereo field")
+    p.cord(stereo_button, stereo_open)
+
+    drifting_rect = [188, 0, 116, 20]
+    drifting = p.add("live.text", drifting_rect, outs=2, types=["bang", ""], view=drifting_rect,
+                     varname="drifting_delay_open", mode=0, text="Drifting Memory…", texton="Drifting Memory…",
+                     parameter_enable=0, hint="Open the Drifting Memory master effect.")
+    drifting_open = p.add("outlet", [792, 370, 26, 26], index=channels + 2, comment="Open Drifting Memory")
+    p.cord(drifting, drifting_open)
+
+    patch = p.patcher(rect=[0, 0, 1040, 555], openinpresentation=1, gridsize=[8, 8],
                       description="Stereo mix effects for FIELD KIT")
     return {"patcher": patch}
 

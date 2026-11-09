@@ -89,6 +89,16 @@ assert(sent('run_3', 0));
 assert(sent('status', 'set', '3 of 4 windows playing'));
 
 trace.length = 0;
+host.wave_mouse(3, 0.8, 0, 1);
+assert(sent('inspector_title', 'set', 'Editing Loop 3'));
+assert(sent('loop_edit_3', 'set', 1));
+host.track_wave(3, 0, 8000, 6400, 6400);
+host.wave_mouse(3, 0.8, 0, 0);
+runTask('commit_wave_edits');
+assert.deepEqual(regions.at(-1), [2, 4000, 6000]);
+assert(!sent('wave_edit_revision_3', 1));
+
+trace.length = 0;
 host.wave_mouse(2, 0.2, 0, 1);
 host.track_wave(2, 0, 8000, 2000, 2000);
 host.wave_mouse(2, 0.5, 0, 2);
