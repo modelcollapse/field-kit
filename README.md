@@ -7,9 +7,9 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-The v0.8.0 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.1 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.0](CHANGELOG.md).
+[See what's new in v0.8.1](CHANGELOG.md).
 
 ![Field Kit standalone in full screen with four loops playing, the docked loop editor, and live stereo visuals beside the mix recorder](docs/screenshots/field-kit-standalone.jpg)
 
@@ -27,7 +27,7 @@ In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to 
 2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
 3. Click **Record source** to capture up to 60 seconds. The red **RECORDING** badge and timer show when audio is being captured. **Stop source** loads the take into all four loops. Use **Save source WAV…** before saving a Set that uses the take or replacing the source.
 
-![The expanded Source, Input & Files drawer in the full-screen workspace](docs/screenshots/field-kit-source-drawer.jpg)
+![Glass Circuit playing with the Source, Input & Files drawer open and the Demos menu available](docs/screenshots/field-kit-source-drawer.jpg)
 
 ## Play and shape the loops
 
@@ -65,11 +65,13 @@ The scene clock controls when patterns change. Set the tempo and meter before yo
 
 The scene strip at the top, between **Transport** and **Master**, shows the current scene, the next playable scene, and progress through the current scene’s bars. Use **Start** or **Stop** and **Next bar** directly from the strip.
 
-![The scene sequencer running three four-bar steps at 112 BPM, with the current scene, next scene, and bar shown above the mixer](docs/screenshots/field-kit-scenes.png)
+![The Scene Sequencer open directly below Patterns, running three four-bar steps at 112 BPM](docs/screenshots/field-kit-scenes.png)
 
 Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Mix recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to collapse the lower panel and focus on the analyzers.
 
 **Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. Click **Stereo X/Y…** above the scope to open a larger, resizable window. The scope plots left against right. Matching left and right signals trace a rising diagonal. Opening Stereo X/Y or Stereo Field from full screen returns the workspace to a window so you can see both at once.
+
+![The resizable Stereo X/Y window showing the live left and right channels of the final mix](docs/screenshots/field-kit-stereo-scope.png)
 
 ## Patch modulation
 
@@ -93,7 +95,7 @@ Click **Record**, drag across the FX pad, and release. **Play** loops the gestur
 
 | Stereo field | FX pad |
 | --- | --- |
-| ![Stereo field with four loop positions and gesture controls](docs/screenshots/field-kit-stereo-field.png) | ![FX pad with full crosshairs and Echo mix and Room mix assigned to the axes](docs/screenshots/field-kit-fx-pad.png) |
+| ![The resizable Stereo Field window with four loop positions and gesture controls](docs/screenshots/field-kit-stereo-field.png) | ![FX pad with full crosshairs and Echo mix and Room mix assigned to the axes](docs/screenshots/field-kit-fx-pad.png) |
 
 **Drifting Memory** runs at the end of Main FX. In **Mix**, click **Enable effect**, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. The **Memory** meter shows what’s circulating in the delay. **Wet return** shows what the delay adds to the final mix. Use **Mix** to blend it in. **Off** stops capture and lets the tail play. Sets and patterns save the effect settings. Captured memory is for the current session.
 
