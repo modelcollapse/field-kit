@@ -22,7 +22,7 @@ programmedSequence.bpm = 132.5;
 programmedSequence.steps[0] = { slot: 1, bars: 2 };
 programmedSequence.steps[1] = { slot: 2, bars: 3 };
 const changedSequence = { ...programmedSequence, bpm: 150 };
-const sequenceState = { data: structuredClone(blankSequence), running: false, validations: [], restores: [] };
+const sequenceState = { data: structuredClone(blankSequence), running: false, validations: [], restores: [], refreshes: 0 };
 const sequencer = {
     js: {
         sequence_snapshot() { return structuredClone(sequenceState.data); },
@@ -38,6 +38,10 @@ const sequencer = {
         },
     },
     message(selector) {
+        if (selector === 'refresh_mix') {
+            sequenceState.refreshes++;
+            return;
+        }
         assert.equal(selector, 'stop');
         sequenceState.running = false;
     },
@@ -195,6 +199,7 @@ assert.equal(controls.pattern_2.text, '2');
 host.toggle_store();
 host.slot(2);
 assert.equal(controls.pattern_2.text, '2 •');
+assert.equal(sequenceState.refreshes, 1);
 assert.equal(host.sequence_has_slot(2), true);
 assert.equal(host.sequence_has_slot('2'), false);
 assert.equal(host.sequence_has_slot(2.5), false);
@@ -321,9 +326,11 @@ assert.deepEqual(modState.curves, Array(8).fill(defaultCurve));
 host.slot(4, 1);
 assert.equal(controls.pattern_4.text, '4 •');
 assert.equal(controls.pattern_status.value, 'Pattern 4 stored · bank unsaved');
+const refreshesAfterStore = sequenceState.refreshes;
 controls.rate_2.value = 0.75;
 host.slot(4, 1);
 assert.equal(controls.pattern_status.value, 'Pattern 4 replaced · bank unsaved');
+assert.equal(sequenceState.refreshes, refreshesAfterStore);
 controls.rate_2.value = 1;
 host.slot(4, 0);
 assert.equal(controls.rate_2.value, 0.75);
@@ -358,6 +365,7 @@ assert.equal(sequenceState.running, true);
 failTextRead = true;
 host.read_bank('/test/bank.json');
 assert.equal(sequenceState.running, false);
+assert.equal(sequenceState.refreshes, refreshesAfterStore + 1);
 assert.deepEqual(sequenceState.data, programmedSequence);
 assert.equal(controls.pattern_4.text, '4');
 assert.equal(controls.pattern_2.text, '2 •');

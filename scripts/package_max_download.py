@@ -78,6 +78,8 @@ Beats/bar once, then choose a scene and how many bars to hold it in each step.
 Start plays the first available scene. Next bar advances at the next bar line.
 Repeat starts the list again after the last step. Stop holds the current scene.
 Stop all stops the sequencer and the loops. The tempo counts scene bars.
+The scene strip beside the workspace tabs shows the current scene, next playable
+scene, and bar count. Use Start, Stop, or Next bar while you stay in Mix.
 Switch between Mix, Scenes, Modulation, and Visuals in the lower workspace, or choose
 Hide to collapse it. Visuals shows left and right frequency histories and a
 stereo scope of the final mix. Switch Display to Spectrum for live frequency

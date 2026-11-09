@@ -171,6 +171,7 @@ function slot(number, shift) {
         lastSlot = index;
         set_armed(false);
         bank_status("Pattern " + number + (replacing ? " replaced." : " stored."));
+        if (!replacing) host.patcher.getnamed("sequence_control").message("refresh_mix");
     } else if (slots[index]) {
         host.patcher.getnamed("sequence_control").message("stop");
         request_recall(index);
@@ -482,6 +483,7 @@ function read_bank(path) {
         set_armed(false);
         render_slots();
         status("Bank loaded. Click a filled square to recall.");
+        host.patcher.getnamed("sequence_control").message("refresh_mix");
     } catch (error) {
         status("Couldn’t open that pattern bank.");
     } finally {

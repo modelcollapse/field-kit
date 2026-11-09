@@ -9,6 +9,7 @@ import wave
 from pathlib import Path
 
 from build_fx import DIALS as FX_DIALS
+from build_mix_scene_strip import append_mix_scene_strip
 from build_mix_sends import PERFORMANCE_SENDS, append_sends_strip
 from build_mix_workspace import append_drifting_strip, append_drifting_taps
 from build_visuals import build as build_visuals
@@ -468,19 +469,19 @@ def sequence_controls(p):
     p.connect("sequence_open_message", 0, "theme_control")
     p.connect("sequence_panel", 0, "sequence_control")
 
-    label = [MARGIN, WORKSPACE_TOP, 136, 20]
+    label = [MARGIN, WORKSPACE_TOP, 100, 20]
     p.add("workspace_label", "comment", label, view=label, outs=0,
-          text="Workspace", fontsize=16, fontface=1)
-    view = [314, WORKSPACE_TOP, 470, 20]
+          text="Workspace", fontsize=15, fontface=1)
+    view = [250, WORKSPACE_TOP, 374, 20]
     p.add("workspace_view", "live.tab", view, view=view, outs=3, types=["int", "", "float"],
-          parameter_mappable=0,
+          parameter_mappable=0, multiline=0, num_lines_patching=1, num_lines_presentation=1,
           **parameter("Lower workspace", 0, 0, 4, options=["Mix", "Scenes", "Modulation", "Visuals", "Hide"]))
     p.obj("workspace_view_command", "prepend workspace", 2820, 2300, ins=2)
     p.connect("workspace_view", 0, "workspace_view_command")
     p.connect("workspace_view_command", 0, "theme_control")
-    view = [160, WORKSPACE_TOP, 140, 20]
+    view = [122, WORKSPACE_TOP, 116, 20]
     p.add("fullscreen_toggle", "textbutton", view, view=view, outs=3, types=["bang", "", ""],
-          mode=0, outputmode=1, rounded=9, usegradient=0, fontface=1, fontsize=12,
+          mode=0, outputmode=1, rounded=9, usegradient=0, fontface=1, fontsize=11,
           text="Full screen", texton="Full screen", parameter_enable=0,
           hint="Toggle the full-screen performance workspace.")
     p.add("fullscreen_toggle_command", "message", [2970, 2300, 90, 22], ins=2, text="full_screen")
@@ -492,6 +493,7 @@ def sequence_controls(p):
     p.connect("workspace_key", 0, "fullscreen_escape")
     p.connect("fullscreen_escape", 0, "fullscreen_exit_command")
     p.connect("fullscreen_exit_command", 0, "theme_control")
+    append_mix_scene_strip(p, 638, WORKSPACE_TOP, 430)
 
 
 def mix_visuals(p):
@@ -754,7 +756,7 @@ def presentation_frame(p):
         ("effects", 8, MIX_TOP - 6, SPLIT * TRACK + 4, MIX_HEIGHT + 12),
         ("capture", MARGIN + SPLIT * TRACK - 2, MIX_TOP - 6, RIGHT_TRACKS * TRACK + 6, MIX_HEIGHT + 12),
         ("input", 8, INPUT_TOP - 6, FRAME_WIDTH - 16, INPUT_HEIGHT + 12),
-        ("workspace", 8, WORKSPACE_TOP - 6, FRAME_WIDTH - 16, 28),
+        ("workspace", 8, WORKSPACE_TOP - 6, 622, 28),
         ("modulation", 8, MODULATION_TOP - 6, FRAME_WIDTH - 16, MODULATION_ROWS * ROW + 8),
     ):
         rect = [left, top, width, height]

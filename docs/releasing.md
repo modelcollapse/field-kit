@@ -11,6 +11,7 @@ Ship the Max 9 patch and the standalone macOS app on the same GitHub release. Bu
    node tests/source_launch_verify.cjs
    node tests/input_record_verify.cjs
    node tests/pattern_bank_verify.cjs
+   node tests/sequence_mix_verify.cjs
    node tests/curve_fade_verify.cjs
    node tests/set_writer_verify.cjs
    git diff --check
@@ -45,7 +46,7 @@ Open **Open FIELD KIT.maxpat** from a clean extraction in Max. Then quit Max and
 - [ ] Select a loop from its waveform and strip. Edit its bounds, direction, speed, and fade. Verify the fade preview, pitch snap, mixer level and pan, mute/unmute, and solo/unsolo.
 - [ ] Use **Audio Setup…** to select a real input. Check channel selection, gain and meters, then record a source and save its WAV. Record a stereo mix WAV and check that the file plays and contains the final mix.
 - [ ] Exercise both Main FX modes. Check that the **Mix** send matrix, loop editor, and Main FX controls agree. Verify that Drifting Memory's inline controls and **Details…** stay in sync and that **Memory** and **Wet return** respond to capture, Mix, and bypass. Open **Stereo field** and **FX pad** and verify manual movement, FX axis selection, and record/play/stop/clear on both pads.
-- [ ] Store and recall patterns. Run a scene sequence with different bar lengths, **Next bar**, and **Repeat**. Save and reopen a Set and a Bank, and check an older fixture if available. Confirm a Set recalls its source and scene timing.
+- [ ] Store and recall patterns. Run a scene sequence with different bar lengths, **Next bar**, and **Repeat**. Confirm that the scene strip in Mix shows the same current scene, next scene, and bar count and can control the sequence. Save and reopen a Set and a Bank, and check an older fixture if available.
 - [ ] Route an LFO and confirm the target responds. Check Mix, Scenes, Modulation, Visuals, Hide, the section shades in all three themes, and entering and exiting full screen. Check live signal in both History and Spectrum and on the stereo scope.
 - [ ] Record which macOS version, chip, and audio devices were tested and any limits of the verification. Resolve regressions before publishing.
 

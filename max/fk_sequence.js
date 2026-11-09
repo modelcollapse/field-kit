@@ -87,7 +87,7 @@ function send(patcher, name, selector, value) {
     if (object) object.message(selector, value);
 }
 
-function render(status) {
+function render(status, now) {
     var panel = panelPatcher();
     send(panel, "seq_status", "set", status);
     send(panel, "seq_start", "active", run ? 0 : 1);
@@ -103,6 +103,7 @@ function render(status) {
         send(host.patcher, "sequence_open", "text", launcher);
         send(host.patcher, "sequence_open", "texton", launcher);
     }
+    renderMix(typeof now === "number" ? now : Date.now());
 }
 
 function idleStatus() {
@@ -124,8 +125,9 @@ function set_beats(beats) {
 }
 
 function set_repeat(repeat) {
-    if (!integerIn(repeat, 0, 1)) return;
+    if (!integerIn(repeat, 0, 1) || settings.repeat === repeat) return;
     settings.repeat = repeat;
+    refresh_mix();
 }
 
 function set_step(index, slot) {
@@ -163,6 +165,42 @@ function playableSteps(patterns) {
     return playable;
 }
 
+function firstPlayableAfter(playable, index) {
+    var cursor = 0;
+    while (cursor < playable.length && playable[cursor] <= index) cursor++;
+    return cursor;
+}
+
+function refresh_mix() {
+    renderMix(Date.now());
+}
+
+function renderMix(now) {
+    var patch = host.patcher;
+    var patternBox = patch.getnamed("pattern_control");
+    var patterns = patternBox && patternBox.js;
+    var playable = patterns ? playableSteps(patterns) : [];
+    var cursor = run ? firstPlayableAfter(playable, run.index) : 0;
+    if (cursor === playable.length && settings.repeat) cursor = 0;
+    var upcoming = settings.steps[playable[cursor]];
+    var current = run && settings.steps[run.index];
+    var queued = run && run.queuedAt !== null;
+    var started = run && run.stepStart !== null;
+    var toggleLabel = run ? "Stop" : "Start";
+    var advanceLabel = queued ? "Queued" : "Next bar";
+
+    send(patch, "mix_scene_current", "set", current ? "Now " + current.slot : "Now —");
+    send(patch, "mix_scene_next", "set", upcoming ? "Next " + upcoming.slot : (run ? "End of set" : "Next —"));
+    send(patch, "mix_scene_bar", "set", started ? "Bar " + currentBar(now) + "/" + current.bars :
+        (run ? "Starting…" : "Bar —"));
+    send(patch, "mix_scene_toggle", "text", toggleLabel);
+    send(patch, "mix_scene_toggle", "texton", toggleLabel);
+    send(patch, "mix_scene_toggle", "active", run || upcoming ? 1 : 0);
+    send(patch, "mix_scene_advance", "text", advanceLabel);
+    send(patch, "mix_scene_advance", "texton", advanceLabel);
+    send(patch, "mix_scene_advance", "active", started && upcoming && !queued ? 1 : 0);
+}
+
 function start() {
     if (run) return;
     var source = host.patcher.getnamed("source_control").js;
@@ -194,6 +232,11 @@ function stop() {
     if (run) finish("Sequence stopped. Current loops keep playing.");
 }
 
+function toggle() {
+    if (run) stop();
+    else start();
+}
+
 function finish(status) {
     clock.cancel();
     run = null;
@@ -206,6 +249,10 @@ function stepEnd() {
 
 function barIndex(now) {
     return Math.max(0, Math.floor((now - run.stepStart) / run.barMs));
+}
+
+function currentBar(now) {
+    return Math.min(settings.steps[run.index].bars, barIndex(now) + 1);
 }
 
 function nextBar(now) {
@@ -239,14 +286,14 @@ function renderCurrent(now) {
     var step = settings.steps[run.index];
     var label = "Step " + (run.index + 1) + " · Scene " + step.slot;
     if (run.stepStart === null) {
-        render("Waiting for audio… · " + label);
+        render("Waiting for audio… · " + label, now);
         return;
     }
-    label += " · Bar " + Math.min(step.bars, barIndex(now) + 1) + "/" + step.bars;
+    label += " · Bar " + currentBar(now) + "/" + step.bars;
     label += " · " + run.bpm + " BPM";
     if (run.queuedAt !== null) label += " · Next queued";
     if (settings.bpm !== run.bpm || settings.beats !== run.beats) label += " · Timing next Start";
-    render(label);
+    render(label, now);
 }
 
 function advance(now, boundary, patternBox) {
@@ -255,8 +302,7 @@ function advance(now, boundary, patternBox) {
         finish("No stored patterns remain in this sequence.");
         return;
     }
-    var cursor = 0;
-    while (cursor < playable.length && playable[cursor] <= run.index) cursor++;
+    var cursor = firstPlayableAfter(playable, run.index);
     if (settings.repeat) {
         var cycleBars = playable.reduce(function (bars, index) {
             return bars + settings.steps[index].bars;
@@ -325,6 +371,6 @@ function tick() {
 
 defaults.local = numberIn.local = integerIn.local = hasFields.local = copySettings.local = 1;
 panelPatcher.local = send.local = render.local = idleStatus.local = sceneEdited.local = 1;
-sourceReady.local = loopsPlaying.local = playableSteps.local = finish.local = 1;
-stepEnd.local = barIndex.local = nextBar.local = dueAt.local = schedule.local = 1;
+sourceReady.local = loopsPlaying.local = playableSteps.local = firstPlayableAfter.local = renderMix.local = finish.local = 1;
+stepEnd.local = barIndex.local = currentBar.local = nextBar.local = dueAt.local = schedule.local = 1;
 renderCurrent.local = advance.local = tick.local = 1;
