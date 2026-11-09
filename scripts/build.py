@@ -9,6 +9,8 @@ import wave
 from pathlib import Path
 
 from build_fx import DIALS as FX_DIALS
+from build_mix_sends import PERFORMANCE_SENDS, append_sends_strip
+from build_mix_workspace import append_drifting_strip, append_drifting_taps
 from build_visuals import build as build_visuals
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -452,7 +454,7 @@ def sequence_controls(p):
     p.add("sequence_open", "live.text", launcher, view=launcher, outs=2, types=["bang", ""], mode=0,
           text="Scene sequencer…", texton="Scene sequencer…", parameter_enable=0,
           hint="Show the scene sequencer in the lower workspace.")
-    p.add("sequence_open_message", "message", [2710, 2300, 94, 22], ins=2, text="workspace 0")
+    p.add("sequence_open_message", "message", [2710, 2300, 94, 22], ins=2, text="workspace 1")
     rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
     p.add("sequence_panel", "bpatcher", rect, view=rect, ins=0, types=[""],
           embed=1, hidden=1, border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0,
@@ -469,10 +471,10 @@ def sequence_controls(p):
     label = [MARGIN, WORKSPACE_TOP, 136, 20]
     p.add("workspace_label", "comment", label, view=label, outs=0,
           text="Workspace", fontsize=16, fontface=1)
-    view = [314, WORKSPACE_TOP, 376, 20]
+    view = [314, WORKSPACE_TOP, 470, 20]
     p.add("workspace_view", "live.tab", view, view=view, outs=3, types=["int", "", "float"],
           parameter_mappable=0,
-          **parameter("Lower workspace", 1, 0, 3, options=["Scenes", "Modulation", "Visuals", "Hide"]))
+          **parameter("Lower workspace", 0, 0, 4, options=["Mix", "Scenes", "Modulation", "Visuals", "Hide"]))
     p.obj("workspace_view_command", "prepend workspace", 2820, 2300, ins=2)
     p.connect("workspace_view", 0, "workspace_view_command")
     p.connect("workspace_view_command", 0, "theme_control")
@@ -497,6 +499,34 @@ def mix_visuals(p):
     p.add("visuals_panel", "bpatcher", rect, view=rect, ins=2, outs=0, embed=1, hidden=1,
           border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0,
           lockeddragscroll=0, clickthrough=0, bgmode=0, patcher=build_visuals())
+
+
+def performance_mix(p):
+    panel = Patch()
+    for name, area in (("surface_mix_drift_monitor", [407, 44, 181, 154]),
+                       ("surface_mix_drift", [0, 0, 600, 212]),
+                       ("surface_mix_sends", [612, 0, 440, 212])):
+        panel.add(name, "panel", area, view=area, outs=0, background=1,
+                  ignoreclick=1, border=0, rounded=8, bgcolor=SLATE_PANEL)
+    append_drifting_strip(panel, parameter)
+    append_sends_strip(panel, parameter)
+    rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
+    p.add("performance_mix", "bpatcher", rect, view=rect, ins=4, outs=2, types=["", ""], embed=1,
+          border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0, lockeddragscroll=0,
+          clickthrough=0, bgmode=0, patcher=dict(fileversion=1, appversion=VERSION, classnamespace="box",
+              rect=[0, 0, rect[2], rect[3]], title="Performance mix", openinpresentation=1,
+              toolbarvisible=0, locked_bgcolor=SLATE_PANEL, boxes=panel.boxes, lines=panel.lines))
+    p.obj("performance_drift_edit", "route details", 3420, 1770, outs=2, types=["bang", ""])
+    p.connect("performance_mix", 0, "performance_drift_edit")
+    p.connect("performance_drift_edit", 0, "drifting_memory_open")
+    p.connect("performance_drift_edit", 1, "drifting_memory", 2)
+    for i in range(3):
+        p.connect("drifting_memory", 2 + i, "performance_mix", i)
+    p.obj("performance_send_edit", "route " + " ".join(PERFORMANCE_SENDS), 3570, 1780,
+          outs=len(PERFORMANCE_SENDS) + 1, types=[""] * (len(PERFORMANCE_SENDS) + 1))
+    p.connect("performance_mix", 1, "performance_send_edit")
+    p.connect("performance_send_edit", len(PERFORMANCE_SENDS), "mix_fx", 7 + FX_MOD_CHANNELS)
+    p.connect("mix_fx", 4 + FX_MOD_CHANNELS, "performance_mix", 3)
 
 
 def window_controls(p):
@@ -694,12 +724,18 @@ def loop_send_gains(p, voice, y):
         p.connect(name + "_ramp", 0, name + "_gain")
         p.connect(name, 0, name + "_sync")
         p.connect(name + "_sync", 0, "source_control")
+        mirror = name + "_performance_sync"
+        p.obj(mirror, "prepend " + name, x, y + 145, ins=2)
+        p.connect(name, 0, mirror)
+        p.connect(mirror, 0, "performance_mix", 3)
+        p.connect("performance_send_edit", PERFORMANCE_SENDS.index(name), name)
 
 
 def drifting_memory(p):
     panel = json.loads((ROOT / "fk_drifting_delay.maxpat").read_text(encoding="utf-8"))["patcher"]
-    p.add("drifting_memory", "newobj", [1410, 1840, 142, 22], ins=3, outs=2,
-          types=["signal", "signal"], text="p Drifting Memory", patcher=panel)
+    append_drifting_taps(panel)
+    p.add("drifting_memory", "newobj", [1410, 1840, 142, 22], ins=3, outs=5,
+          types=["signal"] * 4 + [""], text="p Drifting Memory", patcher=panel)
     p.add("drifting_memory_open", "message", [1410, 1760, 52, 22], ins=2, text="open")
     p.obj("drifting_memory_window", "pcontrol", 1410, 1796)
     p.connect("mix_fx", 3 + FX_MOD_CHANNELS, "drifting_memory_open")
@@ -788,7 +824,10 @@ def build():
     p.add("open_audio_setup", "message", [1420, 804, 110, 22], ins=2, text="; dsp open")
     p.connect("audio_setup", 0, "open_audio_setup")
 
-    p.ui("master_label", "comment", SPLIT + 3, 22, 1, y_offset=MIX_OFFSET, outs=0, text="Master")
+    master_label = grid_rect(SPLIT + 3, 22, 1, y_offset=MIX_OFFSET)
+    master_label[0] -= 4
+    master_label[2] += 7
+    p.add("master_label", "comment", master_label, view=master_label, outs=0, text="Master")
     p.ui("master", "live.numbox", SPLIT + 4, 22, 1, y_offset=MIX_OFFSET, outs=2, types=["float", "float"],
          **parameter("Master", -12, -70, 0, unit_style=4))
     p.ui("audio_switch", "live.text", 16, 0, 3, outs=2, types=["", ""],
@@ -805,8 +844,8 @@ def build():
     p.connect("mix_peak", 0, "mix_meter")
     modulated_gain(p, "master", "master_gain", -12, -70, 0, 36, 22, 1840)
     for name, file, col, width, inputs, output_types in (
-        ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 7 + FX_MOD_CHANNELS,
-         ["signal"] * (2 + FX_MOD_CHANNELS) + ["bang", "bang"]),
+        ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 8 + FX_MOD_CHANNELS,
+         ["signal"] * (2 + FX_MOD_CHANNELS) + ["bang", "bang", ""]),
         ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 2, []),
     ):
         rect = grid_rect(col, 22, width, 5, MIX_OFFSET)
@@ -815,6 +854,7 @@ def build():
                    clickthrough=int(name == "recorder"),
                    enablehscroll=0, enablevscroll=0, lockeddragscroll=0)
     drifting_memory(p)
+    performance_mix(p)
     mix_visuals(p)
     p.obj("normal_voice", "play~ fk-unbound 2", 1100, 1800, outs=3,
           types=["signal", "signal", "bang"])
@@ -874,7 +914,7 @@ def build():
           types=["multichannelsignal", "int"], view=mod_rect)
     patchbay = p.boxes[-1]["box"]
     patchbay.update(name="fk_modulation.maxpat", args=[], offset=[0.0, 0.0],
-                    border=0, clickthrough=0, enablehscroll=0, enablevscroll=0, lockeddragscroll=0)
+                    border=0, clickthrough=0, enablehscroll=0, enablevscroll=0, lockeddragscroll=0, hidden=1)
     p.obj("mod_signals", f"mc.unpack~ {MOD_CHANNELS}", 28, 886, outs=MOD_CHANNELS,
           types=["signal"] * MOD_CHANNELS, width=1016)
     p.connect("patchbay", 0, "mod_signals")

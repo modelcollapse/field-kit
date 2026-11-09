@@ -57,7 +57,7 @@ The scene clock controls when patterns change. Set the tempo and meter before yo
 
 ![The scene sequencer running at 112 BPM with four steps lasting four or eight bars each](docs/screenshots/field-kit-scenes.png)
 
-Use the workspace selector to switch between **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Full screen** expands the workspace for performance.
+Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. **Full screen** expands the workspace for performance.
 
 **Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. The stereo scope plots left against right. Matching left and right signals trace a rising diagonal.
 
@@ -73,7 +73,7 @@ The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Bre
 
 During loop playback, click **Enable FX** to turn on tone, stereo echo, and room reverb. Set an effect's **Mix %** to zero to remove it from the mix. Tone is neutral at zero, and echo time ranges from 45 to 850 ms.
 
-**Full mix** applies Echo and Room to the combined loops. To give each loop its own amount, select **Loop sends** in Main FX and set **Echo send** and **Room send** in the loop editor. The two **Mix %** dials then control the shared return levels. Sets and patterns remember the mode and the send amounts.
+**Full mix** applies Echo and Room to the combined loops. To give each loop its own amount, select **Loop sends** and use the four rows in the **Mix** workspace. The loop editor adjusts the same amounts for the selected loop. **Return level** adjusts the same Echo and Room mix controls as the Main FX dials. Sets and patterns remember the mode and the send amounts.
 
 Open **FX pad…** and use the **X** and **Y** menus to pair Tone tilt, Echo mix, or Room mix. X starts on Echo mix and Y starts on Room mix. Picking the other axis’s effect swaps the pair. Drag right or up to increase the assigned value. Tone tilt moves from dark through neutral to bright. The pad and dials stay in sync.
 
@@ -83,7 +83,7 @@ Click **Record**, drag across the FX pad, and release. **Play** loops the gestur
 | --- | --- |
 | ![Stereo field with four loop positions and gesture controls](docs/screenshots/field-kit-stereo-field.png) | ![FX pad with full crosshairs and Echo mix and Room mix assigned to the axes](docs/screenshots/field-kit-fx-pad.png) |
 
-**Drifting Memory…** opens the original 1.8 engine at the end of Main FX. Click **Enable effect**, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. Use **Mix** to blend it into the main signal. **Off** stops capture and lets the tail play. Sets and patterns save the effect settings. Captured memory is for the current session.
+**Drifting Memory** runs at the end of Main FX. In **Mix**, click **Enable effect**, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. The **Memory** meter shows what’s circulating in the delay. **Wet return** shows what the delay adds to the final mix. Use **Mix** to blend it in. **Off** stops capture and lets the tail play. **Details…** opens the original 1.8 controls. Sets and patterns save the effect settings. Captured memory is for the current session.
 
 ![Drifting Memory with Granular Delay active and signal on the input, memory, and output meters](docs/screenshots/field-kit-drifting-memory.png)
 

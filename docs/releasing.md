@@ -44,9 +44,9 @@ Open **Open FIELD KIT.maxpat** from a clean extraction in Max. Then quit Max and
 - [ ] Both builds launch to the presentation, load the demo, and run without missing files or startup errors. **Play all**, per-loop play/stop, **Play original**, and **Stop all** behave as expected. Verify both audio output channels on the available device, including headphones when present.
 - [ ] Select a loop from its waveform and strip. Edit its bounds, direction, speed, and fade. Verify the fade preview, pitch snap, mixer level and pan, mute/unmute, and solo/unsolo.
 - [ ] Use **Audio Setup…** to select a real input. Check channel selection, gain and meters, then record a source and save its WAV. Record a stereo mix WAV and check that the file plays and contains the final mix.
-- [ ] Exercise both Main FX modes, the loop Echo and Room sends, and the Drifting Memory capture and return. Open **Stereo field** and **FX pad** from Main FX. Verify manual movement, FX axis selection, and record/play/stop/clear on both pads.
+- [ ] Exercise both Main FX modes. Check that the **Mix** send matrix, loop editor, and Main FX controls agree. Verify that Drifting Memory's inline controls and **Details…** stay in sync and that **Memory** and **Wet return** respond to capture, Mix, and bypass. Open **Stereo field** and **FX pad** and verify manual movement, FX axis selection, and record/play/stop/clear on both pads.
 - [ ] Store and recall patterns. Run a scene sequence with different bar lengths, **Next bar**, and **Repeat**. Save and reopen a Set and a Bank, and check an older fixture if available. Confirm a Set recalls its source and scene timing.
-- [ ] Route an LFO and confirm the target responds. Check Scenes, Modulation, Visuals, Hide, the three themes, and entering and exiting full screen. Check live signal in both History and Spectrum and on the stereo scope.
+- [ ] Route an LFO and confirm the target responds. Check Mix, Scenes, Modulation, Visuals, Hide, the section shades in all three themes, and entering and exiting full screen. Check live signal in both History and Spectrum and on the stereo scope.
 - [ ] Record which macOS version, chip, and audio devices were tested and any limits of the verification. Resolve regressions before publishing.
 
 ## Review screenshots and publish

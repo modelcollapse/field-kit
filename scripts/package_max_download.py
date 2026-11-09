@@ -46,7 +46,8 @@ Click Record, drag and release the dot, then click Play to loop the gesture.
 Each loop keeps its own gesture. Use Stop or Clear for the selected loop.
 
 In Main FX, choose Full mix for shared processing, or Loop sends and adjust Echo
-and Room sends in Editing Loop. The Main FX mix dials set the return levels.
+and Room sends in the Mix workspace. The four rows edit each loop; Return level
+edits the same Echo and Room mix controls as the Main FX dials.
 Open FX pad and choose Tone tilt, Echo mix, or Room mix for each axis.
 X starts on Echo mix and Y starts on Room mix. Drag right or up to increase the value.
 Tone tilt goes from dark through neutral to bright. Enable FX to hear the result.
@@ -55,9 +56,10 @@ Stop holds the current values. Clear erases the gesture. Both pads keep gestures
 while the patch is open. Stop all and recalling a pattern stop the gestures.
 Sets and patterns save the control values, but do not store the gestures.
 
-Open Drifting Memory… in Main FX and click Enable effect. Play your loops and
-choose All under Arm capture. The default Two Delays / Small mode returns after
-about 2½ seconds. Use Mix to blend it in, and Off to stop writing to memory.
+In Mix, enable Drifting Memory, play your loops and choose All under Arm capture.
+The default Two Delays / Small mode returns after about 2½ seconds. Memory shows
+the signal in the delay. Wet return shows how much the delay adds to the mix.
+Use Mix to blend it in and Off to stop writing. Details… opens the full controls.
 Mix recording includes Drifting Memory. Click Record mix… beside Master to save
 the final stereo output to a WAV, and Stop mix when you finish.
 
@@ -76,7 +78,7 @@ Beats/bar once, then choose a scene and how many bars to hold it in each step.
 Start plays the first available scene. Next bar advances at the next bar line.
 Repeat starts the list again after the last step. Stop holds the current scene.
 Stop all stops the sequencer and the loops. The tempo counts scene bars.
-Switch between Scenes, Modulation, and Visuals in the lower workspace, or choose
+Switch between Mix, Scenes, Modulation, and Visuals in the lower workspace, or choose
 Hide to collapse it. Visuals shows left and right frequency histories and a
 stereo scope of the final mix. Switch Display to Spectrum for live frequency
 curves. Use Full screen to fit the workspace to the

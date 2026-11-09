@@ -14,6 +14,7 @@ DIALS = (
     ("decay", "Room decay", "Decay s", 1.7, 0.25, 5, "Reverb tail length in seconds."),
 )
 SEND_INPUTS = ("Echo send left", "Echo send right", "Room send left", "Room send right")
+PERFORMANCE_FX_CONTROLS = ("fx_mode", "fx_enabled", "fx_echo", "fx_space")
 
 # Turn-on defaults match the parameters in the native controls. Gen handles
 # smoothing so moving a dial or switching bypass does not jump the audio.
@@ -287,6 +288,11 @@ def build():
     p = Patch()
     dial_pitch = 112
     gutter = 4
+    for key, x, width in (("tone", 0, dial_pitch), ("echo", dial_pitch, 3 * dial_pitch),
+                          ("room", 4 * dial_pitch, 2 * dial_pitch)):
+        area = [x, 23, width - gutter, 95]
+        p.add("panel", area, view=area, outs=0, varname=f"surface_fx_{key}",
+              background=1, ignoreclick=1, border=0, rounded=7, bgcolor=[0.13, 0.17, 0.23, 1])
     p.label("Main FX", 0, 0, 82, heading=True)
     p.label("Tone", 0, 24, dial_pitch - gutter)
     p.label("Stereo echo", dial_pitch, 24, 3 * dial_pitch - gutter)
@@ -366,6 +372,20 @@ def build():
                      parameter_enable=0, hint="Open the Drifting Memory master effect.")
     drifting_open = p.add("outlet", [792, 370, 26, 26], index=channels + 2, comment="Open Drifting Memory")
     p.cord(drifting, drifting_open)
+
+    performance = p.add("inlet", [1080, 172, 26, 26], ins=0, outs=1, types=[""],
+                        index=channels + 6, comment="Performance controls")
+    feedback = p.add("outlet", [1080, 370, 26, 26], index=channels + 3,
+                     comment="Current performance controls")
+    route = p.obj("route " + " ".join(PERFORMANCE_FX_CONTROLS), 1080, 204, 300,
+                  outs=len(PERFORMANCE_FX_CONTROLS) + 1, types=[""] * (len(PERFORMANCE_FX_CONTROLS) + 1))
+    p.cord(performance, route)
+    for index, (name, control) in enumerate(zip(PERFORMANCE_FX_CONTROLS,
+                                                 (mode, enabled, dials["echo"], dials["space"]))):
+        sync = p.obj(f"prepend {name}", 1080, 240 + index * 30, 145, ins=2)
+        p.cord(route, control, outlet=index)
+        p.cord(control, sync)
+        p.cord(sync, feedback)
 
     patch = p.patcher(rect=[0, 0, 1040, 555], openinpresentation=1, gridsize=[8, 8],
                       description="Stereo mix effects for FIELD KIT")

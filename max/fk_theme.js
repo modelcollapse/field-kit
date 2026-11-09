@@ -8,24 +8,52 @@ var fullScreen = false;
 var windowLayout = [];
 var fitTask = new Task(fit_full_screen, this);
 var schemes = [
-    ["141A23", "202936", "151E2A", "303F51", "F3F7FC", "B6C5D5", "8FB9F0", "365D88"],
-    ["131E1B", "1E2C27", "13231E", "2D4439", "F2F9F3", "B5CBC0", "99D4AE", "325E4B"],
-    ["211915", "30231F", "231914", "46312A", "FCF5EE", "D5BFB1", "F1AB82", "6E4534"]
+    {
+        colors: ["141A23", "202936", "151E2A", "303F51", "F3F7FC", "B6C5D5", "8FB9F0", "365D88"],
+        sections: {
+            header: "202B3B", input: "243346", patterns: "2C2C42", playback: "192635",
+            editor: "2B3B4E", effects: "253145", capture: "34384B", workspace: "222B3A",
+            modulation: "253247", scenes: "28364B", visuals: "1C293A", mix: "243347",
+            mix_drift: "333448", mix_drift_monitor: "262738", mix_sends: "203746",
+            fx_tone: "2A394D", fx_echo: "2C344B", fx_room: "253B4C"
+        }
+    },
+    {
+        colors: ["131E1B", "1E2C27", "13231E", "2D4439", "F2F9F3", "B5CBC0", "99D4AE", "325E4B"],
+        sections: {
+            header: "20312A", input: "29392E", patterns: "343A2B", playback: "192923",
+            editor: "304135", effects: "24352B", capture: "353E33", workspace: "1F2E27",
+            modulation: "26372E", scenes: "2D3B2F", visuals: "1B2C26", mix: "24372C",
+            mix_drift: "384032", mix_drift_monitor: "283126", mix_sends: "233931",
+            fx_tone: "2A4035", fx_echo: "303C30", fx_room: "293C39"
+        }
+    },
+    {
+        colors: ["211915", "30231F", "231914", "46312A", "FCF5EE", "D5BFB1", "F1AB82", "6E4534"],
+        sections: {
+            header: "352720", input: "3C2A24", patterns: "422C2E", playback: "2A201D",
+            editor: "47332A", effects: "392923", capture: "43322F", workspace: "2E2321",
+            modulation: "3B2A26", scenes: "402E26", visuals: "2B211F", mix: "372921",
+            mix_drift: "46302A", mix_drift_monitor: "33221F", mix_sends: "39302D",
+            fx_tone: "432F29", fx_echo: "472F2F", fx_room: "41332B"
+        }
+    }
 ];
 
 function loadbang() {
     patch.getnamed("theme_choice").message("set", 0);
     msg_int(0);
-    workspace(1);
+    workspace(0);
 }
 
 function workspace(view) {
-    if (view < 0 || view > 3 || view !== Math.floor(view)) return;
+    if (view < 0 || view > 4 || view !== Math.floor(view)) return;
     patch.getnamed("workspace_view").message("set", view);
-    patch.getnamed("sequence_panel").hidden = view !== 0;
-    patch.getnamed("patchbay").hidden = view !== 1;
-    patch.getnamed("visuals_panel").hidden = view !== 2;
-    patch.getnamed("surface_modulation").hidden = view === 3;
+    patch.getnamed("performance_mix").hidden = view !== 0;
+    patch.getnamed("sequence_panel").hidden = view !== 1;
+    patch.getnamed("patchbay").hidden = view !== 2;
+    patch.getnamed("visuals_panel").hidden = view !== 3;
+    patch.getnamed("surface_modulation").hidden = view === 4;
 }
 
 function full_screen() {
@@ -34,7 +62,7 @@ function full_screen() {
     if (fullScreen) {
         windowLayout = [];
         remember_rects(patch);
-        ["mix_fx", "recorder", "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
+        ["mix_fx", "recorder", "performance_mix", "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
             remember_rects(patch.getnamed(name).subpatcher());
         });
         patch.fullscreen(1);
@@ -109,15 +137,24 @@ label_full_screen.local = 1;
 
 function msg_int(index) {
     if (index < 0 || index >= schemes.length) return;
-    var palette = schemes[index].map(rgba);
+    var scheme = schemes[index];
+    var palette = scheme.colors.map(rgba);
+    var sections = {};
+    Object.keys(scheme.sections).forEach(function (name) {
+        sections[name] = rgba(scheme.sections[name]);
+    });
     var canvas = palette[0], panel = palette[1], inset = palette[2], control = palette[3];
     var ink = palette[4], accent = palette[6], selection = palette[7];
 
-    paint_patch(patch, canvas, palette);
+    paint_patch(patch, canvas, palette, sections);
     send_theme(patch.getnamed("pattern_control"), control.concat(selection, accent, ink, canvas));
     send_theme(patch.getnamed("mixer_control"), control.concat(ink));
-    paint_patch(patch.getnamed("sequence_panel").subpatcher(), panel, palette);
-    paint_patch(patch.getnamed("visuals_panel").subpatcher(), panel, palette);
+    paint_patch(patch.getnamed("sequence_panel").subpatcher(), sections.scenes, palette);
+    paint_patch(patch.getnamed("visuals_panel").subpatcher(), sections.visuals, palette);
+    var performanceMix = patch.getnamed("performance_mix");
+    if (performanceMix && performanceMix.valid) {
+        paint_patch(performanceMix.subpatcher(), sections.mix, palette, sections);
+    }
     var source = patch.getnamed("source_control");
     source.message.apply(source, ["wave_theme"].concat(inset, control, accent, ink));
     send_theme(patch.getnamed("loop_fade_preview"), inset.concat(control, ink, palette[5], accent));
@@ -126,17 +163,17 @@ function msg_int(index) {
     stereo.getnamed("canvas").message("theme", index);
     paint_patch(stereo, panel, palette);
     var effects = patch.getnamed("mix_fx").subpatcher();
-    paint_patch(effects, panel, palette);
+    paint_patch(effects, sections.effects, palette, sections);
     var fxPad = effects.getnamed("fx_pad_panel");
     if (fxPad && fxPad.valid) {
         var fxWindow = fxPad.subpatcher();
         fxWindow.getnamed("fx_pad_canvas").message("theme", index);
         paint_patch(fxWindow, panel, palette);
     }
-    paint_patch(patch.getnamed("recorder").subpatcher(), panel, palette);
-    paint_patch(patch.getnamed("drifting_memory").subpatcher(), panel, palette);
+    paint_patch(patch.getnamed("recorder").subpatcher(), sections.capture, palette);
+    paint_patch(patch.getnamed("drifting_memory").subpatcher(), sections.mix_drift, palette);
     var modulation = patch.getnamed("patchbay").subpatcher();
-    paint_patch(modulation, panel, palette);
+    paint_patch(modulation, sections.modulation, palette);
     send_theme(modulation.getnamed("fk_lfo_preview"), inset.concat(control, selection, accent));
 }
 
@@ -151,20 +188,20 @@ function rgba(hex) {
 }
 rgba.local = 1;
 
-function paint_patch(target, background, palette) {
+function paint_patch(target, background, palette, sections) {
     target.message.apply(target, ["locked_bgcolor"].concat(background));
     target.apply(function (obj) {
         var cls = obj.maxclass;
         if (cls === "comment" || cls === "panel" || cls === "live.text" || cls === "textbutton" || cls === "umenu" ||
             cls === "live.numbox" || cls === "live.slider" || cls === "live.dial" || cls === "live.tab" ||
             cls === "waveform~" || cls === "scope~" || cls === "spectroscope~" || cls === "function") {
-            if (Number(obj.getboxattr("presentation"))) paint(obj, palette);
+            if (Number(obj.getboxattr("presentation"))) paint(obj, palette, sections);
         }
     });
 }
 paint_patch.local = 1;
 
-function paint(obj, palette) {
+function paint(obj, palette, sections) {
     var canvas = palette[0], panel = palette[1], inset = palette[2], control = palette[3];
     var ink = palette[4], muted = palette[5], accent = palette[6], selection = palette[7];
     var name = obj.varname;
@@ -178,7 +215,8 @@ function paint(obj, palette) {
         break;
     case "panel":
         if (/^loop_row_/.test(name)) return;
-        colors = { bgcolor: /^surface_/.test(name) ? panel : control };
+        var surface = /^surface_(.+)$/.exec(name);
+        colors = { bgcolor: surface ? (sections && sections[surface[1]]) || panel : control };
         break;
     case "live.text":
         if (/^pattern_([1-8]|store)$|^mixer_(mute|solo)_/.test(name)) return;
