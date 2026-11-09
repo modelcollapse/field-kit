@@ -39,15 +39,7 @@ var wideLayoutRects = {
         visuals_heading: [0, 0, 156, 23],
         visuals_mode_label: [161, 2, 54, 20],
         visuals_mode: [218, 0, 86, 22],
-        visuals_mix_help: [0, 26, 304, 18],
-        visuals_left_label: [0, 46, 304, 20],
-        visuals_left: [0, 68, 304, 112],
-        visuals_right_label: [0, 186, 304, 20],
-        visuals_right: [0, 208, 304, 112],
-        visuals_frequency_help: [0, 322, 304, 19],
-        visuals_stereo_label: [0, 346, 304, 20],
-        visuals_stereo: [68, 368, 168, 168],
-        visuals_stereo_help: [0, 540, 304, 19]
+        visuals_mix_help: [0, 26, 304, 18]
     }
 };
 var schemes = [
@@ -228,6 +220,35 @@ function fit_full_screen() {
 }
 fit_full_screen.local = 1;
 
+function fit_wide_visuals(width, height) {
+    var deck = wideLayoutRects.main.visuals_panel;
+    var deckWidth = deck[2] * width;
+    var leftTop = 68 * height;
+    var labelBand = 24 * height;
+    var footerBand = 26 * height;
+    var plotHeight = deck[3] * height - leftTop - 2 * labelBand - footerBand;
+    // Keep a square X/Y plot and leave usable history plots on shallow screens.
+    var plotWidth = Math.min(deckWidth, plotHeight - 2 * 38 * height);
+    var channelHeight = (plotHeight - plotWidth) * 0.5;
+    var x = (deckWidth - plotWidth) * 0.5;
+    var rightTop = leftTop + channelHeight + labelBand;
+    var stereoTop = rightTop + channelHeight + labelBand;
+    var labelOffset = 22 * height;
+    var labelHeight = 20 * height;
+    var frequencyWidth = plotWidth * 0.58;
+    return {
+        visuals_left_label: [x, leftTop - labelOffset, plotWidth - frequencyWidth, labelHeight],
+        visuals_frequency_help: [x + plotWidth - frequencyWidth, leftTop - labelOffset, frequencyWidth, labelHeight],
+        visuals_left: [x, leftTop, plotWidth, channelHeight],
+        visuals_right_label: [x, rightTop - labelOffset, plotWidth, labelHeight],
+        visuals_right: [x, rightTop, plotWidth, channelHeight],
+        visuals_stereo_label: [x, stereoTop - labelOffset, plotWidth, labelHeight],
+        visuals_stereo: [x, stereoTop, plotWidth, plotWidth],
+        visuals_stereo_help: [x, stereoTop + plotWidth + 4 * height, plotWidth, labelHeight]
+    };
+}
+fit_wide_visuals.local = 1;
+
 function resize_workspace(width, height, wide) {
     var wind = patch.wind;
     var dirty = wind && wind.dirty;
@@ -236,10 +257,16 @@ function resize_workspace(width, height, wide) {
         update_workspace_panels();
     }
     var wideFxScale = wideLayoutRects.main.mix_fx[2] / patch.getnamed("mix_fx").getboxattr("patching_rect")[2];
+    var wideVisuals = wide ? fit_wide_visuals(width, height) : {};
     windowLayout.forEach(function (item) {
         var box = item.box;
         if (!box.valid) return;
         if (item.drawer) box.hidden = !sourceDrawerOpen;
+        var plotRect = wideVisuals[box.varname];
+        if (plotRect) {
+            box.setboxattr("presentation_rect", plotRect);
+            return;
+        }
         var rect = wide && item.wideRect ? item.wideRect : item.rect;
         var horizontal = width;
         if (wide && item.wideTop) horizontal *= wideFrameWidth / frameWidth;
