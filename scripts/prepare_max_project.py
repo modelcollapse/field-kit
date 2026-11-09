@@ -30,7 +30,11 @@ RUNTIME_ASSETS = {
         "fk_sequence.js": "javascript",
         "fk_voice.gendsp": "gendsp",
     },
-    "media": {"fk_demo.wav": "audiofile"},
+    "media": {
+        "fk_demo.wav": "audiofile",
+        "fk_demo_glass_circuit.wav": "audiofile",
+        "fk_demo_tidal_lanterns.wav": "audiofile",
+    },
 }
 STANDALONE_OPTIONS = (
     "standalone @bundleidentifier audio.poeticstate.fieldkit @preffilename FieldKit "

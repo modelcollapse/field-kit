@@ -9,3 +9,5 @@ __pycache__/
 *.zip
 *.wav
 !/max/fk_demo.wav
+!/max/fk_demo_glass_circuit.wav
+!/max/fk_demo_tidal_lanterns.wav

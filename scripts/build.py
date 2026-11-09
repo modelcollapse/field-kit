@@ -16,7 +16,8 @@ from build_performance_layout import PERFORMANCE_WINDOW_HEIGHT, layout_performan
 from build_mix_scene_strip import append_mix_scene_strip
 from build_mix_sends import PERFORMANCE_SENDS, append_sends_strip
 from build_mix_workspace import append_drifting_strip, append_drifting_taps
-from build_visuals import build as build_visuals
+from build_stereo_field_window import stereo_field_window
+from build_visuals import build as build_visuals, stereo_scope_window
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent / "max"
@@ -214,8 +215,14 @@ def source_input(p):
     button_y = INPUT_TOP + 35
     action(p, "load", "Load audio…", 0, "choose", 3,
            view=[28, button_y, 126, 28])
-    action(p, "demo", "Load demo", 3, "load_demo",
-           view=[160, button_y, 94, 28])
+    demo_rect = [160, button_y, 120, 28]
+    p.add("demo", "umenu", demo_rect, view=demo_rect, outs=3, types=["int", "", ""],
+          items=["Demos…", ",", "Original demo", ",", "Glass Circuit", ",", "Tidal Lanterns"],
+          allowdrag=0, parameter_enable=0,
+          hint="Load and play one of the three built-in demo samples.")
+    p.obj("demo_message", "prepend select_demo", 1045, 2230, ins=2)
+    p.connect("demo", 0, "demo_message")
+    p.connect("demo_message", 0, "source_control")
     for name, text, column, command, hint in (
         ("input_record_button", "Record source", 15, "toggle_input_record",
          "Record the selected inputs as a new source for all four loops."),
@@ -418,16 +425,16 @@ def sequence_controls(p):
     for name, text, rect in (
         ("seq_title", "Scene sequencer", [8, 2, 208, 24]),
         ("seq_help", "Each scene recalls its numbered pattern slot. Skip omits the step.", [224, 5, 820, 20]),
-        ("seq_bpm_label", "BPM", [8, 38, 34, 18]),
-        ("seq_beats_label", "Beats / bar", [124, 38, 65, 18]),
+        ("seq_bpm_label", "BPM", [8, 38, 40, 18]),
+        ("seq_beats_label", "Beats / bar", [122, 38, 74, 18]),
         ("seq_status", "Stopped", [650, 38, 394, 20]),
     ):
         panel.add(name, "comment", rect, view=rect, outs=0, text=text, textcolor=SLATE_INK,
-                  **({"fontsize": 18, "fontface": 1} if name == "seq_title" else {}))
+                  **({"fontsize": 18, "fontface": 1} if name == "seq_title" else {"fontsize": 11}))
 
-    control("seq_bpm", "live.numbox", [46, 34, 70, 26], "set_bpm", ["float", "float"],
+    control("seq_bpm", "live.numbox", [50, 34, 64, 26], "set_bpm", ["float", "float"],
             parameter_mappable=0, **parameter("Sequence BPM", 120, 20, 300, units="%.1f"))
-    control("seq_beats", "live.numbox", [191, 34, 54, 26], "set_beats", ["float", "float"],
+    control("seq_beats", "live.numbox", [200, 34, 45, 26], "set_beats", ["float", "float"],
             parameter_mappable=0, **parameter("Sequence beats per bar", 4, 1, 12, integer=True))
     control("seq_repeat", "live.text", [255, 34, 110, 26], "set_repeat", ["int", ""],
             mode=1, text="Repeat off", texton="Repeat on", parameter_mappable=0,
@@ -465,7 +472,7 @@ def sequence_controls(p):
     launcher = [688, PATTERNS_TOP + 1, 124, 28]
     p.add("sequence_open", "live.text", launcher, view=launcher, outs=2, types=["bang", ""], mode=0,
           text="Scene sequencer…", texton="Scene sequencer…", parameter_enable=0,
-          hint="Show the scene sequencer in the lower workspace.")
+          hint="Open the scene sequencer below Patterns.")
     p.add("sequence_open_message", "message", [2710, 2300, 94, 22], ins=2, text="workspace 1")
     rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
     p.add("sequence_panel", "bpatcher", rect, view=rect, ins=0, types=[""],
@@ -509,9 +516,16 @@ def sequence_controls(p):
 
 def mix_visuals(p):
     rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
-    p.add("visuals_panel", "bpatcher", rect, view=rect, ins=2, outs=0, embed=1, hidden=1,
+    p.add("visuals_panel", "bpatcher", rect, view=rect, ins=2, types=["bang"], embed=1, hidden=1,
           border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0,
           lockeddragscroll=0, clickthrough=0, bgmode=0, patcher=build_visuals())
+    p.add("scope_popout_open", "message", [3520, 1910, 122, 22], ins=2, text="open_scope_popout")
+    p.obj("scope_popout_window", "pcontrol", 3520, 1940)
+    p.add("scope_popout_panel", "newobj", [3520, 1970, 102, 22], ins=2, outs=0,
+          text="p Stereo X/Y", patcher=stereo_scope_window(Patch(), VERSION))
+    p.connect("visuals_panel", 0, "scope_popout_open")
+    p.connect("scope_popout_open", 0, "theme_control")
+    p.connect("scope_popout_window", 0, "scope_popout_panel")
 
 
 def performance_mix(p):
@@ -653,34 +667,12 @@ def performance_mixer(p):
 
 
 def stereo_field(p):
-    field = Patch()
-    field.add("input", "inlet", [20, 396, 30, 30], ins=0, index=1)
-    field.add("output", "outlet", [20, 441, 30, 30], outs=0, index=1)
-    canvas_rect = [12, 12, 480, 346]
-    field.add("canvas", "jsui", canvas_rect, view=canvas_rect,
-              filename="fk_stereo_field.js", border=0, parameter_enable=0, types=[""])
-    help_rect = [12, 368, 392, 22]
-    field.add("help", "comment", help_rect, outs=0, view=help_rect, fontsize=12,
-              text="Select a loop, then drag its dot. X = pan. Y = level.")
-    field.connect("input", 0, "canvas")
-    field.connect("canvas", 0, "output")
-    field.add("stereo_field_close", "textbutton", [310, 396, 78, 22],
-              view=[414, 366, 78, 23], outs=3, types=["bang", "", "int"],
-              mode=0, outputmode=1, text="Close", texton="Close")
-    field.add("stereo_field_close_message", "message", [310, 428, 62, 22], ins=2, text="wclose")
-    field.obj("stereo_field_thispatcher", "thispatcher", 310, 460, outs=2)
-    field.connect("stereo_field_close", 0, "stereo_field_close_message")
-    field.connect("stereo_field_close_message", 0, "stereo_field_thispatcher")
-
-    p.add("stereo_field_open_message", "message", [3040, 1880, 52, 22], ins=2, text="open")
+    p.add("stereo_field_open_message", "message", [3040, 1880, 112, 22], ins=2, text="open_stereo_field")
     p.obj("stereo_field_window", "pcontrol", 3040, 1910)
     p.add("stereo_field_panel", "newobj", [3040, 1940, 122, 22],
-          text="p Stereo field", types=[""], patcher=dict(
-              fileversion=1, appversion=VERSION, classnamespace="box",
-              rect=[570, 152, 506, 400], title="Stereo field", openinpresentation=1,
-              boxes=field.boxes, lines=field.lines))
+          text="p Stereo field", types=[""], patcher=stereo_field_window(Patch(), VERSION))
     p.connect("mix_fx", 2 + FX_MOD_CHANNELS, "stereo_field_open_message")
-    p.connect("stereo_field_open_message", 0, "stereo_field_window")
+    p.connect("stereo_field_open_message", 0, "theme_control")
     p.connect("stereo_field_window", 0, "stereo_field_panel")
     p.add("pad_motion_stop", "message", [3210, 1880, 104, 22], ins=2, text="stop_motion")
     p.connect("pad_motion_stop", 0, "stereo_field_panel")
@@ -980,6 +972,7 @@ def build():
         p.connect("output_" + suffix, 0, "dac", channel)
         p.connect("output_" + suffix, 0, "recorder", channel)
         p.connect("output_" + suffix, 0, "visuals_panel", channel)
+        p.connect("output_" + suffix, 0, "scope_popout_panel", channel)
     append_master_meter(p, capture_left + 144, MIX_TOP, master_output_ceiling)
 
     performance_mixer(p)

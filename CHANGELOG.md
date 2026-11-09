@@ -1,5 +1,11 @@
 # Field Kit changelog
 
+## v0.8.1
+
+- Choose Glass Circuit, Tidal Lanterns, or the original demo in Source, Input & Files. The two new demos start four aligned loops and set Scenes to their tempo.
+- Open a larger Stereo X/Y scope from Mix visuals. The Stereo Field also opens larger and resizes with its window.
+- The scene sequencer opens directly below Patterns, with the mixer and loop editor below it.
+
 ## v0.8.0
 
 - The loop editor sits beside the waveforms. Transport, scene cues, and Master stay at the top, and Source, Input & Files opens as a drawer. Slate, Moss, and Ember use distinct shades for each section.

@@ -13,6 +13,7 @@ const sourceState = {
     normalPlaying: false,
     path: '/test/audio.wav',
     get_set_source() { return { kind: 'file', path: this.path }; },
+    valid_builtin_demo(id) { return id === 'glass-circuit' || id === 'tidal-lanterns'; },
 };
 const recorderState = { state: 'idle' };
 let requestedSource;
@@ -114,6 +115,7 @@ const source = {
         }
         if (selector === 'inspect_window') sourceState.inspector = args[0];
         if (selector === 'open_set_source') requestedSource = args[0];
+        if (selector === 'open_set_demo') messages.push(['source_control', selector, ...args]);
     },
 };
 const mixerState = { mutes: [0, 1, 0, 1], solos: [0, 0, 1, 0] };
@@ -664,3 +666,30 @@ assert.equal(controls.pan_1.value, -62);
 host.recall_silent();
 assert.equal(controls.pan_1.value, -62);
 console.log('PASS live recall waits for silence, coalesces manual and sequenced recalls and recovers if DSP stops');
+
+// Built-in references are portable; older Sets keep the original demo reference.
+recorderState.state = 'idle';
+for (const id of ['glass-circuit', 'tidal-lanterns']) {
+    const reference = { kind: 'builtin', id };
+    sourceState.get_set_source = () => reference;
+    const destination = '/test/sets/' + id + '.json';
+    host.write_set(destination);
+    const stage = messages.at(-1)[2];
+    assert.deepEqual(JSON.parse(files.get(stage)).source, reference);
+    files.set(destination, files.get(stage));
+    host.set_written(1, stage);
+    host.read_set(destination);
+    assert.deepEqual(messages.at(-1), ['source_control', 'open_set_demo', id]);
+    host.set_source_loaded(1);
+    assert.equal(controls.set_status.value, 'Set opened · ' + id + '.json');
+}
+files.set('/test/sets/Invalid demo.json', JSON.stringify({ ...set, source: { kind: 'builtin', id: 'unknown' } }));
+host.read_set('/test/sets/Invalid demo.json');
+assert.match(controls.set_status.value, /Couldn’t open/);
+assert.equal(host.pendingSet, null);
+files.set('/test/sets/Original demo.json', JSON.stringify({ ...set, source: { kind: 'demo' } }));
+host.read_set('/test/sets/Original demo.json');
+assert.deepEqual(messages.at(-1), ['source_control', 'open_set_demo']);
+host.set_source_loaded(1);
+assert.equal(controls.set_status.value, 'Set opened · Original demo.json');
+console.log('PASS portable built-in and original demo Set references');

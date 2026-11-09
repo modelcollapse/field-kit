@@ -639,7 +639,7 @@ function read_set(path) {
     }
     pendingSet = { path: path, data: data, relinking: false };
     var source = data.source;
-    if (source.kind === "demo") {
+    if (source.kind === "demo" || source.kind === "builtin") {
         begin_set_source();
         return;
     }
@@ -673,6 +673,7 @@ function valid_set(data) {
             (!index_valid(data.selectedSlot, SLOT_COUNT) || !data.slots[data.selectedSlot]))) return false;
     var source = data.source;
     return source.kind === "demo" ||
+        (source.kind === "builtin" && host.patcher.getnamed("source_control").js.valid_builtin_demo(source.id)) ||
         (source.kind === "file" && typeof source.path === "string" && source.path.length > 0 &&
             (source.relative === undefined || (typeof source.relative === "string" &&
                 source.relative.length > 0 && !/^(\/|\\)|:|(^|[\/\\])\.\.([\/\\]|$)/.test(source.relative))));
@@ -699,6 +700,7 @@ function begin_set_source(path) {
     set_status("Opening " + file_name(pendingSet.path) + "…");
     var source = host.patcher.getnamed("source_control");
     if (path) source.message("open_set_source", path);
+    else if (pendingSet.data.source.kind === "builtin") source.message("open_set_demo", pendingSet.data.source.id);
     else source.message("open_set_demo");
 }
 begin_set_source.local = 1;

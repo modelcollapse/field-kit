@@ -23,7 +23,7 @@ START_HERE = """FIELD KIT for Max
 
 1. Extract the ZIP and open the Field Kit folder.
 2. Double-click Open FIELD KIT.maxpat. This download requires Max 9.
-3. Click Play all to hear the demo. To play a new sample, open Source, Input & Files and choose Load audio… The four loops start as soon as the file is ready.
+3. Click Play all to hear the original demo. In Source, Input & Files, open Demos… for Glass Circuit (120 BPM) or Tidal Lanterns (75 BPM), or choose Load audio… for your own sample.
 4. Choose Slate, Moss, or Ember from Theme in the header.
 
 Open Source, Input & Files. Select your interface in Audio Setup and enable audio. In Input, choose the
@@ -43,6 +43,7 @@ Low-pass and High-pass to keep the same strength, or drag Filter sweep to move
 continuously through all three.
 
 Click Stereo field… beside FX pad… in the Main FX header. Each dot is one loop.
+Resize the window by dragging an edge.
 Drag left or right to pan, and up or down to set level.
 Select a loop tab to see its pan and level above the pad.
 Click Record, drag and release the dot, then click Play to loop the gesture.
@@ -85,7 +86,7 @@ Fade ms controls the crossfade at the loop seam. Pitch snap treats the sample at
 as the tonic and snaps Speed ×, including speed modulation, to the selected scale.
 
 Click a filled pattern to recall it. Shift-click a square to store the current mix.
-Open Scene sequencer… beside Banks to show Scenes and put stored patterns in order. Set BPM and
+Open Scene sequencer… beside Banks to show Scenes directly below Patterns. Set BPM and
 Beats/bar once, then choose a scene and how many bars to hold it in each step.
 Start plays the first available scene. Next bar advances at the next bar line.
 Repeat starts the list again after the last step. Stop holds the current scene.
@@ -94,8 +95,8 @@ The scene strip between Transport and Master shows the current scene, next playa
 scene, and bar count. Use Start, Stop, or Next bar while you stay in Mix.
 Switch between Mix, Scenes, Modulation, and Visuals in the lower workspace, or choose
 Hide to collapse it. Visuals shows left and right frequency histories and a
-stereo scope of the final mix. Switch Display to Spectrum for live frequency
-curves. Use Full screen to fit the workspace to the
+stereo scope of the final mix. Click Stereo X/Y… above the scope for a larger
+window. Switch Display to Spectrum for live frequency curves. Use Full screen to fit the workspace to the
 display. Click Exit full screen or press Escape to return to the window.
 Open Source, Input & Files and use Set files… to open or save a Set. Save Set keeps the source
 reference, all eight slots, the scene order and tempo, and current settings in

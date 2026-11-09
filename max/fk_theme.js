@@ -14,6 +14,10 @@ var windowLayout = [];
 var frameWidth = 0;
 var frameHeight = 0;
 var fitTask = new Task(fit_full_screen, this);
+var scopeFitTask = new Task(fit_scope_popout, this);
+var scopeOpenTask = new Task(show_scope_popout, this);
+var fieldOpenTask = new Task(show_stereo_field, this);
+var scopeSize = [];
 var sideColumnX = 1084;
 var sideColumnWidth = 320;
 var wideFrameWidth = sideColumnX + sideColumnWidth + 8;
@@ -99,9 +103,15 @@ function loadbang() {
 
 function workspace(view) {
     if (view < 0 || view > 4 || view !== Math.floor(view)) return;
+    var sceneLayoutChanged = (activeWorkspace === 1) !== (view === 1);
     activeWorkspace = view;
     patch.getnamed("workspace_view").message("set", view);
     update_mix_panels();
+    if (sceneLayoutChanged) {
+        remember_layout();
+        if (fullScreen) fit_full_screen();
+        else resize_workspace(1, 1, false);
+    }
     update_workspace_panels();
 }
 
@@ -165,6 +175,58 @@ function exit_full_screen() {
     if (fullScreen) full_screen();
 }
 
+function open_scope_popout() {
+    open_popout(scopeOpenTask);
+}
+
+function open_stereo_field() {
+    open_popout(fieldOpenTask);
+}
+
+function open_popout(task) {
+    // Max opens subpatches full screen while the main patch is full screen.
+    var delay = fullScreen ? 180 : 0;
+    exit_full_screen();
+    task.cancel();
+    task.schedule(delay);
+}
+open_popout.local = 1;
+
+function show_stereo_field() {
+    patch.getnamed("stereo_field_window").message("open");
+}
+show_stereo_field.local = 1;
+
+function show_scope_popout() {
+    patch.getnamed("scope_popout_window").message("open");
+    scopeFitTask.cancel();
+    scopeSize = [];
+    scopeFitTask.schedule(60);
+}
+show_scope_popout.local = 1;
+
+function fit_scope_popout() {
+    var child = patch.getnamed("scope_popout_panel").subpatcher();
+    var wind = child.wind;
+    if (!wind || !wind.visible) return;
+    var size = wind.size;
+    if (size[0] !== scopeSize[0] || size[1] !== scopeSize[1]) {
+        var width = Math.max(320, size[0]);
+        var height = Math.max(360, size[1]);
+        if (width !== size[0] || height !== size[1]) wind.size = [width, height];
+        var side = Math.min(width - 32, height - 86);
+        var dirty = wind.dirty;
+        child.getnamed("scope_popout_title").setboxattr("presentation_rect", [16, 12, width - 122, 27]);
+        child.getnamed("scope_popout_close").setboxattr("presentation_rect", [width - 96, 12, 80, 26]);
+        child.getnamed("scope_popout_plot").setboxattr("presentation_rect", [(width - side) / 2, 48, side, side]);
+        child.getnamed("scope_popout_help").setboxattr("presentation_rect", [8, 58 + side, width - 16, 20]);
+        wind.dirty = dirty;
+        scopeSize = [width, height];
+    }
+    scopeFitTask.schedule(80);
+}
+fit_scope_popout.local = 1;
+
 function remember_layout() {
     if (windowLayout.length) return;
     var anchor = patch.getnamed("source_drawer_anchor");
@@ -173,7 +235,14 @@ function remember_layout() {
         sourceDrawerHeight = drawer[3];
         anchor.hidden = true;
     }
-    remember_rects(patch, "main", drawer);
+    var mixer = patch.getnamed("surface_mixer").getboxattr("presentation_rect");
+    var tabs = patch.getnamed("surface_workspace").getboxattr("presentation_rect");
+    var lower = patch.getnamed("surface_modulation").getboxattr("presentation_rect");
+    var tabsBottom = tabs[1] + tabs[3];
+    remember_rects(patch, "main", drawer, {
+        top: mixer[1], bottom: tabsBottom,
+        lift: mixer[1] - lower[1], shift: lower[1] + lower[3] - tabsBottom
+    });
     ["mix_fx", "recorder", "performance_mix", "performance_sends", "drifting_memory",
         "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
         remember_rects(patch.getnamed(name).subpatcher(), name);
@@ -181,7 +250,7 @@ function remember_layout() {
 }
 remember_layout.local = 1;
 
-function remember_rects(target, panel, drawer) {
+function remember_rects(target, panel, drawer, sceneDock) {
     target.apply(function (box) {
         if (!Number(box.getboxattr("presentation")) || box.varname === "source_drawer_anchor") return;
         var rect = box.getboxattr("presentation_rect");
@@ -193,9 +262,16 @@ function remember_rects(target, panel, drawer) {
         }
         var shiftDown = drawer && !isDrawerControl && rect[1] >= drawer[1] + 2;
         var alternate = wideLayoutRects[panel];
+        var wideRect = alternate && alternate[box.varname];
+        var sceneOffset = 0;
+        if (sceneDock && !isDrawerControl) {
+            if (box.varname === "sequence_panel" || box.varname === "surface_modulation") sceneOffset = sceneDock.lift;
+            else if (rect[1] >= sceneDock.top && rect[1] < sceneDock.bottom) sceneOffset = sceneDock.shift;
+        }
         windowLayout.push({
-            box: box, rect: rect.slice(), wideRect: alternate && alternate[box.varname],
-            drawer: isDrawerControl, shiftDown: shiftDown,
+            box: box, rect: rect.slice(), wideRect: wideRect,
+            drawer: isDrawerControl, shiftDown: shiftDown, sceneOffset: sceneOffset,
+            wideRail: panel === "main" && wideRect && wideRect[0] >= sideColumnX,
             wideTop: panel === "main" && (isDrawerControl || rect[1] < wideLayoutRects.main.surface_capture[1]),
             wideFx: panel === "mix_fx"
         });
@@ -242,7 +318,7 @@ function fit_wide_visuals(width, height) {
         visuals_left: [x, leftTop, plotWidth, channelHeight],
         visuals_right_label: [x, rightTop - labelOffset, plotWidth, labelHeight],
         visuals_right: [x, rightTop, plotWidth, channelHeight],
-        visuals_stereo_label: [x, stereoTop - labelOffset, plotWidth, labelHeight],
+        visuals_stereo_open: [x, stereoTop - labelOffset, plotWidth, labelHeight],
         visuals_stereo: [x, stereoTop, plotWidth, plotWidth],
         visuals_stereo_help: [x, stereoTop + plotWidth + 4 * height, plotWidth, labelHeight]
     };
@@ -274,7 +350,9 @@ function resize_workspace(width, height, wide) {
         var w = rect[2] * horizontal;
         var h = rect[3] * height;
         var x = rect[0] * horizontal;
-        var y = (rect[1] + (item.shiftDown && sourceDrawerOpen ? sourceDrawerHeight : 0)) * height;
+        var sourceOffset = item.shiftDown && sourceDrawerOpen ? sourceDrawerHeight : 0;
+        var sceneOffset = activeWorkspace === 1 && !(wide && item.wideRail) ? item.sceneOffset : 0;
+        var y = (rect[1] + sourceOffset + sceneOffset) * height;
         // A jsui draws at its patching size. Center it inside its larger presentation cell.
         if (box.maxclass === "jsui") {
             x += (w - rect[2]) * 0.5;
@@ -318,6 +396,7 @@ function msg_int(index) {
     send_theme(patch.getnamed("mixer_control"), control.concat(ink));
     paint_patch(patch.getnamed("sequence_panel").subpatcher(), sections.scenes, palette);
     paint_patch(patch.getnamed("visuals_panel").subpatcher(), sections.visuals, palette);
+    paint_patch(patch.getnamed("scope_popout_panel").subpatcher(), sections.visuals, palette);
     var performanceMix = patch.getnamed("performance_mix");
     if (performanceMix && performanceMix.valid) {
         paint_patch(performanceMix.subpatcher(), sections.mix, palette, sections);

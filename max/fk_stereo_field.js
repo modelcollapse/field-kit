@@ -30,8 +30,13 @@ var armed = 0;
 var recording = null;
 var sendingLoop = 0;
 var clockRunning = false;
+var windowConfigured = false;
+var windowWidth = 0;
+var windowHeight = 0;
 var motionClock = new Task(motionFrame, this);
 motionClock.interval = FRAME_MS;
+var windowClock = new Task(fitWindow, this);
+windowClock.interval = 80;
 theme(0);
 
 function rgba(hex) {
@@ -81,6 +86,41 @@ function select(loop) {
     mgraphics.redraw();
 }
 
+function window_active(active) {
+    windowClock.cancel();
+    if (!active) return;
+    if (!windowConfigured) {
+        var controller = patcher.getnamed("stereo_field_thispatcher");
+        if (controller && controller.valid) {
+            windowConfigured = true;
+            controller.message("window", "constrain", 540, 420, 4096, 4096);
+            controller.message("window", "exec");
+        }
+    }
+    fitWindow();
+    windowClock.repeat();
+}
+
+function fitWindow() {
+    var wind = patcher.wind;
+    if (!wind) return;
+    var size = wind.size;
+    var width = Math.floor(size[0]);
+    var height = Math.floor(size[1]);
+    if (width <= 24 || height <= 80 || (width === windowWidth && height === windowHeight)) return;
+    windowWidth = width;
+    windowHeight = height;
+
+    // jsui needs matching patching and presentation sizes for hit testing.
+    var dirty = wind.dirty;
+    var canvas = [12, 44, width - 24, height - 80];
+    box.setboxattr("patching_rect", canvas);
+    box.setboxattr("presentation_rect", canvas);
+    var close = patcher.getnamed("stereo_field_close");
+    if (close && close.valid) close.setboxattr("presentation_rect", [width - 90, 11, 78, 23]);
+    wind.dirty = dirty;
+}
+
 function bounds() {
     var size = mgraphics.size;
     var width = size && size[0] ? size[0] : box.rect[2] - box.rect[0];
@@ -90,7 +130,8 @@ function bounds() {
         left: 64, right: Math.max(65, width - 24),
         top: 151, bottom: Math.max(152, height - 49),
         tabLeft: 14, tabWidth: (width - 28) / loops.length,
-        motionWidth: (width - 28) / 5.2
+        motionWidth: (width - 28) / 5.2,
+        markerRadius: clamp(11 + (Math.min(width, height) - 346) / 50, 11, 16)
     };
 }
 
@@ -130,7 +171,7 @@ function marker(loop, grid) {
     var track = loops[loop - 1];
     var point = trackPosition(track, grid);
     var active = loop === selected;
-    var radius = active ? 11 : 9;
+    var radius = grid.markerRadius - (active ? 0 : 2);
     var accent = recording && recording.loop === loop ? ink.record : ink.accent;
     mgraphics.ellipse(point[0] - radius, point[1] - radius, radius * 2, radius * 2);
     colour(active ? accent : ink.field);
@@ -259,7 +300,8 @@ function nearLoop(loop, x, y, grid) {
     var point = trackPosition(loops[loop - 1], grid);
     var dx = point[0] - x;
     var dy = point[1] - y;
-    return dx * dx + dy * dy <= 14 * 14;
+    var hitRadius = grid.markerRadius + 3;
+    return dx * dx + dy * dy <= hitRadius * hitRadius;
 }
 
 function syncClock() {
@@ -474,6 +516,7 @@ function onresize() {
 }
 
 validLoop.local = clamp.local = bounds.local = trackPosition.local = 1;
+fitWindow.local = 1;
 colour.local = label.local = rectangle.local = rule.local = marker.local = 1;
 nearLoop.local = moveLoop.local = 1;
 rgba.local = readout.local = percent.local = 1;

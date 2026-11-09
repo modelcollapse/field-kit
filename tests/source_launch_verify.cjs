@@ -10,10 +10,11 @@ const regions = [];
 const tasks = new Map();
 let frames = 352800;
 let channels = 2;
+const named = name => ({ message: (...args) => trace.push([name, ...args]) });
 const host = vm.createContext({
     patcher: {
         filepath: `${home}/Field Kit.maxpat`,
-        getnamed: name => ({ message: (...args) => trace.push([name, ...args]) }),
+        getnamed: name => name === 'sequence_panel' ? { subpatcher: () => ({ getnamed: named }) } : named(name),
     },
     arrayfromargs: value => Array.from(value),
     outlet: (index, values) => regions.push([index, ...values]),
@@ -158,6 +159,7 @@ frames = 1;
 host.source_loaded(48000);
 assert(sent('source_label', 'set', 'No source'));
 assert(sent('wave_4', 'set'));
+assert(sent('demo', 'ignoreclick', 0));
 assert(!sent('dac', 'start'));
 
 trace.length = 0;
@@ -362,6 +364,72 @@ assert.equal(host.get_set_source().kind, 'demo');
 assert(sent('voice_4', 'source', 'field-kit-source-1'));
 assert(sent('pattern_control', 'set_source_loaded', 1));
 
+// Explicit demo selections play immediately after reading, without changing the mix.
+trace.length = 0;
+host.select_demo(NaN);
+host.select_demo(4);
+assert(!tasks.has('read_source'));
+assert(sent('demo', 'set', 0));
+for (const [item, id, file, name, tempo, sectionFrames] of [
+    [2, 'glass-circuit', 'fk_demo_glass_circuit.wav', 'Glass Circuit', 120, 192000],
+    [3, 'tidal-lanterns', 'fk_demo_tidal_lanterns.wav', 'Tidal Lanterns', 75, 307200],
+]) {
+    host.set_region(1, 7, 38);
+    trace.length = 0;
+    host.select_demo(item);
+    assert(sent('sequence_control', 'stop'));
+    assert(sent('demo', 'ignoreclick', 1));
+    runTask('read_source');
+    assert(sent('buffer', 'replace', `${home}/${file}`));
+    assert(!sent('run_1', 1));
+    frames = 4 * sectionFrames;
+    host.source_loaded(48000);
+    if (tasks.has('audio_timeout')) settleAudio();
+    assert.equal(JSON.stringify(host.get_set_source()), JSON.stringify({kind: 'builtin', id}));
+    assert.equal(JSON.stringify(host.positions), '[[0,25],[25,50],[50,75],[75,100]]');
+    assert(sent('source_label', 'set', `${name}   ·   ${(frames / 48000).toFixed(2)} s   ·   stereo`));
+    assert(sent('demo', 'ignoreclick', 0));
+    assert(sent('seq_bpm', tempo));
+    assert(sent('seq_beats', 4));
+    for (let voice = 1; voice <= 4; voice++) {
+        assert(sent(`run_${voice}`, 1));
+        assert(sent(`rate_${voice}`, 1));
+        assert(sent(`direction_${voice}`, 0));
+        assert(sent(`fade_${voice}`, 0));
+    }
+    assert(!trace.some(([target]) => /^(pan_|level_|fx_|master$|mixer_control$|pattern_control$)/.test(target)));
+}
+
+trace.length = 0;
+host.set_region(1, 7, 38);
+host.open_set_demo('glass-circuit');
+runTask('read_source');
+assert(sent('set_buffer', 'replace', `${home}/fk_demo_glass_circuit.wav`));
+frames = 768000;
+host.set_source_read(48000);
+runTask('commit_set_source');
+assert.equal(host.get_set_source().id, 'glass-circuit');
+assert.equal(host.positions[0][0], 7);
+assert.equal(host.positions[0][1], 38);
+assert(sent('pattern_control', 'set_source_loaded', 1));
+assert(!sent('seq_bpm', 120));
+assert(!sent('rate_1', 1));
+assert(!sent('run_1', 1));
+
+trace.length = 0;
+host.open_set_demo('unknown');
+assert(sent('pattern_control', 'set_source_loaded', 0));
+assert(!tasks.has('read_source'));
+assert.equal(host.get_set_source().id, 'glass-circuit');
+host.select_demo(1);
+runTask('read_source');
+assert(sent('set_buffer', 'replace', `${home}/fk_demo.wav`));
+frames = 352800;
+host.set_source_read(44100);
+assert.equal(host.get_set_source().kind, 'demo');
+assert(sent('run_1', 1));
+assert(!sent('rate_1', 1));
+
 // A filter change in Max updates the voice control, then feeds the inspector sync route.
 const filters = [0, 0, 0, 0];
 const getnamed = host.patcher.getnamed;
@@ -415,4 +483,4 @@ filterEditorShows(55, 2);
 host.inspector_edit('filter', 0);
 filterEditorShows(0, 1);
 
-console.log('PASS file load autoplay, normal transport, staged Set source commit/rollback, concurrent loads, and filter selection');
+console.log('PASS file and demo autoplay, layered demo timing, staged Set source commit/rollback, transport, and filter selection');

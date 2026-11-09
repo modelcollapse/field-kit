@@ -22,7 +22,7 @@ if [[ -e $output || -L $output ]]; then
 fi
 
 # Reject a stale or incomplete collective before expanding the large runtime ZIP.
-python3 - "$collective" "$source" "$(dirname "$0")" <<'PY'
+media_files=$(python3 - "$collective" "$source" "$(dirname "$0")" <<'PY'
 from collections import Counter
 import json
 from pathlib import Path
@@ -62,8 +62,10 @@ for group, assets in RUNTIME_ASSETS.items():
         evidence = name.encode() if group == 'media' else asset.read_bytes()
         if evidence not in data:
             raise SystemExit(f'The compiled collective is missing the staged {name}')
-print('Verified collective graph and dependencies.')
+print('\n'.join(RUNTIME_ASSETS['media']))
 PY
+)
+printf 'Verified collective graph and dependencies.\n'
 
 stage=$(mktemp -d /private/tmp/field-kit-package.XXXXXX)
 proof=
@@ -86,7 +88,9 @@ plutil -replace CFBundleShortVersionString -string "$version" "$plist"
 plutil -replace CFBundleVersion -string "$version" "$plist"
 plutil -replace NSMicrophoneUsageDescription -string 'Field Kit uses audio input to record samples.' "$plist"
 cp "$collective" "$resources/Field Kit.mxf"
-cp "$source/fk_demo.wav" "$resources/C74/media/fk_demo.wav"
+while IFS= read -r name; do
+    cp "$source/$name" "$resources/C74/media/$name"
+done <<< "$media_files"
 cp "$source/fk_set_writer.js" "$resources/fk_set_writer.js"
 
 # Change only the app signature. The signed runtime libraries and Node keep their signatures.
@@ -106,7 +110,9 @@ codesign --verify --strict "$proof${node_external#"$stage"}"
 "$proof${node#"$stage"}" --check "$proof_resources/fk_set_writer.js"
 lipo "$proof_app/Contents/MacOS/Field Kit" -verify_arch arm64 x86_64
 cmp "$collective" "$proof_resources/Field Kit.mxf"
-cmp "$source/fk_demo.wav" "$proof_resources/C74/media/fk_demo.wav"
+while IFS= read -r name; do
+    cmp "$source/$name" "$proof_resources/C74/media/$name"
+done <<< "$media_files"
 cmp "$source/fk_set_writer.js" "$proof_resources/fk_set_writer.js"
 test "$(plutil -extract CFBundleShortVersionString raw "$proof_plist")" = "$version"
 test "$(plutil -extract CFBundleVersion raw "$proof_plist")" = "$version"

@@ -13,7 +13,7 @@ The v0.8.0 standalone includes Apple silicon and Intel binaries. It is ad hoc si
 
 ![Field Kit standalone in full screen with four loops playing, the docked loop editor, and live stereo visuals beside the mix recorder](docs/screenshots/field-kit-standalone.jpg)
 
-The eight-second demo loads on startup. Click **Play all** to turn on audio and start the four loops, or click one window's play button to hear it on its own. Open **Source, Input & Files** and choose **Load audio…** to load a sample and start its four loops as soon as the file is ready. The same drawer holds audio setup, source recording, and Set files. **Enable audio** starts the engine without starting playback.
+The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Choose **Load audio…** to play your own sample. The same drawer holds audio setup, source recording, and Set files.
 
 Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header. Each theme uses related background shades to separate source setup, the mixer, loop controls, effects, and recording.
 
@@ -45,7 +45,7 @@ Each waveform has a mixer strip with playback, level, pan, mute, solo, and a pea
 
 The **L** and **R** meters in the **Master** strip show each output channel. A red **Clip** light shows which channel hit the output ceiling. Lower **Master** if either light comes on. The **Mix recording** panel below has the record and stop controls, timer, status, and take name.
 
-Open **Stereo field…** beside **FX pad…** in the **Main FX** header to place all four loops together. The tabs select which loop's pan and level are shown above the pad. Drag its dot left or right to pan it, and up or down to change its level. If dots overlap, use the tabs to pick one.
+Open **Stereo field…** beside **FX pad…** in the **Main FX** header. Drag a window edge to resize the Stereo Field. The tabs select which loop's pan and level are shown above the pad. Drag its dot left or right to pan it, and up or down to change its level. If dots overlap, use the tabs to pick one.
 
 To record movement, select a loop, click **Record**, then drag and release its dot. Click **Play** to repeat the movement, **Stop** to hold the current position, or **Clear** to erase the gesture. Each loop keeps one gesture and can play it alongside the others.
 
@@ -59,7 +59,7 @@ Open **Banks…** to load or save a bank of patterns.
 
 Banks from the three-LFO version still open. Their settings are restored on LFOs 1–3. LFOs 4–8 start at their defaults with no routes.
 
-Open **Scene sequencer…** beside **Banks…** to show the Scenes workspace and chain up to eight stored patterns. Set **BPM** and **Beats/bar**, then choose a scene and duration in bars for each step. **Start** starts with the first available scene, and **Next bar** advances early at the next bar line. **Repeat** loops the sequence. **Stop** holds the current scene and lets the loops continue. **Stop all** stops the sequencer and the loops. Selecting a pattern by hand stops the sequence and recalls that pattern.
+Open **Scene sequencer…** beside **Banks…** to show the sequencer directly under Patterns. Set **BPM** and **Beats/bar**, then choose a scene and duration in bars for each step. **Start** starts with the first available scene, and **Next bar** advances early at the next bar line. **Repeat** loops the sequence. **Stop** holds the current scene and lets the loops continue. **Stop all** stops the sequencer and the loops. Selecting a pattern by hand stops the sequence and recalls that pattern.
 
 The scene clock controls when patterns change. Set the tempo and meter before you start. Loop speed still follows each loop's **Speed ×** setting. **Save Set…** saves the sequence, tempo, and meter with the patterns. **Open Set…** restores them ready to start.
 
@@ -69,7 +69,7 @@ The scene strip at the top, between **Transport** and **Master**, shows the curr
 
 Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Mix recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to collapse the lower panel and focus on the analyzers.
 
-**Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. The stereo scope plots left against right. Matching left and right signals trace a rising diagonal.
+**Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. Click **Stereo X/Y…** above the scope to open a larger, resizable window. The scope plots left against right. Matching left and right signals trace a rising diagonal. Opening Stereo X/Y or Stereo Field from full screen returns the workspace to a window so you can see both at once.
 
 ## Patch modulation
 

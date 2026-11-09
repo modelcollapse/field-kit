@@ -6,6 +6,11 @@ outlets = 4;
 var WINDOWS = 4;
 var ALL_WINDOWS = (1 << WINDOWS) - 1;
 var DEFAULT_POSITIONS = [[0, 25], [25, 50], [50, 75], [75, 100]];
+var DEMOS = [
+    {name: "Demo", file: "fk_demo.wav"},
+    {id: "glass-circuit", name: "Glass Circuit", file: "fk_demo_glass_circuit.wav", bpm: 120},
+    {id: "tidal-lanterns", name: "Tidal Lanterns", file: "fk_demo_tidal_lanterns.wav", bpm: 75}
+];
 var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "filter", "level", "pan", "echo_send", "room_send"];
 var BUFFER_OBJECTS = ["buffer", "set_buffer"];
 var INFO_OBJECTS = ["source_info", "set_source_info"];
@@ -19,14 +24,14 @@ var bufferName = "";
 var duration = 0;
 var pendingPath = "";
 var pendingName = "";
-var pendingIsDemo = false;
+var pendingDemo = null;
 var pendingSet = false;
 var pendingBuffer = -1;
 var readStarted = false;
 var stagedSource = null;
 var sourcePath = "";
 var sourceLabel = "No source";
-var sourceIsDemo = false;
+var sourceDemo = null;
 var inputSampleRate = 0;
 var inputCount = -1;
 var inputChannels = [1, 2];
@@ -217,17 +222,24 @@ function choose() {
 }
 
 function load_demo() {
-    open_source(demo_path(), true);
+    begin_direct_source(demo_path(DEMOS[0].file), DEMOS[0], false);
 }
 
-function demo_path() {
+function select_demo(item) {
+    send("demo", "set", 0);
+    if (item !== Math.floor(item) || item < 1 || item > DEMOS.length) return;
+    var demo = DEMOS[item - 1];
+    begin_direct_source(demo_path(demo.file), demo, true);
+}
+
+function demo_path(name) {
     var file = host.patcher.filepath;
     var folder = file.slice(0, file.lastIndexOf("/") + 1);
-    var demo = folder + "fk_demo.wav";
+    var demo = folder + name;
     if (typeof File === "function") {
-        var candidates = [demo, folder + "Support/fk_demo.wav"];
+        var candidates = [demo, folder + "Support/" + name];
         // Standalones resolve bundled media by name inside their collective.
-        demo = "fk_demo.wav";
+        demo = name;
         for (var index = 0; index < candidates.length; index++) {
             var fileOnDisk = new File(candidates[index], "read");
             if (fileOnDisk.isopen) {
@@ -242,26 +254,43 @@ function demo_path() {
 demo_path.local = 1;
 
 function get_set_source() {
-    if (!ready || (!sourceIsDemo && !sourcePath)) {
-        return null;
-    }
-    return sourceIsDemo ? {kind: "demo"} : {kind: "file", path: sourcePath};
+    if (!ready) return null;
+    if (sourceDemo === DEMOS[0]) return {kind: "demo"};
+    if (sourceDemo) return {kind: "builtin", id: sourceDemo.id};
+    return sourcePath ? {kind: "file", path: sourcePath} : null;
 }
 
-function open_set_demo() {
-    begin_set_source(demo_path(), true);
+function builtin_demo(id) {
+    for (var index = 1; index < DEMOS.length; index++) {
+        if (DEMOS[index].id === id) return DEMOS[index];
+    }
+    return null;
+}
+builtin_demo.local = 1;
+
+function valid_builtin_demo(id) {
+    return builtin_demo(id) !== null;
+}
+
+function open_set_demo(id) {
+    var demo = id === undefined ? DEMOS[0] : builtin_demo(id);
+    if (!demo) {
+        send("pattern_control", "set_source_loaded", 0);
+        return;
+    }
+    begin_set_source(demo_path(demo.file), demo);
 }
 
 function open_set_source(path) {
-    begin_set_source(path, false);
+    begin_set_source(path, null);
 }
 
-function begin_set_source(path, isDemo) {
+function begin_set_source(path, demo) {
     if (!can_open_source(path)) {
         send("pattern_control", "set_source_loaded", 0);
         return;
     }
-    if (!isDemo && typeof File === "function") {
+    if (!demo && typeof File === "function") {
         try {
             var file = new File(path, "read");
             if (!file.isopen) {
@@ -275,7 +304,7 @@ function begin_set_source(path, isDemo) {
     }
     queuedWindows = 0;
     queuedNormal = false;
-    begin_source_read(path, isDemo, 1 - activeBuffer, true);
+    begin_source_read(path, demo, 1 - activeBuffer, true);
 }
 begin_set_source.local = 1;
 
@@ -285,7 +314,11 @@ function can_open_source(path) {
 }
 can_open_source.local = 1;
 
-function open_source(path, isDemo) {
+function open_source(path) {
+    begin_direct_source(path, null, true);
+}
+
+function begin_direct_source(path, demo, autoplay) {
     if (!can_open_source(path)) {
         return;
     }
@@ -294,16 +327,17 @@ function open_source(path, isDemo) {
     pendingWaveEdits = 0;
     ready = false;
     duration = 0;
-    queuedWindows = isDemo ? 0 : ALL_WINDOWS;
-    begin_source_read(path, !!isDemo, activeBuffer, false);
+    queuedWindows = autoplay ? ALL_WINDOWS : 0;
+    begin_source_read(path, demo, activeBuffer, false);
 }
+begin_direct_source.local = 1;
 
-function begin_source_read(path, isDemo, target, isSet) {
+function begin_source_read(path, demo, target, isSet) {
     pendingPath = path;
-    pendingIsDemo = isDemo;
+    pendingDemo = demo;
     pendingBuffer = target;
     pendingSet = isSet;
-    pendingName = isDemo ? "Demo" : path.split("/").pop();
+    pendingName = demo ? demo.name : path.split("/").pop();
     label("source_label", "Loading " + pendingName + "…");
     update_status();
     // Normal loads release the voices first. A set reads into the idle buffer.
@@ -372,13 +406,28 @@ function commit_set_source() {
 commit_set_source.local = 1;
 
 function accept_source(sampleRate, frames, channels) {
-    sourceIsDemo = pendingIsDemo;
+    sourceDemo = pendingDemo;
     sourcePath = pendingPath;
     var name = pendingName;
+    if (!pendingSet && sourceDemo && sourceDemo.bpm) set_demo_timing(sourceDemo.bpm);
     clear_pending_source();
     activate_source(sampleRate, frames, channels, name);
 }
 accept_source.local = 1;
+
+function set_demo_timing(bpm) {
+    // The four stems use equal-length, pre-looped sections at the source tempo.
+    reset_regions();
+    for (var voice = 1; voice <= WINDOWS; voice++) {
+        send("rate_" + voice, 1);
+        send("direction_" + voice, 0);
+        send("fade_" + voice, 0);
+    }
+    var panel = host.patcher.getnamed("sequence_panel").subpatcher();
+    panel.getnamed("seq_bpm").message(bpm);
+    panel.getnamed("seq_beats").message(4);
+}
+set_demo_timing.local = 1;
 
 function activate_source(sampleRate, frames, channels, name) {
     duration = 1000 * frames / sampleRate;
@@ -409,7 +458,7 @@ function clear_pending_source() {
     pendingPath = "";
     pendingName = "";
     pendingSet = false;
-    pendingIsDemo = false;
+    pendingDemo = null;
     pendingBuffer = -1;
     readStarted = false;
 }
@@ -422,6 +471,7 @@ function read_timeout() {
     queuedWindows = 0;
     queuedNormal = false;
     if (isSet) {
+        update_status();
         label("source_label", sourceLabel);
         label("status", "Couldn’t load set audio.");
         send("pattern_control", "set_source_loaded", 0);
@@ -433,6 +483,7 @@ function read_timeout() {
     for (var voice = 1; voice <= WINDOWS; voice++) {
         send("wave_" + voice, "set");
     }
+    update_status();
     label("source_label", sourceLabel);
     label("status", "Couldn’t load audio. Try another file.");
     update_fade_preview();
@@ -463,8 +514,9 @@ function update_status() {
     send("input_record_button", "texton", inputButton);
     send("input_record_button", "active", recording || (audioOn && !audioStarting &&
         inputSampleRate > 0 && inputCount > 0 && !pendingPath && !inputWritePath && !inputTake) ? 1 : 0);
-    send("input_save_button", "active", ready && !sourceIsDemo && !sourcePath &&
+    send("input_save_button", "active", ready && !sourceDemo && !sourcePath &&
         !pendingPath && !inputTake && !inputWritePath ? 1 : 0);
+    send("demo", "ignoreclick", pendingPath || inputTake || inputWritePath ? 1 : 0);
     INPUT_MENUS.forEach(function (name) {
         send(name, "ignoreclick", inputTake || inputCount < 1 ? 1 : 0);
     });
@@ -484,10 +536,10 @@ function update_status() {
     } else if (count) {
         label("status", count + " of " + WINDOWS + " windows playing");
     } else if (ready) {
-        label("status", sourceIsDemo ? "Click Play all to hear the demo." :
+        label("status", sourceDemo ? "Click Play all to hear the demo." :
             sourcePath ? "Ready · Click Play all." : "Input ready · Save a WAV to keep the take.");
     } else if (bufferName) {
-        label("status", "Choose Load audio… or Load demo.");
+        label("status", "Choose Load audio… or Demos…");
     }
 }
 update_status.local = 1;
@@ -628,7 +680,7 @@ function commit_input_record() {
     }
     inputTake = null;
     bind_source(take.target);
-    sourceIsDemo = false;
+    sourceDemo = null;
     sourcePath = "";
     activate_source(take.sampleRate, frames, channels, "Recorded input");
     send(BUFFER_OBJECTS[1 - activeBuffer], "sizeinsamps", 1);
@@ -636,13 +688,13 @@ function commit_input_record() {
 commit_input_record.local = 1;
 
 function choose_input_save() {
-    if (!ready || sourceIsDemo || sourcePath || pendingPath || inputTake || inputWritePath) return;
+    if (!ready || sourceDemo || sourcePath || pendingPath || inputTake || inputWritePath) return;
     send("input_save_dialog", "name", "Field Kit Source.wav");
     send("input_save_dialog", "bang");
 }
 
 function save_input_path(path) {
-    if (!ready || sourceIsDemo || sourcePath || pendingPath || inputTake || inputWritePath ||
+    if (!ready || sourceDemo || sourcePath || pendingPath || inputTake || inputWritePath ||
         typeof path !== "string" || !/\.wav$/i.test(path)) return;
     inputWritePath = path;
     update_status();
