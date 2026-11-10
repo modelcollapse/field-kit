@@ -18,6 +18,7 @@ RUNTIME_ASSETS = {
     },
     "code": {
         "fk_mixer.js": "javascript",
+        "fk_io.js": "javascript",
         "fk_mod_routes.js": "javascript",
         "fk_source.js": "javascript",
         "fk_stereo_field.js": "javascript",

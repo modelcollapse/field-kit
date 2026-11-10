@@ -13,8 +13,7 @@ function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
     let response;
     const maxApi = {
         addHandler(name, callback) {
-            assert.equal(name, "commit_set");
-            handler = callback;
+            if (name === "commit_set") handler = callback;
         },
         outlet(...args) {
             response = args;
@@ -22,8 +21,8 @@ function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
         post() {},
     };
     vm.runInNewContext(source, {
-        require: name => ({fs: fileApi, path: pathApi, "max-api": maxApi})[name],
-        process: {platform},
+        require: name => ({fs: fileApi, path: pathApi, os: {homedir: () => dir}, "max-api": maxApi})[name],
+        process: {platform, env: {}},
     });
     return (staged, destination, success) => {
         response = null;

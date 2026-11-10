@@ -220,6 +220,26 @@ function update_fade_preview() {
 }
 update_fade_preview.local = 1;
 
+function folder_paths(importPath, recordingPath, status) {
+    var panel = host.patcher.getnamed("working_folders_panel").subpatcher();
+    var recordingDialog = host.patcher.getnamed("recorder").subpatcher().getnamed("save_dialog");
+    function apply(dialog, path) {
+        if (path) dialog.message("setpath", path);
+        else dialog.message("setpath");
+    }
+    [[ "import", importPath, "audio_file" ], [ "recording", recordingPath, "input_save_dialog" ]]
+        .forEach(function (entry) {
+            var path = entry[1];
+            apply(host.patcher.getnamed(entry[2]), path);
+            apply(panel.getnamed(entry[0] + "_folder_dialog"), path);
+            var caption = panel.getnamed(entry[0] + "_path");
+            caption.message("set", path.length > 47 ? "…" + path.slice(-46) : path || "System default");
+            caption.message("hint", path || "Uses the last location remembered by the system");
+        });
+    apply(recordingDialog, recordingPath);
+    panel.getnamed("folders_status").message("set", status);
+}
+
 function choose() {
     if (bufferName && !pendingPath && !inputTake && !inputWritePath) {
         send("audio_file", "bang");

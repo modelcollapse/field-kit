@@ -15,6 +15,7 @@ SUPPORT_PATH = "Patcher:/Support/"
 EMBEDDED_PATCHERS = {"fk_fx.maxpat", "fk_modulation.maxpat", "fk_record.maxpat"}
 SUPPORT_JSUI = {"fk_lfo_preview.js", "fk_loop_fade.js", "fk_stereo_field.js", "fk_fx_pad.js", "fk_tuner.js"}
 EMBEDDED_SCRIPTS = {
+    "js fk_io.js": f"js {SUPPORT_PATH}fk_io.js",
     "js fk_mod_routes.js": f"js {SUPPORT_PATH}fk_mod_routes.js",
     "js fk_recorder.js": f"js {SUPPORT_PATH}fk_recorder.js",
     "js fk_theme.js": f"js {SUPPORT_PATH}fk_theme.js",
@@ -35,8 +36,13 @@ Open Visuals and set the Tuner source to Live input L, Live input R, or Selected
 Enable audio and play one note at a time. The display shows the nearest note,
 frequency and cents relative to A4 = 440 Hz.
 
-Open Source, Input & Files. Select your interface in Audio Setup and enable audio. In Input, choose the
-left and right channels. For mono, select the same channel twice.
+Open Source, Input & Files → Working folders… to select the starting folders
+for Load audio…, Save source WAV…, and Record mix…. Field Kit remembers the two
+choices across launches. The default folders, when present, are Imports and
+Recordings under Documents/Field Kit.
+
+Open Source, Input & Files → Audio & MIDI Setup… and choose your Input device
+and Output device. Enable audio. In Input, choose the left and right channels. For mono, select the same channel twice.
 Input gain adjusts both channels from −60 to +18 dB and starts at 0 dB.
 The two post-gain peak meters show the recording levels with peak hold
 and a red overload indicator.
@@ -44,6 +50,10 @@ Click Record source and watch for the red RECORDING badge and timer.
 Click Stop source to use the take in all four loops.
 Recording stops automatically after 60 seconds. Click Save source WAV… before
 saving a Set with the take or replacing it with a different source.
+
+To use MIDI Learn, choose a port under MIDI In, pick a control and click Learn.
+Move an absolute CC knob or fader, or use a note or momentary CC for buttons.
+Clear removes the selected mapping. Mappings last for the current session.
 
 Click a loop number or waveform to focus the editor beside the waveforms. Drag the waveform to set
 the range. Fade preview shows how the outgoing and incoming audio overlap.

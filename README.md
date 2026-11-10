@@ -7,11 +7,11 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-The v0.8.13 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.15 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.13](CHANGELOG.md).
+[See what's new in v0.8.15](CHANGELOG.md).
 
-![Field Kit v0.8.13 playing four loops with Relative speed selected and the Record mix button ready](docs/screenshots/field-kit-standalone.jpg)
+![Field Kit v0.8.15 playing four loops with Relative speed selected and the Record mix button ready](docs/screenshots/field-kit-standalone.jpg)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Choose **Load audio…** to play your own sample. The same drawer holds audio setup, source recording, and Set files.
 
@@ -21,13 +21,27 @@ In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to 
 
 ![The windowed Mix workspace playing Glass Circuit with the effects bypassed and the Main FX dials dimmed](docs/screenshots/field-kit-overview.png)
 
+## Working folders
+
+Open **Source, Input & Files → Working folders…** to choose the starting locations for **Load audio…**, **Save source WAV…**, and **Record mix…**. Field Kit remembers the two folder choices across launches. When present, the default folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
+
+![Working folders with separate import and recording locations and a Choose button for each](docs/screenshots/field-kit-working-folders.jpg)
+
 ## Record a source
 
-1. Open **Source, Input & Files**, select your interface in **Audio Setup…**, and click **Enable audio**. In **Input**, choose the left and right channels. Select the same channel on both sides for a mono source.
+1. Open **Source, Input & Files**, open **Audio & MIDI Setup…**, and select your interface in **Input device** and **Output device**. Click **Enable audio**. In **Input**, choose the left and right channels. Select the same channel on both sides for a mono source.
 2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
 3. Click **Record source** to capture up to 60 seconds. The red **RECORDING** badge and timer show when audio is being captured. **Stop source** loads the take into all four loops. Use **Save source WAV…** before saving a Set that uses the take or replacing the source.
 
 ![Glass Circuit playing with the Source, Input & Files drawer open and the Demos menu available](docs/screenshots/field-kit-source-drawer.jpg)
+
+## MIDI Learn
+
+Open **Source, Input & Files → Audio & MIDI Setup…** and choose a controller under **MIDI In**. Pick a control and click **Learn**. Move an absolute MIDI CC knob or fader for a value, or press a note or momentary CC button for an action. You can learn global speed, master level, transport, Main FX, and each loop’s play, level, pan, and sends.
+
+Select a mapped control and click **Clear** to remove its assignment. MIDI input starts off, and assignments are kept for the current session.
+
+![Audio & MIDI Setup with independent input and output menus, MIDI In, and the Learn and Clear buttons](docs/screenshots/field-kit-audio-midi-setup.jpg)
 
 ## Play and shape the loops
 

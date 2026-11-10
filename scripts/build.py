@@ -11,6 +11,8 @@ from pathlib import Path
 from build_drift_advanced import layout_drift_advanced
 from build_drift_modulation import DRIFT_MOD_TARGETS, append_drift_modulation
 from build_fx import DIALS as FX_DIALS
+from build_io import add_io_setup
+from build_working_folders import add_working_folders
 from build_master_meter import append_master_meter
 from build_performance_layout import PERFORMANCE_WINDOW_HEIGHT, layout_performance
 from build_mix_scene_strip import append_mix_scene_strip
@@ -398,7 +400,11 @@ def pattern_controls(p):
     p.connect("set_relink_result", 0, "pattern_control")
     p.connect("set_relink_cancel", 0, "pattern_control")
     p.obj("set_writer", "node.script fk_set_writer.js @autostart 1", 2425, 2125, outs=2)
-    p.connect("set_writer", 0, "pattern_control")
+    p.obj("file_preferences_route", "routepass folder_paths", 2425, 2160, outs=2)
+    p.connect("set_writer", 0, "file_preferences_route")
+    p.connect("file_preferences_route", 0, "source_control")
+    p.connect("file_preferences_route", 1, "pattern_control")
+    add_working_folders(p, Patch(), VERSION)
     sequence_controls(p)
 
 
@@ -884,9 +890,8 @@ def build():
            hint="Stop and restore the default loop, modulation and effects settings. Saved patterns stay in their squares.")
 
     p.ui("audio_setup", "live.text", 19, 0, 3, outs=2, types=["", ""],
-         text="Audio Setup…", texton="Audio Setup…", mode=0, parameter_enable=0)
-    p.add("open_audio_setup", "message", [1420, 804, 110, 22], ins=2, text="; dsp open")
-    p.connect("audio_setup", 0, "open_audio_setup")
+         text="Audio & MIDI Setup…", texton="Audio & MIDI Setup…", mode=0, parameter_enable=0)
+    add_io_setup(p, Patch(), VERSION)
 
     capture_left = grid_rect(SPLIT, 22, RIGHT_TRACKS)[0]
     master_label = [capture_left + 10, MIX_TOP + 6, 65, 22]

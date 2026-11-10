@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const maxApi = require("max-api");
 
 const stagingName = /^\.field-kit-[^/\\]+\.tmp$/;
@@ -105,3 +106,75 @@ maxApi.addHandler("commit_set", (staged, destination) => {
     const result = commitSet(staged, destination);
     maxApi.outlet("set_written", result, typeof staged === "string" ? staged : "");
 });
+
+const home = os.homedir();
+const workspace = path.join(home, "Documents", "Field Kit");
+const appData = process.platform === "darwin"
+    ? path.join(home, "Library", "Application Support")
+    : process.env.APPDATA || path.join(home, "AppData", "Roaming");
+const preferences = path.join(appData, "FieldKit", "working-folders.json");
+const defaultFolders = {
+    import: path.join(workspace, "Imports"),
+    recording: path.join(workspace, "Recordings"),
+};
+
+function readFolders() {
+    try {
+        const saved = JSON.parse(fs.readFileSync(preferences, "utf8"));
+        return {
+            import: typeof saved.import === "string" ? saved.import : "",
+            recording: typeof saved.recording === "string" ? saved.recording : "",
+        };
+    } catch (error) {
+        if (error.code !== "ENOENT") maxApi.post(`Field Kit could not read working folders: ${error.message}`);
+        return {};
+    }
+}
+
+function directory(value) {
+    try {
+        return fs.statSync(value).isDirectory();
+    } catch (_) {
+        return false;
+    }
+}
+
+function showFolders(message) {
+    const saved = readFolders();
+    const missing = Object.keys(defaultFolders).some(key => saved[key] && !directory(saved[key]));
+    const active = key => saved[key] && directory(saved[key]) ? saved[key] :
+        directory(defaultFolders[key]) ? defaultFolders[key] : "";
+    maxApi.outlet("folder_paths", active("import"), active("recording"), message ||
+        (missing ? "A saved folder is unavailable. Using the default location." :
+            "These folders are the starting locations for audio dialogs."));
+}
+
+function saveFolder(key, value) {
+    let staging;
+    try {
+        if (key !== "import" && key !== "recording") return;
+        const folder = nativePath(value);
+        if (!directory(folder)) {
+            showFolders("That folder is unavailable. Choose an existing folder.");
+            return;
+        }
+        const parent = path.dirname(preferences);
+        fs.mkdirSync(parent, { recursive: true });
+        const saved = readFolders();
+        saved[key] = folder;
+        staging = fs.mkdtempSync(path.join(parent, ".folders-"));
+        const file = path.join(staging, "working-folders.json");
+        fs.writeFileSync(file, JSON.stringify(saved) + "\n", { mode: 0o600 });
+        fs.renameSync(file, preferences);
+        showFolders("Working folder saved.");
+    } catch (error) {
+        maxApi.post(`Field Kit could not save the working folder: ${error.message}`);
+        showFolders("Couldn’t save that folder. The previous setting is still in use.");
+    } finally {
+        if (staging) fs.rmSync(staging, { recursive: true, force: true });
+    }
+}
+
+maxApi.addHandler("folder_get", () => showFolders());
+maxApi.addHandler("folder_choose", saveFolder);
+showFolders();

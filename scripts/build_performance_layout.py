@@ -79,7 +79,6 @@ def layout_performance(p, parameter):
     for name, title, x, width in (
         ("drawer_input_title", "Input", 310, 110),
         ("drawer_capture_title", "Source recording", 674, 211),
-        ("drawer_files_title", "Files", 918, 146),
     ):
         rect = [x, 128, width, 22]
         p.add(name, "comment", rect, view=rect, outs=0, text=title,

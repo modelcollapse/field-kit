@@ -1,5 +1,14 @@
 # Field Kit changelog
 
+## v0.8.15
+
+- Working folders lets you choose and remember separate import and recording locations.
+
+## v0.8.14
+
+- Audio & MIDI Setup gives input and output devices separate menus.
+- MIDI Learn maps a selected MIDI port to transport, global and loop controls.
+
 ## v0.8.13
 
 - Record mix changes to Stop recording during a take.

@@ -18,6 +18,8 @@ var frameHeight = 0;
 var fitTask = new Task(fit_full_screen, this);
 var scopeFitTask = new Task(fit_scope_popout, this);
 var scopeOpenTask = new Task(show_scope_popout, this);
+var foldersOpenTask = new Task(show_working_folders, this);
+var ioOpenTask = new Task(show_io_setup, this);
 var fieldOpenTask = new Task(show_stereo_field, this);
 var scopeSize = [];
 var interfacePalette = null;
@@ -211,6 +213,26 @@ function full_screen() {
 function exit_full_screen() {
     if (fullScreen) full_screen();
 }
+
+function open_working_folders() {
+    open_popout(foldersOpenTask);
+}
+
+function show_working_folders() {
+    patch.getnamed("working_folders_window").message("open");
+    patch.getnamed("set_writer").message("folder_get");
+}
+show_working_folders.local = 1;
+
+function open_io_setup() {
+    open_popout(ioOpenTask);
+}
+
+function show_io_setup() {
+    patch.getnamed("io_setup_window").message("open");
+    patch.getnamed("io_control").message("bang");
+}
+show_io_setup.local = 1;
 
 function open_scope_popout() {
     open_popout(scopeOpenTask);
@@ -430,6 +452,8 @@ function msg_int(index) {
     send_theme(patch.getnamed("pattern_control"), control.concat(selection, accent, ink, canvas));
     send_theme(patch.getnamed("mixer_control"), control.concat(ink));
     paint_patch(patch.getnamed("sequence_panel").subpatcher(), sections.scenes, palette);
+    paint_patch(patch.getnamed("io_setup_panel").subpatcher(), sections.input, palette);
+    paint_patch(patch.getnamed("working_folders_panel").subpatcher(), sections.source_files, palette);
     var tuner = patch.getnamed("tuner_panel").subpatcher();
     paint_patch(tuner, panel, palette);
     send_theme(tuner.getnamed("tuner_canvas"), inset.concat(ink, palette[5], accent, control));
