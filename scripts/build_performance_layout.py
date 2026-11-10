@@ -48,7 +48,8 @@ def layout_performance(p, parameter):
         ("surface_source", [8, 120, 284, 102]),
         ("surface_input", [298, 120, 358, 102]),
         ("surface_input_capture", [662, 120, 238, 102]),
-        ("input_heading", [20, 128, 255, 22]),
+        ("input_heading", [20, 128, 83, 22]),
+        ("loop_destination", [154, 127, 126, 24]),
         ("load", [20, 163, 125, 28]),
         ("demo", [154, 163, 126, 28]),
         ("audio_setup", [500, 127, 144, 24]),
@@ -71,6 +72,8 @@ def layout_performance(p, parameter):
         ("set_status", [918, 182, 146, 36]),
     ):
         place(name, rect, **drawer)
+    rect = [105, 130, 46, 19]
+    p.add("loop_destination_label", "comment", rect, view=rect, outs=0, text="Send to", fontsize=11, **drawer)
     boxes["input_level_label"].update(text="Input level", fontsize=11)
     boxes["input_record_state"]["fontsize"] = 11
     boxes["input_save_button"]["fontsize"] = 10

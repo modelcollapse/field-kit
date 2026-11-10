@@ -27,6 +27,7 @@ var baseSampleRate = 0;
 var loopBuffers = [];
 var loopSources = [null, null, null, null];
 var loopPending = null;
+var loopDestination = 0;
 var loopSet = null;
 var loopWrite = null;
 var lateLoopReads = {};
@@ -320,9 +321,22 @@ function release_loop_buffer(entry) {
 }
 release_loop_buffer.local = 1;
 
-function choose_loop_audio() {
+function set_loop_destination(index) {
+    if (loop_busy() || typeof index !== "number" || index % 1 || index < 0 || index > WINDOWS + 1) {
+        send("loop_destination", "set", loopDestination);
+        return;
+    }
+    loopDestination = index;
+    update_status();
+}
+
+function import_loop_audio() {
+    choose_loop_audio(loopDestination || inspectedWindow);
+}
+
+function choose_loop_audio(voice) {
     if (!ready || loop_busy()) return;
-    loopPending = {state: "choosing", voice: inspectedWindow};
+    loopPending = {state: "choosing", voice: voice || inspectedWindow};
     send("loop_file", "bang");
 }
 
@@ -410,8 +424,9 @@ loop_file_name.local = 1;
 function stage_loop_entry(voice, entry) {
     loopPending = {state: "staged", voice: voice, entry: entry, range: [0, 100]};
     var panel = host.patcher.getnamed("loop_take_panel").subpatcher();
-    var caption = "Use on Loop " + voice;
-    panel.getnamed("take_title").message("set", "New audio for Loop " + voice);
+    var destination = voice === WINDOWS + 1 ? "all loops" : "Loop " + voice;
+    var caption = "Use on " + destination;
+    panel.getnamed("take_title").message("set", "New audio for " + destination);
     panel.getnamed("take_detail").message("set", entry.name + " · " + (entry.frames / entry.sampleRate).toFixed(2) + " s");
     panel.getnamed("take_confirm").message("text", caption);
     panel.getnamed("take_confirm").message("texton", caption);
@@ -456,9 +471,11 @@ function copy_loop_to(voice) {
 }
 
 function switch_loop_audio(voice, entry, range) {
-    loopPending = {state: "switching", voice: voice, entry: entry, range: range};
-    if (audioOn && playing[voice - 1]) {
-        send("run_" + voice, 0);
+    var voices = voice === WINDOWS + 1 ? [1, 2, 3, 4] : [voice];
+    loopPending = {state: "switching", voices: voices, entry: entry, range: range};
+    var running = voices.filter(function (target) { return audioOn && playing[target - 1]; });
+    if (running.length) {
+        running.forEach(function (target) { send("run_" + target, 0); });
         loopSwitch.schedule(40);
     } else {
         commit_loop_switch();
@@ -469,14 +486,21 @@ switch_loop_audio.local = 1;
 
 function commit_loop_switch() {
     var change = loopPending;
-    var voice = change.voice;
-    var previous = loopSources[voice - 1];
-    loopSources[voice - 1] = change.entry;
-    bind_loop(voice);
-    set_region(voice, change.range[0], change.range[1]);
-    send("run_" + voice, audioOn && playing[voice - 1] ? 1 : 0);
+    var previous = [];
+    change.voices.forEach(function (voice) {
+        var old = loopSources[voice - 1];
+        if (old && previous.indexOf(old) === -1) previous.push(old);
+        loopSources[voice - 1] = change.entry;
+        bind_loop(voice);
+        var range = change.voices.length === 1 ? change.range :
+            [(voice - 1) * 100 / WINDOWS, voice * 100 / WINDOWS];
+        set_region(voice, range[0], range[1]);
+    });
     loopPending = null;
-    release_loop_buffer(previous);
+    change.voices.forEach(function (voice) {
+        send("run_" + voice, audioOn && playing[voice - 1] ? 1 : 0);
+    });
+    previous.forEach(release_loop_buffer);
     update_status();
 }
 commit_loop_switch.local = 1;
@@ -499,6 +523,8 @@ function update_loop_buttons() {
     var entry = loopSources[inspectedWindow - 1];
     send("loop_copy", "ignoreclick", busy || !ready ? 1 : 0);
     send("loop_replace", "active", !busy && ready ? 1 : 0);
+    send("load", "active", !busy && ready ? 1 : 0);
+    send("loop_destination", "ignoreclick", busy ? 1 : 0);
     var saveCaption = entry ? "Save Loop WAV…" : "Save source WAV…";
     send("input_save_button", "text", saveCaption);
     send("input_save_button", "texton", saveCaption);
@@ -833,7 +859,9 @@ function update_status() {
     } else {
         send("input_record_state", "bgcolor", 0, 0, 0, 0);
     }
-    var inputButton = recording ? "Stop recording" : "Record for Loop " + inspectedWindow;
+    var destination = loopDestination || inspectedWindow;
+    var inputButton = recording ? "Stop recording" :
+        destination === WINDOWS + 1 ? "Record for All" : "Record for Loop " + destination;
     send("input_record_button", "text", inputButton);
     send("input_record_button", "texton", inputButton);
     send("input_record_button", "active", recording || (audioOn && !audioStarting &&
@@ -910,7 +938,7 @@ function set_input_channel(outletNumber, index) {
 }
 
 function toggle_loop_record() {
-    toggle_input_record(inspectedWindow);
+    toggle_input_record(loopDestination || inspectedWindow);
 }
 
 function toggle_input_record(voice) {
@@ -1250,7 +1278,7 @@ function set_play(voice, state) {
     if (playing[voice - 1] !== actual) {
         playing[voice - 1] = actual;
         send("run_" + voice, actual && !(loopPending && loopPending.state === "switching" &&
-            loopPending.voice === voice) ? 1 : 0);
+            loopPending.voices.indexOf(voice) !== -1) ? 1 : 0);
         send("playhead_gate_" + voice, actual ? 1 : 0);
     }
     send("play_" + voice, "set", actual ? 1 : 0);

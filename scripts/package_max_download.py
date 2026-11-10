@@ -24,7 +24,7 @@ START_HERE = """FIELD KIT for Max
 
 1. Extract the ZIP and open the Field Kit folder.
 2. Double-click Open FIELD KIT.maxpat. This download requires Max 9.
-3. Click Play all to hear the original demo. In Source, Input & Files, open Demos… for Glass Circuit (120 BPM) or Tidal Lanterns (75 BPM), or choose Load audio… for your own sample.
+3. Click Play all to hear the original demo. In Source, Input & Files, open Demos… for Glass Circuit (120 BPM) or Tidal Lanterns (75 BPM), or choose a Send to destination and click Import audio… for your own sample.
 4. Choose Slate, Moss, or Ember from Theme in the header.
 
 In Transport, Speed changes all four loops from half to double speed.
@@ -37,7 +37,7 @@ Enable audio and play one note at a time. The display shows the nearest note,
 frequency and cents relative to A4 = 440 Hz.
 
 Open Source, Input & Files → Working folders… to select the starting folders
-for Load audio…, Save source WAV…, and Record mix…. Field Kit remembers the two
+for Import audio…, Replace audio…, Save Loop WAV…, and Record mix…. Field Kit remembers the two
 choices across launches. The default folders, when present, are Imports and
 Recordings under Documents/Field Kit.
 
@@ -46,12 +46,13 @@ and Output device. Enable audio. In Input, choose the left and right channels. F
 Input gain adjusts both channels from −60 to +18 dB and starts at 0 dB.
 The two post-gain peak meters show the recording levels with peak hold
 and a red overload indicator.
-Select a loop and click Record for Loop N. The current loops keep playing.
-Click Stop recording and choose Use on Loop N or Discard. Takes are limited to
+Choose Selected loop, a loop number, or All loops in Send to. Click Record.
+The current loops keep playing. Click Stop recording and confirm or discard. Takes are limited to
 60 seconds. Select the recorded loop and choose Save Loop WAV… before saving a Set.
 In the loop editor, Copy to Loop… shares the source and copies its range while
 keeping the destination’s settings. Replace audio… stages a file for that loop.
-Load audio… in the Source drawer still loads a shared source for all four loops.
+Import audio… in the Source drawer uses the same Send to menu. All loops uses
+one source, with each loop starting on a different quarter of the audio.
 
 To use MIDI Learn, choose a port under MIDI In, pick a control and click Learn.
 Move an absolute CC knob or fader, or use a note or momentary CC for buttons.

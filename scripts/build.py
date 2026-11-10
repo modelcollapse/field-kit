@@ -217,8 +217,16 @@ def source_input(p):
           text="00:00.0", fontface=1, textjustification=2,
           hint="Elapsed audio captured in the current or last input take.")
     button_y = INPUT_TOP + 35
-    action(p, "load", "Load audio…", 0, "choose", 3,
+    action(p, "load", "Import audio…", 0, "import_loop_audio", 3,
            view=[28, button_y, 126, 28])
+    target_rect = [160, INPUT_TOP + 8, 120, 24]
+    p.add("loop_destination", "umenu", target_rect, view=target_rect, outs=3, types=["int", "", ""],
+          items=["Selected loop", ",", "Loop 1", ",", "Loop 2", ",", "Loop 3", ",", "Loop 4", ",", "All loops"],
+          allowdrag=0, parameter_enable=0,
+          hint="Choose where the next recording or import will go.")
+    p.obj("loop_destination_message", "prepend set_loop_destination", 1225, 2230, ins=2)
+    p.connect("loop_destination", 0, "loop_destination_message")
+    p.connect("loop_destination_message", 0, "source_control")
     demo_rect = [160, button_y, 120, 28]
     p.add("demo", "umenu", demo_rect, view=demo_rect, outs=3, types=["int", "", ""],
           items=["Demos…", ",", "Original demo", ",", "Glass Circuit", ",", "Tidal Lanterns"],
@@ -229,7 +237,7 @@ def source_input(p):
     p.connect("demo_message", 0, "source_control")
     for name, text, column, command, hint in (
         ("input_record_button", "Record for Loop 1", 15, "toggle_loop_record",
-         "Record the selected inputs for the loop you are editing."),
+         "Record the selected inputs for the destination in the Source drawer."),
         ("input_save_button", "Save source WAV…", 18, "choose_input_save",
          "Save the current input take so a Set can reopen it."),
     ):

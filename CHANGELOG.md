@@ -1,5 +1,10 @@
 # Field Kit changelog
 
+## v0.8.18
+
+- Choose Selected loop, a specific loop, or All loops from the same Send to menu for recording and importing.
+- Record or stage an import while the current loops keep playing. Confirm before swapping audio. All loops starts the four loops on different quarters of one take or file.
+
 ## v0.8.17
 
 - Record a take for the selected loop while all current loops continue playing. Confirm or discard before swapping the audio.

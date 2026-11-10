@@ -13,6 +13,8 @@ const namedBuffers = new Map();
 const buffers = new Map([
     ['buffer', { frames: 1, channels: 1, rate: 44100 }],
     ['set_buffer', { frames: 1, channels: 1, rate: 44100 }],
+    ...Array.from({ length: 8 }, (_, slot) =>
+        [`loop_buffer_${slot}`, { frames: 1, channels: 1, rate: 44100 }]),
 ]);
 const sampleRate = 48000;
 const capacity = sampleRate * 60;
@@ -88,6 +90,9 @@ const host = vm.createContext({
         getnamed: target => ({
             message: (...args) => message(target, ...args),
             getattr: attr => attr === 'sr' ? buffers.get(target)?.rate : undefined,
+            subpatcher: () => ({
+                getnamed: control => ({ message: (...args) => message(control, ...args) }),
+            }),
         }),
     },
     arrayfromargs: value => Array.from(value),
@@ -310,5 +315,60 @@ assert(sent('input_recorder', 0), 'turning off DSP stops capture');
 assert.equal(displayed('input_record_state'), 'Preparing take…');
 host.input_record_progress(0);
 assert.equal(displayed('input_record_state'), 'Enable audio to record');
+
+host.dsp_enabled(1);
+host.play_all();
+host.set_loop_destination(5);
+trace.length = 0;
+host.toggle_loop_record();
+host.set_loop_destination(2);
+assert(sent('loop_destination', 'set', 5), 'a take keeps the destination chosen at record start');
+host.toggle_loop_record();
+host.input_record_progress(0.05);
+advance(100);
+assert(host.playing.every(Boolean));
+assert(host.loopSources.every(source => source === null), 'recorded audio waits for confirmation');
+assert(sent('take_confirm', 'text', 'Use on all loops'));
+host.confirm_loop_audio();
+advance(40);
+const shared = host.loopSources[0];
+assert(shared && host.loopSources.every(source => source === shared));
+assert.deepEqual(JSON.parse(JSON.stringify(host.positions)), [[0, 25], [25, 50], [50, 75], [75, 100]]);
+assert(host.playing.every(Boolean));
+
+host.set_loop_destination(3);
+host.import_loop_audio();
+host.inspect_window(0);
+host.stage_loop_file(fixturePath);
+host.loop_buffer_ready(host.loopPending.slot, 44100);
+assert(sent('take_confirm', 'text', 'Use on Loop 3'));
+assert(host.loopSources.every(source => source === shared), 'an import leaves the old audio in place');
+host.confirm_loop_audio();
+advance(40);
+assert.equal(host.loopSources[2].path, fixturePath);
+assert.equal(host.loopSources[0], shared);
+assert.equal(host.loopSources[1], shared);
+assert.equal(host.loopSources[3], shared);
+
+host.set_loop_destination(5);
+host.import_loop_audio();
+host.stage_loop_file(fixturePath);
+host.loop_buffer_ready(host.loopPending.slot, 44100);
+host.discard_loop_audio();
+assert.equal(host.loopSources[0], shared);
+assert.equal(host.loopSources[2].path, fixturePath);
+assert(host.playing.every(Boolean));
+
+host.set_loop_destination(2);
+host.inspect_window(3);
+host.toggle_loop_record();
+assert.equal(host.inputTake.voice, 2, 'the explicit record target is independent of the editor');
+host.toggle_loop_record();
+host.input_record_progress(0.05);
+advance(100);
+assert(sent('take_confirm', 'text', 'Use on Loop 2'));
+host.discard_loop_audio();
+assert.equal(host.loopSources[1], shared);
+assert(host.playing.every(Boolean));
 
 console.log('Verified Field Kit input routing, recording indicator, playback independence, and saved Set paths.');
