@@ -25,6 +25,8 @@ var duration = 0;
 var baseSampleRate = 0;
 var loopBuffers = [];
 var loopSources = [null, null, null, null];
+var loopCleared = [false, false, false, false];
+var emptyBufferName = "";
 var loopPending = null;
 var loopDestination = 0;
 var loopSet = null;
@@ -118,6 +120,9 @@ function boot_source() {
         send("loop_buffer_" + loopSlot, "name", name);
         send("loop_info_" + loopSlot, "set", name);
     }
+    emptyBufferName = "field-kit-empty-" + bufferIds.last;
+    send("empty_loop_buffer", "name", emptyBufferName);
+    send("empty_loop_buffer", "sizeinsamps", 1);
     bind_source(0);
     for (var voice = 1; voice <= WINDOWS; voice++) bind_loop(voice);
     send("input_device_channels", "bang");
@@ -236,14 +241,15 @@ function update_fade_preview() {
 }
 update_fade_preview.local = 1;
 
-function folder_paths(importPath, recordingPath, status) {
+function folder_paths(importPath, recordingPath, banksPath, status) {
     var panel = host.patcher.getnamed("working_folders_panel").subpatcher();
     var recordingDialog = host.patcher.getnamed("recorder").subpatcher().getnamed("save_dialog");
     function apply(dialog, path) {
         if (path) dialog.message("setpath", path);
         else dialog.message("setpath");
     }
-    [[ "import", importPath, "audio_file" ], [ "recording", recordingPath, "input_save_dialog" ]]
+    [[ "import", importPath, "audio_file" ], [ "recording", recordingPath, "input_save_dialog" ],
+     [ "banks", banksPath, "pattern_save_dialog" ]]
         .forEach(function (entry) {
             var path = entry[1];
             apply(host.patcher.getnamed(entry[2]), path);
@@ -253,6 +259,7 @@ function folder_paths(importPath, recordingPath, status) {
             caption.message("hint", path || "Uses the last location remembered by the system");
         });
     apply(recordingDialog, recordingPath);
+    apply(host.patcher.getnamed("pattern_load_dialog"), banksPath);
     apply(host.patcher.getnamed("loop_file"), importPath);
     panel.getnamed("folders_status").message("set", status);
 }
@@ -300,6 +307,7 @@ function loop_busy() {
 }
 
 function loop_duration(voice) {
+    if (loopCleared[voice - 1]) return 0;
     var entry = loopSources[voice - 1];
     return entry ? entry.frames * 1000 / entry.sampleRate : duration;
 }
@@ -447,6 +455,8 @@ function stage_loop_entry(voice, entry) {
     var caption = "Use on " + destination;
     panel.getnamed("take_title").message("set", "New audio for " + destination);
     panel.getnamed("take_detail").message("set", entry.name + " · " + (entry.frames / entry.sampleRate).toFixed(2) + " s");
+    panel.getnamed("take_discard").message("text", "Discard");
+    panel.getnamed("take_discard").message("texton", "Discard");
     panel.getnamed("take_confirm").message("text", caption);
     panel.getnamed("take_confirm").message("texton", caption);
     send("theme_control", "open_loop_take");
@@ -460,7 +470,29 @@ function close_loop_take() {
 }
 close_loop_take.local = 1;
 
+function clear_loop() {
+    if (!ready || loop_busy() || loopCleared[inspectedWindow - 1]) return;
+    var voice = inspectedWindow;
+    loopPending = {state: "clearing", voice: voice};
+    var panel = host.patcher.getnamed("loop_take_panel").subpatcher();
+    panel.getnamed("take_title").message("set", "Clear Loop " + voice + "?");
+    panel.getnamed("take_detail").message("set", loopSources[voice - 1] && !loopSources[voice - 1].path ?
+        "Unsaved audio will be removed. Saved WAVs are kept." :
+        "Empties this track. Saved audio files stay on disk.");
+    panel.getnamed("take_discard").message("text", "Cancel");
+    panel.getnamed("take_discard").message("texton", "Cancel");
+    panel.getnamed("take_confirm").message("text", "Clear Loop " + voice);
+    panel.getnamed("take_confirm").message("texton", "Clear Loop " + voice);
+    send("theme_control", "open_loop_take");
+    update_status();
+}
+
 function confirm_loop_audio() {
+    if (loopPending && loopPending.state === "clearing") {
+        switch_loop_audio(loopPending.voice, null, [0, 100], true);
+        close_loop_take();
+        return;
+    }
     if (!loopPending || loopPending.state !== "staged") return;
     var change = loopPending;
     switch_loop_audio(change.voice, change.entry, change.range);
@@ -468,31 +500,38 @@ function confirm_loop_audio() {
 }
 
 function loop_take_closed() {
-    if (loopPending && loopPending.state === "staged") discard_loop_audio(false);
+    if (loopPending && (loopPending.state === "staged" || loopPending.state === "clearing")) discard_loop_audio(false);
 }
 
 function discard_loop_audio(close) {
-    if (!loopPending || (loopPending.state !== "staged" && loopPending.state !== "choosing")) return;
+    if (!loopPending || (loopPending.state !== "staged" && loopPending.state !== "choosing" && loopPending.state !== "clearing")) return;
     var change = loopPending;
     loopPending = null;
-    if (change.entry) {
-        if (close !== false) close_loop_take();
-        release_loop_buffer(change.entry);
-    }
+    if (close !== false) close_loop_take();
+    if (change.entry) release_loop_buffer(change.entry);
     update_status();
 }
 
 function copy_loop_to(voice) {
     send("loop_copy", "set", 0);
+    if (voice === WINDOWS + 1) {
+        clear_loop();
+        return;
+    }
     if (!ready || loop_busy() || voice < 1 || voice > WINDOWS || voice % 1 || voice === inspectedWindow) return;
     var index = inspectedWindow - 1;
+    if (loopCleared[index]) return;
     switch_loop_audio(voice, loopSources[index], positions[index].slice());
 }
 
-function switch_loop_audio(voice, entry, range) {
+function switch_loop_audio(voice, entry, range, clearing) {
     var voices = voice === WINDOWS + 1 ? [1, 2, 3, 4] : [voice];
-    loopPending = {state: "switching", voices: voices, entry: entry, range: range};
+    loopPending = {state: "switching", voices: voices, entry: entry, range: range, clearing: !!clearing};
     var running = voices.filter(function (target) { return audioOn && playing[target - 1]; });
+    if (clearing) {
+        queuedWindows &= ~(1 << (voice - 1));
+        set_play(voice, false);
+    }
     if (running.length) {
         running.forEach(function (target) { send("run_" + target, 0); });
         loopSwitch.schedule(40);
@@ -510,6 +549,7 @@ function commit_loop_switch() {
         var old = loopSources[voice - 1];
         if (old && previous.indexOf(old) === -1) previous.push(old);
         loopSources[voice - 1] = change.entry;
+        loopCleared[voice - 1] = change.clearing;
         bind_loop(voice);
         var range = change.voices.length === 1 ? change.range :
             [(voice - 1) * 100 / WINDOWS, voice * 100 / WINDOWS];
@@ -526,7 +566,7 @@ commit_loop_switch.local = 1;
 
 function bind_loop(voice) {
     var entry = loopSources[voice - 1];
-    var name = entry ? loopBuffers[entry.slot] : bufferName;
+    var name = loopCleared[voice - 1] ? emptyBufferName : entry ? loopBuffers[entry.slot] : bufferName;
     send("voice_" + voice, "source", name);
     send("source_rate_" + voice, entry ? entry.sampleRate : baseSampleRate);
     var wasDrawing = drawing;
@@ -539,6 +579,14 @@ bind_loop.local = 1;
 
 function update_loop_buttons() {
     var busy = loop_busy();
+    for (var voice = 1; voice <= WINDOWS; voice++) {
+        var empty = loopCleared[voice - 1];
+        send("play_" + voice, "active", ready && !empty ? 1 : 0);
+        send("play_" + voice, "text", empty ? "Empty" : "▶ Play");
+        send("play_" + voice, "texton", empty ? "Empty" : "■ Stop");
+    }
+    label("inspector_title", loopCleared[inspectedWindow - 1] ?
+        "Loop " + inspectedWindow + " · Empty" : "Editing Loop " + inspectedWindow);
     var entry = loopSources[inspectedWindow - 1];
     send("loop_copy", "ignoreclick", busy || !ready ? 1 : 0);
     send("loop_replace", "active", !busy && ready ? 1 : 0);
@@ -547,22 +595,27 @@ function update_loop_buttons() {
     var saveCaption = !entry && ready && !sourceDemo && !sourcePath ? "Save source WAV…" : "Save Loop WAV…";
     send("input_save_button", "text", saveCaption);
     send("input_save_button", "texton", saveCaption);
-    send("input_save_button", "active", !busy && ready &&
+    send("input_save_button", "active", !busy && ready && !loopCleared[inspectedWindow - 1] &&
         ((entry && !entry.path) || (!entry && !sourceDemo && !sourcePath)) ? 1 : 0);
 }
 update_loop_buttons.local = 1;
+
+function get_set_cleared() {
+    return loopCleared.slice();
+}
 
 function get_set_loops() {
     if (loop_busy() || loopSources.some(function (entry) { return entry && !entry.path; })) return null;
     return loopSources.map(function (entry) { return entry ? entry.path : null; });
 }
 
-function open_set_loops(base, demoId, paths) {
+function open_set_loops(base, demoId, paths, cleared) {
     if (!Array.isArray(paths) || paths.length !== WINDOWS || loop_busy()) {
         send("pattern_control", "set_source_loaded", 0);
         return;
     }
-    loopSet = {base: base, demoId: demoId, paths: paths, sources: [null, null, null, null]};
+    loopSet = {base: base, demoId: demoId, paths: paths, sources: [null, null, null, null],
+        cleared: cleared ? cleared.slice() : [false, false, false, false]};
     read_next_set_loop();
 }
 
@@ -601,6 +654,7 @@ abandon_loop_set.local = 1;
 function finish_loop_set() {
     var previous = loopSources;
     loopSources = loopSet ? loopSet.sources : [null, null, null, null];
+    loopCleared = loopSet ? loopSet.cleared : [false, false, false, false];
     loopSet = null;
     previous.forEach(release_loop_buffer);
 }
@@ -906,6 +960,8 @@ function update_status() {
         label("status", "Saving recorded source…");
     } else if (staged) {
         label("status", (loopPending.entry.path ? "File" : "Take") + " ready · Confirm or discard.");
+    } else if (loopPending && loopPending.state === "clearing") {
+        label("status", "Clear Loop " + loopPending.voice + "? Confirm or cancel.");
     } else if (pendingPath) {
         label("status", (queuedWindows || queuedNormal) ? "Loading audio… Playback queued." : "Loading audio…");
     } else if (audioStarting) {
@@ -917,7 +973,8 @@ function update_status() {
     } else if (count) {
         label("status", count + " of " + WINDOWS + " loops playing");
     } else if (ready) {
-        label("status", sourceDemo ? "Click Play all to hear the demo." :
+        label("status", loopCleared.every(Boolean) ? "Empty tracks · Record or import audio." :
+            sourceDemo ? "Click Play all to hear the demo." :
             sourcePath ? "Ready · Click Play all." : "Input ready · Save a WAV to keep the take.");
     } else if (bufferName) {
         label("status", "Choose a demo to get started.");
@@ -1318,7 +1375,7 @@ function normal_finished() {
 }
 
 function set_play(voice, state) {
-    var actual = !!(state && ready && audioOn);
+    var actual = !!(state && ready && audioOn && !loopCleared[voice - 1]);
     if (playing[voice - 1] !== actual) {
         playing[voice - 1] = actual;
         send("run_" + voice, actual && !(loopPending && loopPending.state === "switching" &&

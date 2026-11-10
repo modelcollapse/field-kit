@@ -116,6 +116,7 @@ const preferences = path.join(appData, "FieldKit", "working-folders.json");
 const defaultFolders = {
     import: path.join(workspace, "Imports"),
     recording: path.join(workspace, "Recordings"),
+    banks: path.join(workspace, "Banks"),
 };
 
 function readFolders() {
@@ -124,6 +125,7 @@ function readFolders() {
         return {
             import: typeof saved.import === "string" ? saved.import : "",
             recording: typeof saved.recording === "string" ? saved.recording : "",
+            banks: typeof saved.banks === "string" ? saved.banks : "",
         };
     } catch (error) {
         if (error.code !== "ENOENT") maxApi.post(`Field Kit could not read working folders: ${error.message}`);
@@ -141,18 +143,25 @@ function directory(value) {
 
 function showFolders(message) {
     const saved = readFolders();
+    if (!directory(saved.banks) && !directory(defaultFolders.banks)) {
+        try {
+            fs.mkdirSync(defaultFolders.banks, { recursive: true });
+        } catch (error) {
+            maxApi.post(`Field Kit could not prepare the bank folder: ${error.message}`);
+        }
+    }
     const missing = Object.keys(defaultFolders).some(key => saved[key] && !directory(saved[key]));
     const active = key => saved[key] && directory(saved[key]) ? saved[key] :
         directory(defaultFolders[key]) ? defaultFolders[key] : "";
-    maxApi.outlet("folder_paths", active("import"), active("recording"), message ||
+    maxApi.outlet("folder_paths", active("import"), active("recording"), active("banks"), message ||
         (missing ? "A saved folder is unavailable. Using the default location." :
-            "These folders are the starting locations for audio dialogs."));
+            "Starting locations for audio and bank dialogs."));
 }
 
 function saveFolder(key, value) {
     let staging;
     try {
-        if (key !== "import" && key !== "recording") return;
+        if (!Object.prototype.hasOwnProperty.call(defaultFolders, key)) return;
         const folder = nativePath(value);
         if (!directory(folder)) {
             showFolders("That folder is unavailable. Choose an existing folder.");

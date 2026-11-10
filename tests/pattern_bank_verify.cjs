@@ -13,6 +13,7 @@ const sourceState = {
     normalPlaying: false,
     path: '/test/audio.wav',
     get_set_loops() { return [null, null, null, null]; },
+    get_set_cleared() { return [false, false, false, false]; },
     loop_busy() { return false; },
     get_set_source() { return { kind: 'file', path: this.path }; },
     valid_builtin_demo(id) { return id === 'glass-circuit' || id === 'tidal-lanterns'; },
@@ -152,6 +153,10 @@ for (const [name, value] of Object.entries({
     fx_enabled: 1, fx_mode: 1, fx_tone: -8, fx_distortion: 34, fx_echo: 60, fx_time_ms: 500, fx_repeats: 77, fx_space: 12, fx_decay: 3.2,
     pitch_scale: 5, master: -5, global_speed: 1, speed_mode: 0, pitch_lock: 0,
 })) addControl(name, value);
+for (let i = 1; i <= 4; i++) {
+    addControl('voice_' + i, 0);
+    addControl('scene_sample_' + i, 0);
+}
 for (let i = 1; i <= 8; i++) addControl('pattern_' + i, 0);
 for (const name of ['pattern_store', 'pattern_status', 'set_status', 'pattern_save_dialog', 'pattern_load_dialog',
                     'set_save_dialog', 'set_open_dialog', 'set_relink_dialog', 'set_writer',
@@ -730,6 +735,7 @@ assert.match(controls.set_status.value, /Stop recording/);
 console.log('PASS Set round-trip, Stereo Field presets, transactional sequence restore, older Sets, relocation, relink and cancel');
 
 sourceState.audioOn = true;
+sourceState.normalPlaying = true;
 sourceState.playing[0] = true;
 controls.pan_1.value = 13;
 host.slot(2, 1);
@@ -752,6 +758,7 @@ host.release_recall_tail();
 assert.deepEqual(messages.at(-1), ['pattern_transition_command', 0]);
 host.slot(2);
 host.slot(1);
+sourceState.normalPlaying = true;
 assert.equal(controls.pan_1.value, 13);
 host.recall_phase(0);
 assert.deepEqual(messages.slice(-2), [
@@ -769,6 +776,7 @@ host.recall_phase(0);
 host.slot(2);
 assert.equal(controls.pan_1.value, 13);
 assert.equal(host.recallStage, 'idle');
+sourceState.normalPlaying = true;
 sourceState.playing[0] = true;
 host.slot(1);
 sourceState.audioOn = false;
@@ -778,6 +786,62 @@ assert.deepEqual(messages.at(-1), ['pattern_transition_command', 2]);
 host.recall_phase(1);
 assert.equal(controls.pan_1.value, -62);
 console.log('PASS buffered recall waits for DSP, queues the latest click and recovers on transport and DSP stops');
+
+// Loop scenes stage safely, then each voice completes independently.
+sourceState.normalPlaying = false;
+sourceState.audioOn = true;
+sourceState.playing = [true, false, true, false];
+controls.pan_1.value = 37;
+host.slot(1);
+assert.equal(host.recallStage, 'voice_capture');
+assert.equal(controls.pan_1.value, 37);
+let generation = host.recallGeneration;
+host.recall_voice_phase(1, (generation - 1) * 4 + 3);
+assert.equal(host.recallStage, 'voice_capture');
+host.slot(2);
+for (let voice = 1; voice <= 3; voice++) host.recall_voice_phase(voice, generation * 4 + 1);
+assert.equal(controls.pan_1.value, 37);
+const globalRoutesBefore = [...modState.globalGains];
+host.recall_voice_phase(4, generation * 4 + 1);
+assert.deepEqual(modState.globalGains, globalRoutesBefore);
+assert.equal(host.recallStage, 'voice_settling');
+assert.equal(controls.pan_1.value, 13);
+const sharedBefore = controls.master.value;
+host.release_recall_tail();
+assert.equal(host.recallStage, 'voice_wait');
+assert.deepEqual(messages.at(-1), ['voice_4', 'scene_command', generation * 2 + 1]);
+host.recall_voice_phase(2, generation * 4 + 3); // stopped voices acknowledge immediately
+host.recall_voice_phase(4, generation * 4 + 3);
+host.recall_voice_phase(1, generation * 4 + 2);
+assert.equal(host.recallStage, 'voice_wait');
+assert.equal(controls.master.value, sharedBefore);
+host.slot(1); // a later request waits for the current handoff
+host.recall_voice_phase(1, generation * 4 + 3);
+host.recall_voice_phase(3, generation * 4 + 3);
+assert.equal(host.recallStage, 'voice_capture');
+assert.equal(host.recallGeneration, generation + 1);
+generation = host.recallGeneration;
+for (let voice = 1; voice <= 4; voice++) host.recall_voice_phase(voice, generation * 4 + 1);
+host.release_recall_tail();
+sourceState.audioOn = false;
+host.recall_dsp(0);
+assert.equal(host.recallStage, 'idle');
+assert.equal(host.voiceRecall, null);
+assert.equal(controls.pan_1.value, -62);
+host.recall_voice_phase(1, generation * 4 + 3);
+assert.equal(host.recallStage, 'idle');
+sourceState.audioOn = true;
+host.slot(2);
+for (let voice = 1; voice <= 4; voice++) host.recall_voice_phase(voice, host.recallGeneration * 4 + 1);
+host.release_recall_tail();
+sourceState.playing.fill(false);
+host.transport_stopped();
+assert.equal(host.voiceRecall, null);
+assert.equal(host.pendingRecall, null);
+host.recall_phase(0);
+assert.equal(host.recallStage, 'idle');
+sourceState.audioOn = false;
+console.log('PASS per-loop scene capture, independent completion, stopped voices, stale replies, latest cue, DSP and transport cancellation');
 
 // Built-in references are portable; older Sets keep the original demo reference.
 recorderState.state = 'idle';
@@ -805,3 +869,30 @@ assert.deepEqual(messages.at(-1), ['source_control', 'open_set_demo']);
 host.set_source_loaded(1);
 assert.equal(controls.set_status.value, 'Set opened · Original demo.json');
 console.log('PASS portable built-in and original demo Set references');
+
+sourceState.get_set_cleared = () => [true, false, false, false];
+sourceState.get_set_source = () => ({kind: 'demo'});
+host.write_set('/test/sets/Empty track.json');
+const emptyStage = messages.at(-1)[2];
+const emptySet = JSON.parse(files.get(emptyStage));
+assert.equal(emptySet.version, 3);
+assert.deepEqual(emptySet.clearedLoops, [true, false, false, false]);
+assert.deepEqual(emptySet.loopSources, [null, null, null, null]);
+assert.equal(host.valid_set(emptySet), true);
+assert.equal(host.valid_set({...emptySet, clearedLoops: [true]}), false);
+assert.equal(host.valid_set({...emptySet, clearedLoops: [1, false, false, false]}), false);
+assert.equal(host.valid_set({...emptySet, loopSources: [{kind: 'file', path: '/unexpected.wav'}, null, null, null]}), false);
+files.set('/test/sets/Empty track.json', files.get(emptyStage));
+host.set_written(1, emptyStage);
+let openedLoops;
+sourceState.open_set_loops = (...args) => { openedLoops = structuredClone(args); };
+host.read_set('/test/sets/Empty track.json');
+assert.deepEqual(openedLoops, [null, null, [null, null, null, null], [true, false, false, false]]);
+host.set_source_loaded(1);
+assert.equal(controls.set_status.value, 'Set opened · Empty track.json');
+console.log('PASS empty-track Set serialization, validation and restoration alongside older Sets.');
+
+files.set('/test/sets/Older loop Set.json', JSON.stringify({...emptySet, version: 2, clearedLoops: 'ignored old metadata'}));
+host.read_set('/test/sets/Older loop Set.json');
+assert.equal(openedLoops[3], undefined);
+host.set_source_loaded(1);

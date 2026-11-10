@@ -7,11 +7,13 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-The v0.8.20 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.21**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
 
-[See what's new in v0.8.20](CHANGELOG.md).
+The v0.8.21 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-![The Max build of Field Kit v0.8.20 recording at 1:11 while the four demo loops keep playing](docs/screenshots/field-kit-long-recording.jpg)
+[See what's new in v0.8.21](CHANGELOG.md).
+
+![Field Kit v0.8.21 standalone playing four demo loops with a scene queued to finish the outgoing loops](docs/screenshots/field-kit-v0821-overview.png)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Use **Send to** and the **Import to…** button to stage your own sample for a loop or all four. The same drawer holds audio setup, loop recording, and Set files.
 
@@ -19,13 +21,11 @@ Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header. 
 
 In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to cut lows, or **Flat (off)** to center the filter. Switch between Low-pass and High-pass to keep the same strength, or drag **Filter sweep** for a continuous move through all three. **Drive** is off at 0%. Patterns, Sets, and LFO routes still use each loop’s filter sweep.
 
-![The windowed Mix workspace playing Glass Circuit with the effects bypassed and the Main FX dials dimmed](docs/screenshots/field-kit-overview.png)
-
 ## Working folders
 
-Open **Source, Input & Files → Working folders…** to choose the starting locations for the **Import to…** button, **Replace audio…**, **Save Loop WAV…**, and **Record mix…**. Field Kit remembers the two folder choices across launches. When present, the default folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
+Open **Source, Input & Files → Working folders…** to choose the starting locations for the **Import to…** button, **Replace audio…**, **Save Loop WAV…**, and **Record mix…**. Use **Banks & patterns folder** for **Save Bank** and **Load Bank**. Patterns are stored together inside bank files. Field Kit remembers all three folder choices across launches. The default bank folder is **Documents/Field Kit/Banks**, which Field Kit creates when needed. When present, the default audio folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
 
-![Working folders with separate import and recording locations and a Choose button for each](docs/screenshots/field-kit-working-folders.jpg)
+![Working folders with import, recording and Banks & patterns locations](docs/screenshots/field-kit-v0821-working-folders.png)
 
 ## Record a source
 
@@ -50,7 +50,7 @@ Select a mapped control and click **Clear** to remove its assignment. MIDI input
 2. Use **In %** and **Out %** to enter the bounds precisely. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials.
 3. **Fade ms** blends each pass into the next. **Fade preview** shows the two gain curves and the overlap duration. The live duration reflects short-loop limits, speed, and modulation. **Filter** is flat at zero. Turn left to cut highs or right to cut lows.
 
-In the selected loop editor, choose **Copy to Loop…** to copy the audio and range to another loop while keeping the destination’s playback and mixer settings. **Replace audio…** lets you choose a file and confirm or discard it while your loops continue playing. Confirming a replacement starts the new audio with its full range. The **Import to…** button in the Source drawer uses the same **Send to** menu as the recorder. **All loops** starts each loop on a different quarter of the same audio. A single loop starts with the full range.
+In the selected loop editor, choose **Loop actions… → Copy to Loop** to copy the audio and range to another loop while keeping the destination’s playback and mixer settings. **Replace audio…** lets you choose a file and confirm or discard it while your loops continue playing. Confirming a replacement starts the new audio with its full range. The **Import to…** button in the Source drawer uses the same **Send to** menu as the recorder. **All loops** starts each loop on a different quarter of the same audio. A single loop starts with the full range.
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 
@@ -74,9 +74,23 @@ Use **Field presets** to store four arrangements of all four loops' pan and leve
 
 To record movement, select a loop, click **Record**, then drag its dot as many times as you like. Click **Finish** to save and start looping the take. It also starts looping when it reaches 30 seconds. The **Play / Stop** button controls playback and **Clear** erases the gesture. Each loop keeps one gesture and can play it alongside the others. Click **Play paths** to start every recorded Stereo Field gesture. Paths already running keep their place. Once all recorded paths are running, click **Stop paths** to stop the gestures while the audio loops keep playing. Click **Show all paths** to see the recorded paths together, color-coded to match the numbered loop markers. Click **Show selected path** to focus on one loop.
 
+## Clear a track
+
+Select the loop, open **Loop actions…** above its editor, then choose **Clear loop…**.
+Confirm **Clear Loop** to stop and empty that track. Its playback button reads **Empty**.
+Saved audio files stay on disk. Save an unsaved recorded take as a WAV first if you
+want to keep it. **Cancel** keeps the existing loop. Record or import to that track
+to fill it again, or copy another loop into it through **Loop actions…**.
+**Play all** skips empty tracks. Saving a Set remembers them.
+Sets containing empty tracks require v0.8.21 or later.
+
+![The Clear Loop confirmation explains that saved audio files stay on disk](docs/screenshots/field-kit-v0821-clear-confirmation.png)
+
+![Loop 1 is Empty while the other three tracks continue playing](docs/screenshots/field-kit-v0821-empty-track.png)
+
 ## Store patterns
 
-Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. During playback, Field Kit holds a short buffer of the outgoing stereo mix and crossfades into the new pattern over 100 ms. Scene changes use the same transition. **Fade ms** in the loop editor still controls only that loop's seam. Recall clears active solos. Click **Cancel store** to exit store mode.
+Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. In v0.8.21, each playing loop finishes its current pass and crossfades into the next pattern over 80 ms. Scene changes use the same transition. Reverse loops finish at the start of their range and ping-pong loops switch at the next turnaround. Different loop lengths reach the new scene at different times. The status shows a queued change. A newer request waits for the current handoff to finish. Shared Main FX, Drifting Memory and master level update after all loops have switched. Modulated loop controls hold their captured values while waiting. Stopped loops stay stopped. **Play original** keeps its existing short stereo-mix transition. **Fade ms** in the loop editor still controls only that loop's seam. Recall clears active solos. Click **Cancel store** to exit store mode.
 
 Open **Source, Input & Files** and use **Save Set…** in the **Set files…** menu to save the shared source and any per-loop audio file locations, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
 
@@ -90,13 +104,13 @@ The scene clock controls when patterns change. Set the tempo and meter before yo
 
 The scene strip at the top, between **Transport** and **Master**, shows the current scene, the next playable scene, and progress through the current scene’s bars. Use **Start** or **Stop** and **Next bar** directly from the strip.
 
-![The compact Scene Sequencer running four programmed scenes directly below Patterns](docs/screenshots/field-kit-scenes.png)
+![The compact Scene Sequencer running four programmed scenes directly below Patterns](docs/screenshots/field-kit-v0821-scenes.png)
 
 Use the workspace selector to switch between **Mix**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Mix recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to show the tuner below the workspace tabs while the analyzers stay in the right column.
 
 **Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. Click **Stereo X/Y…** above the scope to open a larger, resizable window. The scope plots left against right. Matching left and right signals trace a rising diagonal. Opening Stereo X/Y or Stereo Field from full screen returns the workspace to a window so you can see both at once.
 
-![The Visuals workspace with live stereo frequency history, Stereo X/Y, and the docked Tuner](docs/screenshots/field-kit-visuals.jpg)
+![The Visuals workspace with live stereo frequency history, Stereo X/Y, and the docked Tuner](docs/screenshots/field-kit-v0821-visuals.png)
 
 ![The resizable Stereo X/Y window showing the live left and right channels of the final mix](docs/screenshots/field-kit-stereo-scope.png)
 
@@ -108,7 +122,7 @@ In **Loop sends** mode, the per-loop send routes control which loops feed Echo a
 
 The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Breakpoint** or click **Use curve** to edit that LFO’s custom curve. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO keeps its curve when you switch shapes. The graph on the right shows the live signal when audio is on.
 
-![A sine LFO routed to Loop 1 Echo send at +25% depth with a live Applied value and signal graph](docs/screenshots/field-kit-modulation.png)
+![A sine LFO routed to Loop 1 Pan at +25% depth with an Applied value and live signal graph](docs/screenshots/field-kit-v0821-modulation.png)
 
 ## Process and capture
 
@@ -124,7 +138,7 @@ Click **● Record** in the FX pad to arm it. Drag across the grid as many times
 
 | Stereo field | FX pad |
 | --- | --- |
-| ![The Stereo Field window showing all four color-coded paths and the Stop paths button](docs/screenshots/field-kit-stereo-field.png) | ![FX pad playing a recorded Echo and Room gesture with the Record button visible](docs/screenshots/field-kit-fx-pad.png) |
+| ![The Stereo Field window with four loop positions, per-loop recording and Play paths controls](docs/screenshots/field-kit-v0821-stereo-field.png) | ![The FX pad with Echo and Room axes and Record, Play and Clear controls](docs/screenshots/field-kit-v0821-fx-pad.png) |
 
 **Drifting Memory** runs at the end of Main FX. In **Mix**, click **Drift · Off** to turn it on, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. The **Memory** meter shows what’s circulating in the delay. **Wet return** shows what the delay adds to the final mix. Use **Mix** to blend it in. Choose **Off** under **Arm capture** to stop recording into memory while the tail plays. Sets and patterns save the effect settings. Captured memory is for the current session.
 
@@ -132,7 +146,7 @@ Drifting Memory starts with **Advanced** open in **Mix**, showing **Time**, **Te
 
 Use **Hold** to freeze what’s in memory. **Cut Tail** clears the captured audio and turns capture off while the dry mix keeps playing. To capture again, release **Hold** if it’s on and choose a capture bank.
 
-![Drifting Memory with live Memory and Wet return meters, Hold and Cut Tail, and the Advanced Time page](docs/screenshots/field-kit-drifting-memory.png)
+![Drifting Memory enabled with Memory and Wet return meters, Hold, Cut Tail and the Advanced Time page](docs/screenshots/field-kit-v0821-drifting-memory.png)
 
 With audio enabled, click **Record mix…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. The recorder writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click the same button, now labeled **Stop recording**, to finish and save the take.
 

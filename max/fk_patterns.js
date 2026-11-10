@@ -18,6 +18,7 @@ var LEGACY_BANK_VERSION = 1;
 var SET_FORMAT = "field-kit-set";
 var SET_VERSION = 1;
 var LOOP_SET_VERSION = 2;
+var EMPTY_LOOP_SET_VERSION = 3;
 var PATTERN_HINT = "Click to recall. Shift-click to store.";
 // Allow all eight slots to hold eight full curves with unrounded values.
 var MAX_BANK_BYTES = 8 * 1024 * 1024;
@@ -74,6 +75,9 @@ var writingSet = null;
 var writeTimeout = null;
 var pendingRecall = null;
 var recallStage = "idle";
+var voiceRecall = null;
+var recallGeneration = 0;
+var voiceRecallPhases = [0, 0, 0, 0];
 var releaseTail = new Task(release_recall_tail, host);
 for (var index = 0; index < SLOT_COUNT; index++) {
     slots.push(null);
@@ -158,7 +162,7 @@ function slot(number, shift) {
     }
     var index = number - 1;
     if (armed || shift === 1) {
-        if (pendingRecall) {
+        if (pendingRecall || voiceRecall) {
             bank_status("Wait for the pattern switch to finish.");
             return;
         }
@@ -262,7 +266,9 @@ request_recall.local = 1;
 
 function begin_pending_recall() {
     var source = host.patcher.getnamed("source_control").js;
-    if (source.normalPlaying || source.normalStopping || source.playing.some(Boolean)) {
+    if (source.playing.some(Boolean) && !source.normalPlaying && !source.normalStopping) {
+        begin_voice_recall();
+    } else if (source.normalPlaying || source.normalStopping) {
         recallStage = "covering";
         host.patcher.getnamed("pattern_transition_command").message(1);
         host.patcher.getnamed("pattern_transition_sample").message("start");
@@ -272,6 +278,68 @@ function begin_pending_recall() {
     }
 }
 begin_pending_recall.local = 1;
+
+// Capture on the audio thread before changing any controls. Each voice then
+// commits at its own loop boundary, independently of the Max scheduler.
+function begin_voice_recall() {
+    voiceRecall = pendingRecall;
+    pendingRecall = null;
+    recallGeneration = recallGeneration % 1000000 + 1;
+    voiceRecallPhases = [0, 0, 0, 0];
+    recallStage = "voice_capture";
+    bank_status("Pattern " + (voiceRecall.index + 1) + " queued · finishing loops.");
+    for (var i = 1; i <= VOICE_COUNT; i++) {
+        host.patcher.getnamed("scene_sample_" + i).message("start");
+        host.patcher.getnamed("voice_" + i).message("scene_command", recallGeneration * 2);
+    }
+}
+begin_voice_recall.local = 1;
+
+function recall_voice_phase(number, encoded) {
+    var generation = Math.floor(encoded / 4);
+    var phase = encoded % 4;
+    if (!voiceRecall || generation !== recallGeneration ||
+        number < 1 || number > VOICE_COUNT || phase < 1) return;
+    voiceRecallPhases[number - 1] = phase;
+    if (recallStage === "voice_capture" && voiceRecallPhases.every(function (value) { return value >= 1; })) {
+        // A newer click received before staging can replace this cue.
+        if (pendingRecall) {
+            voiceRecall = pendingRecall;
+            pendingRecall = null;
+        }
+        bank_status("Pattern " + (voiceRecall.index + 1) + " queued · finishing loops.");
+        recallStage = "voice_settling";
+        try {
+            apply_pattern(voiceRecall.pattern, true);
+        } finally {
+            releaseTail.schedule(RECALL_SETTLE_MS);
+        }
+    } else if (recallStage === "voice_wait" &&
+               voiceRecallPhases.every(function (value) { return value === 3; })) {
+        finish_voice_recall();
+        if (pendingRecall) begin_pending_recall();
+    }
+}
+
+function finish_voice_recall() {
+    if (!voiceRecall) return;
+    apply_shared_pattern(voiceRecall.pattern);
+    lastSlot = voiceRecall.index;
+    voiceRecall = null;
+    clear_voice_recall();
+    recallStage = "idle";
+    bank_status("Pattern " + (lastSlot + 1) + " recalled.");
+    render_slots();
+}
+finish_voice_recall.local = 1;
+
+function clear_voice_recall(force) {
+    for (var i = 1; i <= VOICE_COUNT; i++) {
+        host.patcher.getnamed("voice_" + i).message("scene_command", force ? -1 : 0);
+        host.patcher.getnamed("scene_sample_" + i).message("stop");
+    }
+}
+clear_voice_recall.local = 1;
 
 function recall_phase(phase) {
     if (phase === 1 && recallStage === "covering") {
@@ -296,6 +364,12 @@ function recall_dsp(state) {
         if (recallStage === "idle") host.patcher.getnamed("pattern_transition_command").message(0);
     } else {
         try {
+            if (voiceRecall) {
+                apply_pattern(voiceRecall.pattern);
+                lastSlot = voiceRecall.index;
+                voiceRecall = null;
+                clear_voice_recall(true);
+            }
             apply_pending_recall();
         } finally {
             cancel_recall(false);
@@ -315,6 +389,13 @@ function apply_pending_recall() {
 apply_pending_recall.local = 1;
 
 function release_recall_tail() {
+    if (recallStage === "voice_settling") {
+        recallStage = "voice_wait";
+        for (var i = 1; i <= VOICE_COUNT; i++) {
+            host.patcher.getnamed("voice_" + i).message("scene_command", recallGeneration * 2 + 1);
+        }
+        return;
+    }
     if (recallStage !== "settling") return;
     recallStage = "fading";
     host.patcher.getnamed("pattern_transition_command").message(0);
@@ -324,6 +405,12 @@ release_recall_tail.local = 1;
 function cancel_recall(audioOn, discardHistory) {
     if (audioOn === undefined) audioOn = host.patcher.getnamed("source_control").js.audioOn;
     releaseTail.cancel();
+    if (voiceRecall) {
+        if (recallStage !== "voice_capture") apply_shared_pattern(voiceRecall.pattern);
+        voiceRecall = null;
+        clear_voice_recall(!audioOn);
+        recallStage = "idle";
+    }
     pendingRecall = null;
     if (!audioOn) {
         recallStage = "idle";
@@ -342,12 +429,10 @@ function transport_stopped() {
     cancel_recall(true, true);
 }
 
-function apply_pattern(pattern) {
+function apply_pattern(pattern, deferShared) {
     var patch = host.patcher;
     var source = patch.getnamed("source_control");
     var router = patch.getnamed("patchbay").subpatcher().getnamed("fk_router");
-    var fx = patch.getnamed("mix_fx").subpatcher();
-    var drifting = patch.getnamed("drifting_memory").subpatcher();
     source.message("stop_pad_motion");
     source.message("exit_normal");
     // Banks written before Pitch Snap was added omit this field.
@@ -362,15 +447,7 @@ function apply_pattern(pattern) {
             patch.getnamed(key + "_" + voice).message(window[key] === undefined ? 0 : window[key]);
         });
     });
-    patch.getnamed("master").message(pattern.master);
-    FX_CONTROLS.forEach(function (spec) {
-        fx.getnamed(spec[0]).message(pattern.effects[spec[0]]);
-    });
-    fx.getnamed("fx_mode").message(pattern.effects.fx_mode === undefined ? 0 : pattern.effects.fx_mode);
-    fx.getnamed("fx_distortion").message(pattern.effects.fx_distortion === undefined ? 0 : pattern.effects.fx_distortion);
-    DRIFT_CONTROLS.forEach(function (spec) {
-        drifting.getnamed(spec[0]).message(pattern.drifting ? pattern.drifting[spec[0]] : spec[3]);
-    });
+    if (!deferShared) apply_shared_pattern(pattern);
 
     for (var i = 0; i < LFO_COUNT; i++) {
         router.message("rate_state", i, pattern.rates[i]);
@@ -384,15 +461,6 @@ function apply_pattern(pattern) {
             var group = Math.floor(route / TARGET_COUNT);
             router.message("depth", Math.floor(group / LFO_COUNT) + 1,
                            group % LFO_COUNT + 1, route % TARGET_COUNT + 1, pattern.gains[route]);
-        }
-    }
-    var savedGlobalGains = pattern.globalGains || [];
-    var currentGlobalGains = router.js.globalGains.slice();
-    for (var globalRoute = 0; globalRoute < currentGlobalGains.length; globalRoute++) {
-        var depth = savedGlobalGains[globalRoute] || 0;
-        if (depth !== currentGlobalGains[globalRoute]) {
-            router.message("depth", VOICE_COUNT + 1, Math.floor(globalRoute / GLOBAL_TARGET_COUNT) + 1,
-                           globalRoute % GLOBAL_TARGET_COUNT + 1, depth);
         }
     }
     router.message("select_lfo", pattern.selection.lfo);
@@ -409,6 +477,33 @@ function apply_pattern(pattern) {
     mixer.message.apply(mixer, ["recall_mutes"].concat(pattern.mixerMutes || DEFAULT_MIXER_MUTES));
 }
 apply_pattern.local = 1;
+
+function apply_shared_pattern(pattern) {
+    var patch = host.patcher;
+    var router = patch.getnamed("patchbay").subpatcher().getnamed("fk_router");
+    var fx = patch.getnamed("mix_fx").subpatcher();
+    var drifting = patch.getnamed("drifting_memory").subpatcher();
+    patch.getnamed("master").message(pattern.master);
+    FX_CONTROLS.forEach(function (spec) {
+        fx.getnamed(spec[0]).message(pattern.effects[spec[0]]);
+    });
+    fx.getnamed("fx_mode").message(pattern.effects.fx_mode === undefined ? 0 : pattern.effects.fx_mode);
+    fx.getnamed("fx_distortion").message(pattern.effects.fx_distortion === undefined ? 0 : pattern.effects.fx_distortion);
+    DRIFT_CONTROLS.forEach(function (spec) {
+        drifting.getnamed(spec[0]).message(pattern.drifting ? pattern.drifting[spec[0]] : spec[3]);
+    });
+
+    var savedGlobalGains = pattern.globalGains || [];
+    var currentGlobalGains = router.js.globalGains.slice();
+    for (var globalRoute = 0; globalRoute < currentGlobalGains.length; globalRoute++) {
+        var depth = savedGlobalGains[globalRoute] || 0;
+        if (depth !== currentGlobalGains[globalRoute]) {
+            router.message("depth", VOICE_COUNT + 1, Math.floor(globalRoute / GLOBAL_TARGET_COUNT) + 1,
+                           globalRoute % GLOBAL_TARGET_COUNT + 1, depth);
+        }
+    }
+}
+apply_shared_pattern.local = 1;
 
 function modulation_defaults() {
     var router = host.patcher.getnamed("patchbay").subpatcher().getnamed("fk_router").js;
@@ -562,6 +657,10 @@ folder_of.local = 1;
 
 function save_set() {
     if (set_busy()) return;
+    if (voiceRecall) {
+        set_status("Wait for the scene change before saving the Set.");
+        return;
+    }
     var source = host.patcher.getnamed("source_control").js;
     if (!source.get_set_source() || !source.get_set_loops()) {
         set_status("Save any recorded loop WAVs before saving the Set.");
@@ -585,10 +684,15 @@ set_gesture_pads.local = 1;
 
 function write_set(path) {
     if (typeof path !== "string" || !path || set_busy()) return;
+    if (voiceRecall) {
+        set_status("Wait for the scene change before saving the Set.");
+        return;
+    }
     var folder = folder_of(path);
     var controller = host.patcher.getnamed("source_control").js;
     var source = controller.get_set_source();
     var loops = controller.get_set_loops();
+    var cleared = controller.get_set_cleared();
     var current = capture_pattern();
     if (!source || !loops || !valid_pattern(current, LFO_COUNT)) {
         set_status("Set isn’t ready. Save any recorded loop WAVs first.");
@@ -611,7 +715,7 @@ function write_set(path) {
         ],
         pitchLock: value_of(host.patcher.getnamed("pitch_lock"))
     };
-    if (loops.some(Boolean)) {
+    if (loops.some(Boolean) || cleared.some(Boolean)) {
         data.version = LOOP_SET_VERSION;
         data.loopSources = loops.map(function (loopPath) {
             if (!loopPath) return null;
@@ -619,6 +723,10 @@ function write_set(path) {
             if (folder && loopPath.indexOf(folder) === 0) reference.relative = loopPath.slice(folder.length);
             return reference;
         });
+    }
+    if (cleared.some(Boolean)) {
+        data.version = EMPTY_LOOP_SET_VERSION;
+        data.clearedLoops = cleared;
     }
     var stage = folder + ".field-kit-" + Date.now() + "-" + Math.floor(Math.random() * 1e9) + ".tmp";
     try {
@@ -721,7 +829,7 @@ function read_set(path) {
         if (file && file.isopen) file.close();
     }
     pendingSet = { path: path, data: data, relinking: false };
-    if (data.version === LOOP_SET_VERSION) {
+    if (data.version >= LOOP_SET_VERSION) {
         pendingSet.references = [data.source].concat(data.loopSources);
         pendingSet.resolved = {};
         resolve_set_loops();
@@ -770,7 +878,8 @@ function resolve_set_loops() {
         paths.push(candidate);
     }
     set_status("Opening " + file_name(opening.path) + "…");
-    host.patcher.getnamed("source_control").js.open_set_loops(paths[0], opening.data.source.id || null, paths.slice(1));
+    host.patcher.getnamed("source_control").js.open_set_loops(paths[0], opening.data.source.id || null, paths.slice(1),
+        opening.data.version === EMPTY_LOOP_SET_VERSION ? opening.data.clearedLoops : undefined);
 }
 resolve_set_loops.local = 1;
 
@@ -783,7 +892,7 @@ function file_exists(path) {
 file_exists.local = 1;
 
 function valid_set(data) {
-    if (!data || data.format !== SET_FORMAT || (data.version !== SET_VERSION && data.version !== LOOP_SET_VERSION) ||
+    if (!data || data.format !== SET_FORMAT || (data.version !== SET_VERSION && data.version !== LOOP_SET_VERSION && data.version !== EMPTY_LOOP_SET_VERSION) ||
         !data.source || !valid_pattern(data.current, LFO_COUNT) ||
         !Array.isArray(data.slots) || data.slots.length !== SLOT_COUNT ||
         !data.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, LFO_COUNT); }) ||
@@ -795,9 +904,14 @@ function valid_set(data) {
             !in_range(data.globalSpeed[0], 0.5, 2) || !index_valid(data.globalSpeed[1], 2))) ||
         (data.selectedSlot !== -1 &&
             (!index_valid(data.selectedSlot, SLOT_COUNT) || !data.slots[data.selectedSlot]))) return false;
-    if (data.version === LOOP_SET_VERSION &&
+    if (data.version >= LOOP_SET_VERSION &&
         (!Array.isArray(data.loopSources) || data.loopSources.length !== VOICE_COUNT ||
             !data.loopSources.every(function (ref) { return ref === null || valid_file_reference(ref); }))) return false;
+    if (data.version === EMPTY_LOOP_SET_VERSION &&
+        (!Array.isArray(data.clearedLoops) || data.clearedLoops.length !== VOICE_COUNT ||
+            !data.clearedLoops.every(function (value, i) {
+                return typeof value === "boolean" && (!value || data.loopSources[i] === null);
+            }))) return false;
     var source = data.source;
     return source.kind === "demo" ||
         (source.kind === "builtin" && host.patcher.getnamed("source_control").js.valid_builtin_demo(source.id)) ||

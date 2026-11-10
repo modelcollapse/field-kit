@@ -14,7 +14,8 @@ const named = name => ({ message: (...args) => trace.push([name, ...args]) });
 const host = vm.createContext({
     patcher: {
         filepath: `${home}/Field Kit.maxpat`,
-        getnamed: name => name === 'sequence_panel' ? { subpatcher: () => ({ getnamed: named }) } : named(name),
+        getnamed: name => ['sequence_panel', 'working_folders_panel', 'recorder'].includes(name)
+            ? { subpatcher: () => ({ getnamed: named }) } : named(name),
     },
     arrayfromargs: value => Array.from(value),
     outlet: (index, values) => regions.push([index, ...values]),
@@ -43,6 +44,14 @@ function sent(name, ...args) {
     return trace.some(([target, ...actual]) => target === name &&
         actual.length === args.length && actual.every((value, index) => value === args[index]));
 }
+
+host.folder_paths('/test/Imports', '/test/Recordings', '/test/Saved banks', 'Folder settings ready');
+for (const dialog of ['pattern_save_dialog', 'pattern_load_dialog', 'banks_folder_dialog']) {
+    assert(sent(dialog, 'setpath', '/test/Saved banks'));
+}
+assert(sent('audio_file', 'setpath', '/test/Imports'));
+assert(sent('input_save_dialog', 'setpath', '/test/Recordings'));
+assert(sent('banks_path', 'hint', '/test/Saved banks'));
 
 host.initialize();
 runTask('boot_source');

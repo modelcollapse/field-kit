@@ -13,6 +13,7 @@ const namedBuffers = new Map();
 const buffers = new Map([
     ['buffer', { frames: 1, channels: 1, rate: 44100 }],
     ['set_buffer', { frames: 1, channels: 1, rate: 44100 }],
+    ['empty_loop_buffer', { frames: 1, channels: 1, rate: 44100 }],
     ...Array.from({ length: 8 }, (_, slot) =>
         [`loop_buffer_${slot}`, { frames: 1, channels: 1, rate: 44100 }]),
 ]);
@@ -264,4 +265,40 @@ assert(host.playing.every(Boolean));
 host.set_loop_destination(0);
 assert(sent('input_record_button', 'text', 'Record to Loop 4'));
 assert(sent('load', 'text', 'Import to Loop 4…'));
+host.inspect_window(2);
+host.clear_loop();
+assert.equal(host.loopPending.state, 'clearing');
+assert(host.playing.every(Boolean), 'clear waits for confirmation');
+host.discard_loop_audio();
+assert.equal(host.loopPending, null);
+assert(host.playing.every(Boolean), 'cancel keeps the existing loop playing');
+const fileCountBefore = files.size;
+host.clear_loop();
+host.confirm_loop_audio();
+assert.equal(host.playing[2], false);
+assert.equal(host.loopPending.state, 'switching');
+advance(40);
+assert.equal(host.loopSources[2], null);
+assert.deepEqual([...host.get_set_cleared()], [false, false, true, false]);
+assert(sent('voice_3', 'source', host.emptyBufferName));
+assert.equal(files.size, fileCountBefore, 'clearing does not delete files');
+assert.equal(host.loopSources[0], shared);
+assert.equal(host.loopSources[1], shared);
+assert.equal(host.loopSources[3], shared);
+host.play_all();
+assert.deepEqual([...host.playing], [true, true, false, true], 'Play all skips the empty track');
+host.inspect_window(0);
+host.copy_loop_to(3);
+advance(40);
+assert.equal(host.loopCleared[2], false, 'copying new audio fills an empty track');
+assert.equal(host.loopSources[2], shared);
+host.edit_play(3, 1);
+assert(host.playing.every(Boolean));
+host.inspect_window(3);
+host.clear_loop();
+host.loop_take_closed();
+assert.equal(host.loopPending, null);
+assert(host.playing.every(Boolean), 'closing the clear dialog cancels it');
+
+console.log('Verified confirmed track clearing, cancellation, shared buffers, file preservation and refilling.');
 console.log('Verified disk capture beyond 60 seconds, confirmation, transport, and WAV save.');

@@ -37,8 +37,7 @@ Enable audio and play one note at a time. The display shows the nearest note,
 frequency and cents relative to A4 = 440 Hz.
 
 Open Source, Input & Files → Working folders… to select the starting folders
-for Import to…, Replace audio…, Save Loop WAV…, and Record mix…. Field Kit remembers the two
-choices across launches. The default folders, when present, are Imports and
+for Import to…, Replace audio…, Save Loop WAV…, and Record mix…. Field Kit remembers these choices across launches. The default folders, when present, are Imports and
 Recordings under Documents/Field Kit.
 
 Open Source, Input & Files → Audio & MIDI Setup… and choose your Input device
@@ -48,10 +47,20 @@ The two post-gain peak meters show the recording levels with peak hold
 and a red overload indicator.
 Choose Selected loop, a loop number, or All loops in Send to. Click the Record to button.
 The current loops keep playing. Click Stop recording. Loop recording shows which take needs confirmation. Choose Use on or Discard. Recording continues until you stop it, subject to available storage. Select the recorded loop and choose Save Loop WAV… before saving a Set.
-In the loop editor, Copy to Loop… shares the source and copies its range while
+In the loop editor, Loop actions… → Copy to Loop shares the source and copies its range while
 keeping the destination’s settings. Replace audio… stages a file for that loop.
 The Import to… button in the Source drawer uses the same Send to menu. All loops uses
 one source, with each loop starting on a different quarter of the audio.
+
+To empty a track, select it and choose Loop actions… → Clear loop….
+Confirm Clear Loop. Saved audio files stay on disk. Save an unsaved take as a
+WAV first to keep it. Cancel keeps the loop. The playback button reads Empty.
+Record, import or copy audio into that track to fill it again. Play all skips
+empty tracks. Sets remember empty tracks and require v0.8.21 or later.
+
+Working folders also includes Banks & patterns folder. Its default is
+Documents/Field Kit/Banks. Save Bank and Load Bank start there. Patterns are
+stored together inside a bank file. Folder choices are remembered across launches.
 
 To use MIDI Learn, choose a port under MIDI In, pick a control and click Learn.
 Move an absolute CC knob or fader, or use a note or momentary CC for buttons.
@@ -120,8 +129,14 @@ Applied value shows what the destination receives while audio is on.
 The lower left graph shows the selected LFO shape. Choose Breakpoint or click Use curve
 to edit that LFO's own curve. The lower right graph shows the live signal while audio is on.
 
-During playback, pattern and scene recalls crossfade a short buffer of the old mix
-into the new mix over 100 ms. Fade ms separately controls the crossfade at the loop seam.
+During loop playback, each loop finishes its current pass before fading into the
+next pattern or scene over 80 ms. Reverse loops finish at the start of their range;
+ping-pong loops change at the next turnaround. Different loop lengths switch at
+their own boundaries. The status shows when a scene is queued. A newer scene waits
+for the current handoff to finish. Shared Main FX, Drifting Memory and master level
+update after every loop has switched. Modulated loop controls hold their captured
+values while waiting. Stopped loops stay stopped. Fade ms still controls the loop
+seam separately. Play original uses the existing short stereo-mix transition.
 Pitch snap treats the sample at 1×
 as the tonic and snaps Speed ×, including speed modulation, to the selected scale.
 

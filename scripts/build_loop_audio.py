@@ -13,7 +13,8 @@ def add_loop_audio(p, panel, version):
 
     rect = [0, 0, 112, 22]
     p.add("loop_copy", "umenu", rect, view=rect, outs=3, types=["int", "", ""],
-          items=["Copy to Loop…", ",", "Loop 1", ",", "Loop 2", ",", "Loop 3", ",", "Loop 4"],
+          items=["Loop actions…", ",", "Copy to Loop 1", ",", "Copy to Loop 2", ",",
+                 "Copy to Loop 3", ",", "Copy to Loop 4", ",", "Clear loop…"],
           allowdrag=0, parameter_enable=0)
     p.obj("loop_copy_command", "prepend copy_loop_to", 1720, 2780, ins=2)
     p.connect("loop_copy", 0, "loop_copy_command")
@@ -42,11 +43,11 @@ def add_loop_audio(p, panel, version):
     panel.obj("take_closebang", "closebang", 290, 160, types=["bang"])
     command(panel, "take_closebang", "take_closed", "loop_take_closed", "take_out", 290, 242)
     patcher = dict(fileversion=1, appversion=version, classnamespace="box",
-                   title="Replace loop audio", rect=[290, 182, 420, 130],
+                   title="Loop audio", rect=[290, 182, 420, 130],
                    openinpresentation=1, toolbarvisible=0, boxes=panel.boxes, lines=panel.lines)
     p.obj("loop_take_window", "pcontrol", 2290, 2780)
     p.add("loop_take_panel", "newobj", [2290, 2810, 160, 22], outs=1, types=[""],
-          text="p Replace loop audio", patcher=patcher)
+          text="p Loop audio", patcher=patcher)
     p.connect("loop_take_window", 0, "loop_take_panel")
     p.connect("loop_take_panel", 0, "source_control")
 

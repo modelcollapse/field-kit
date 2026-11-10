@@ -1,5 +1,15 @@
 # Field Kit changelog
 
+## v0.8.21
+
+- Add Loop actions… → Clear loop… with confirmation. Empty tracks stay silent and can receive new recordings, imports or copied audio.
+- Preserve saved audio files when clearing a track. Sets with empty tracks use format version 3, while earlier Sets continue to open.
+- Add a remembered Banks & patterns folder for Save Bank and Load Bank, defaulting to Documents/Field Kit/Banks.
+- Switch each playing loop at its own end when recalling a pattern or scene.
+- Crossfade the outgoing and incoming playback over 80 ms, with per-loop mute and send transitions.
+- Show queued scene changes. Preserve stopped tracks and finish the current handoff before the newest queued scene.
+- Apply shared effects and master level after all loops have switched. Keep the existing Play original transition.
+
 ## v0.8.20
 
 - Remove the 60-second cutoff from Loop recording. Takes write to a temporary stereo WAV until you stop recording.

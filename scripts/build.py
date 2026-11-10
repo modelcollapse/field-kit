@@ -1030,8 +1030,8 @@ def build():
         p.connect("source_control", voice - 1, f"wave_{voice}", 2)
 
         y = 950 + 210 * (voice - 1)
-        p.obj(f"voice_{voice}", "gen~ fk_voice", 28, y + 132, ins=13, outs=13,
-              types=["signal"] * 13, width=500)
+        p.obj(f"voice_{voice}", "gen~ fk_voice", 28, y + 132, ins=16, outs=16,
+              types=["signal"] * 16, width=500)
         shifter = f"voice_pitch_{voice}"
         p.add(shifter, "newobj", [2680, y + 60, 125, 22], text="p Pitch Lock", ins=4, outs=2,
               types=["signal"] * 2, patcher=pitch_lock_patch(Patch, VERSION))
@@ -1095,20 +1095,22 @@ def build():
         mixer_strip(p, voice, row, y)
         loop_send_gains(p, voice, y)
         p.obj(f"mixer_gain_{voice}", "line~ 1.", 2680, y + 94, ins=2, outs=2, types=["signal", "bang"])
+        p.connect(f"mixer_gain_{voice}", 0, f"voice_{voice}", 13)
+        for send_index, send_key in enumerate(LOOP_SENDS):
+            p.connect(f"{send_key}_{voice}_gain", 0, f"voice_{voice}", 14 + send_index)
         p.obj(f"peak_{voice}", "maximum~", 920, y + 170, ins=2, types=["signal"])
         p.connect(f"peak_{voice}", 0, f"meter_{voice}")
         for suffix, outlet in (("left", 0), ("right", 1)):
             mix_channel = f"mixer_{suffix}_{voice}"
-            p.obj(mix_channel, "*~", 2680 + 116 * outlet, y + 124, ins=2, types=["signal"])
+            p.obj(mix_channel, "*~ 1.", 2680 + 116 * outlet, y + 124, ins=2, types=["signal"])
             p.connect(shifter, outlet, mix_channel)
-            p.connect(f"mixer_gain_{voice}", 0, mix_channel, 1)
             p.connect(mix_channel, 0, "mix_fx", outlet)
             for send_index, send_key in enumerate(LOOP_SENDS):
                 send_channel = f"{send_key}_{suffix}_{voice}"
                 x = 3510 + 100 * (2 * send_index + outlet)
                 p.obj(send_channel, "*~", x, y + 124, ins=2, types=["signal"])
                 p.connect(mix_channel, 0, send_channel)
-                p.connect(f"{send_key}_{voice}_gain", 0, send_channel, 1)
+                p.connect(f"voice_{voice}", 14 + send_index, send_channel, 1)
                 p.connect(send_channel, 0, "mix_fx", 3 + FX_MOD_CHANNELS + 2 * send_index + outlet)
             rect_x = 780 + outlet * 100
             p.obj(f"abs_{suffix}_{voice}", "abs~", rect_x, y + 132, types=["signal"])
@@ -1155,6 +1157,17 @@ def build():
         p.connect(name, 0, name + "_command")
         for voice in range(1, 5):
             p.connect(name + "_command", 0, f"voice_{voice}")
+    for voice in range(1, 5):
+        y = 950 + 210 * (voice - 1)
+        p.obj(f"scene_sample_{voice}", "snapshot~ 5 @active 0", 2820, y + 165,
+              ins=2, types=["float"])
+        p.obj(f"scene_defer_{voice}", "deferlow", 2980, y + 165)
+        p.obj(f"scene_phase_{voice}", f"prepend recall_voice_phase {voice}", 3050, y + 165, ins=2)
+        p.connect(f"voice_{voice}", 13, f"scene_sample_{voice}")
+        p.connect(f"scene_sample_{voice}", 0, f"scene_defer_{voice}")
+        p.connect(f"scene_defer_{voice}", 0, f"scene_phase_{voice}")
+        p.connect(f"scene_phase_{voice}", 0, "pattern_control")
+    p.obj("empty_loop_buffer", "buffer~ fk-empty-unbound", 5000, 2780, outs=2, types=["float", "bang"])
     p.save()
 
 

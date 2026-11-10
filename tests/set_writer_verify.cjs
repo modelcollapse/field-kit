@@ -35,12 +35,37 @@ function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
         return response[2];
     };
     write.removeTake = handlers.remove_input_temp;
+    write.folders = () => {
+        handlers.folder_get();
+        return response;
+    };
+    write.chooseFolder = (key, folder) => {
+        handlers.folder_choose(key, folder);
+        return response;
+    };
     return write;
 }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "field-kit-writer-"));
 try {
     const write = loadWriter();
+    const bankDefault = path.join(dir, "Documents", "Field Kit", "Banks");
+    assert.equal(write.folders()[3], bankDefault);
+    assert(fs.statSync(bankDefault).isDirectory());
+    const importFolder = path.join(dir, "Imported loops");
+    const recordingFolder = path.join(dir, "Recorded loops");
+    const bankFolder = path.join(dir, "Saved banks ✨");
+    for (const folder of [importFolder, recordingFolder, bankFolder]) fs.mkdirSync(folder);
+    write.chooseFolder("import", importFolder);
+    write.chooseFolder("recording", recordingFolder);
+    const chosen = write.chooseFolder("banks", bankFolder);
+    assert.deepEqual(chosen.slice(0, 4), ["folder_paths", importFolder, recordingFolder, bankFolder]);
+    assert.deepEqual(loadWriter().folders().slice(1, 4), [importFolder, recordingFolder, bankFolder]);
+    fs.rmdirSync(bankFolder);
+    assert.equal(write.folders()[3], bankDefault);
+    assert.match(write.folders()[4], /unavailable/);
+    assert.equal(write.chooseFolder("banks", path.join(dir, "missing"))[3], bankDefault);
+    assert.deepEqual(write.folders().slice(1, 3), [importFolder, recordingFolder]);
     const staging = path.join(dir, ".field-kit-épreuve.tmp");
     const destination = path.join(dir, "My set ✨.json");
     fs.writeFileSync(destination, "original");
