@@ -17100,7 +17100,6 @@
             "toolbarvisible": 0
           },
           "embed": 1,
-          "hidden": 1,
           "border": 0,
           "offset": [
             0.0,
@@ -17435,7 +17434,7 @@
                       "parameter_mmin": 0,
                       "parameter_mmax": 1,
                       "parameter_initial": [
-                        0
+                        1
                       ],
                       "parameter_initial_enable": 1,
                       "parameter_unitstyle": 0,
@@ -19406,7 +19405,8 @@
             676,
             440,
             212
-          ]
+          ],
+          "hidden": 1
         }
       },
       {

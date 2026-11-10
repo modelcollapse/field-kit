@@ -49,7 +49,7 @@ def append_drifting_strip(panel, parameter):
     control("advanced", "live.text", [463, 9, 125, 28], ["int", ""],
             text="Advanced", texton="Hide advanced", mode=1, parameter_mappable=0,
             hint="Show or hide advanced Drifting Memory controls beside this strip.",
-            **parameter("Drifting Memory Advanced view", 0, 0, 1, options=["Off", "On"]))
+            **parameter("Drifting Memory Advanced view", 1, 0, 1, options=["Off", "On"]))
     control("enabled", "live.text", [225, 9, 144, 28], ["int", ""],
             text="Drift · Off", texton="Drift · On", fontface=1, mode=1, parameter_mappable=0,
             hint="Enable the delay in the main mix. Bypassing it retains the memory.",

@@ -1,5 +1,9 @@
 # Field Kit changelog
 
+## v0.8.16
+
+- Drifting Memory starts with Advanced open in Mix.
+
 ## v0.8.15
 
 - Working folders lets you choose and remember separate import and recording locations.

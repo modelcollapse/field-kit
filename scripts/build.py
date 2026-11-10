@@ -558,6 +558,7 @@ def performance_mix(p):
     append_sends_strip(sends)
     workspace_panel("performance_sends", sends, MARGIN + PERFORMANCE_RIGHT_OFFSET,
                     PERFORMANCE_RIGHT_WIDTH, 1, [])
+    p.boxes[-1]["box"]["hidden"] = 1
     p.connect("mix_fx", 4 + FX_MOD_CHANNELS, "performance_sends")
 
 
@@ -788,7 +789,7 @@ def drifting_memory(p):
     view = [MARGIN + PERFORMANCE_RIGHT_OFFSET, MODULATION_TOP, PERFORMANCE_RIGHT_WIDTH, PERFORMANCE_HEIGHT]
     mod_count = len(DRIFT_MOD_TARGETS)
     p.add("drifting_memory", "bpatcher", [1410, 1840, 142, 22], view=view, ins=3 + mod_count, outs=6 + mod_count,
-          types=["signal"] * 4 + ["", ""] + ["signal"] * mod_count, patcher=panel, embed=1, hidden=1,
+          types=["signal"] * 4 + ["", ""] + ["signal"] * mod_count, patcher=panel, embed=1,
           border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0, lockeddragscroll=0,
           clickthrough=0, bgmode=0)
     p.add("drifting_memory_show", "message", [1410, 1760, 108, 22], ins=2, text="drift_advanced 1")
