@@ -7,11 +7,11 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-The v0.8.16 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.17 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.16](CHANGELOG.md).
+[See what's new in v0.8.17](CHANGELOG.md).
 
-![Field Kit v0.8.16 playing four demo loops with Drifting Memory Advanced open in Mix](docs/screenshots/field-kit-standalone.jpg)
+![Field Kit v0.8.17 playing four demo loops with Record for Loop 1, Copy to Loop, and Replace audio visible](docs/screenshots/field-kit-standalone.jpg)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Choose **Load audio…** to play your own sample. The same drawer holds audio setup, source recording, and Set files.
 
@@ -23,7 +23,7 @@ In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to 
 
 ## Working folders
 
-Open **Source, Input & Files → Working folders…** to choose the starting locations for **Load audio…**, **Save source WAV…**, and **Record mix…**. Field Kit remembers the two folder choices across launches. When present, the default folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
+Open **Source, Input & Files → Working folders…** to choose the starting locations for **Load audio…**, **Save Loop WAV…**, and **Record mix…**. Field Kit remembers the two folder choices across launches. When present, the default folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
 
 ![Working folders with separate import and recording locations and a Choose button for each](docs/screenshots/field-kit-working-folders.jpg)
 
@@ -31,9 +31,10 @@ Open **Source, Input & Files → Working folders…** to choose the starting loc
 
 1. Open **Source, Input & Files**, open **Audio & MIDI Setup…**, and select your interface in **Input device** and **Output device**. Click **Enable audio**. In **Input**, choose the left and right channels. Select the same channel on both sides for a mono source.
 2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
-3. Click **Record source** to capture up to 60 seconds. The red **RECORDING** badge and timer show when audio is being captured. **Stop source** loads the take into all four loops. Use **Save source WAV…** before saving a Set that uses the take or replacing the source.
+3. Select a loop and click **Record for Loop N**. The current loops keep playing while you capture up to 60 seconds. Click **Stop recording**, then **Use on Loop N** to put the take on that loop, or **Discard** to keep its current audio.
+4. With the new loop selected, click **Save Loop WAV…** before saving a Set. One saved WAV is enough for any copies that share the take.
 
-![Glass Circuit playing with the Source, Input & Files drawer open and the Demos menu available](docs/screenshots/field-kit-source-drawer.jpg)
+![Loop 2 has a new take waiting for confirmation while all four demo loops continue playing](docs/screenshots/field-kit-take-ready.jpg)
 
 ## MIDI Learn
 
@@ -48,6 +49,8 @@ Select a mapped control and click **Clear** to remove its assignment. MIDI input
 1. Click a loop number or waveform to select it. **Editing Loop** sits beside the waveforms and shows the selected loop's settings. Drag across a waveform and release to change its range. The moving line shows playback position.
 2. Use **In %** and **Out %** to enter the bounds precisely. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials.
 3. **Fade ms** blends each pass into the next. **Fade preview** shows the two gain curves and the overlap duration. The live duration reflects short-loop limits, speed, and modulation. **Filter** is flat at zero. Turn left to cut highs or right to cut lows.
+
+In the selected loop editor, choose **Copy to Loop…** to copy the audio and range to another loop while keeping the destination’s playback and mixer settings. **Replace audio…** lets you choose a file and confirm or discard it while your loops continue playing. Confirming a replacement starts the new audio with its full range. **Load audio…** in the Source drawer still loads a shared source for all four loops.
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 
@@ -75,7 +78,7 @@ To record movement, select a loop, click **Record**, then drag its dot as many t
 
 Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. During playback, Field Kit holds a short buffer of the outgoing stereo mix and crossfades into the new pattern over 100 ms. Scene changes use the same transition. **Fade ms** in the loop editor still controls only that loop's seam. Recall clears active solos. Click **Cancel store** to exit store mode.
 
-Open **Source, Input & Files** and use **Save Set…** in the **Set files…** menu to save the source file location, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
+Open **Source, Input & Files** and use **Save Set…** in the **Set files…** menu to save the shared source and any per-loop audio file locations, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
 
 Open **Banks…** to load or save a bank of patterns.
 

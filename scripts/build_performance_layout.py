@@ -65,8 +65,8 @@ def layout_performance(p, parameter):
         ("input_meter_R", [557, 194, 87, 10]),
         ("input_record_state", [674, 153, 157, 20]),
         ("input_record_time", [832, 153, 55, 20]),
-        ("input_record_button", [674, 184, 98, 26]),
-        ("input_save_button", [778, 184, 110, 26]),
+        ("input_record_button", [674, 184, 111, 26]),
+        ("input_save_button", [790, 184, 98, 26]),
         ("set_menu", [918, 155, 146, 24]),
         ("set_status", [918, 182, 146, 36]),
     ):

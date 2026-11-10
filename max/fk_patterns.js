@@ -17,6 +17,7 @@ var BANK_VERSION = 2;
 var LEGACY_BANK_VERSION = 1;
 var SET_FORMAT = "field-kit-set";
 var SET_VERSION = 1;
+var LOOP_SET_VERSION = 2;
 var PATTERN_HINT = "Click to recall. Shift-click to store.";
 // Allow all eight slots to hold eight full curves with unrounded values.
 var MAX_BANK_BYTES = 8 * 1024 * 1024;
@@ -561,8 +562,9 @@ folder_of.local = 1;
 
 function save_set() {
     if (set_busy()) return;
-    if (!host.patcher.getnamed("source_control").js.get_set_source()) {
-        set_status("Load a sample or save the input WAV first.");
+    var source = host.patcher.getnamed("source_control").js;
+    if (!source.get_set_source() || !source.get_set_loops()) {
+        set_status("Save any recorded loop WAVs before saving the Set.");
         return;
     }
     var dialog = host.patcher.getnamed("set_save_dialog");
@@ -584,10 +586,12 @@ set_gesture_pads.local = 1;
 function write_set(path) {
     if (typeof path !== "string" || !path || set_busy()) return;
     var folder = folder_of(path);
-    var source = host.patcher.getnamed("source_control").js.get_set_source();
+    var controller = host.patcher.getnamed("source_control").js;
+    var source = controller.get_set_source();
+    var loops = controller.get_set_loops();
     var current = capture_pattern();
-    if (!source || !valid_pattern(current, LFO_COUNT)) {
-        set_status("Set isn’t ready. Check the sample.");
+    if (!source || !loops || !valid_pattern(current, LFO_COUNT)) {
+        set_status("Set isn’t ready. Save any recorded loop WAVs first.");
         return;
     }
     if (source.kind === "file" && folder && source.path.indexOf(folder) === 0) {
@@ -607,6 +611,15 @@ function write_set(path) {
         ],
         pitchLock: value_of(host.patcher.getnamed("pitch_lock"))
     };
+    if (loops.some(Boolean)) {
+        data.version = LOOP_SET_VERSION;
+        data.loopSources = loops.map(function (loopPath) {
+            if (!loopPath) return null;
+            var reference = {kind: "file", path: loopPath};
+            if (folder && loopPath.indexOf(folder) === 0) reference.relative = loopPath.slice(folder.length);
+            return reference;
+        });
+    }
     var stage = folder + ".field-kit-" + Date.now() + "-" + Math.floor(Math.random() * 1e9) + ".tmp";
     try {
         // File positions are byte offsets. ASCII JSON also preserves Unicode paths.
@@ -663,7 +676,7 @@ function set_write_timed_out() {
 set_write_timed_out.local = 1;
 
 function open_set() {
-    if (!set_busy() && !recording_set_guard()) {
+    if (!set_busy() && !recording_set_guard() && !loop_set_guard()) {
         var dialog = host.patcher.getnamed("set_open_dialog");
         if (activeSetPath) dialog.message("setpath", folder_of(activeSetPath));
         dialog.message("bang");
@@ -678,8 +691,15 @@ function recording_set_guard() {
 }
 recording_set_guard.local = 1;
 
+function loop_set_guard() {
+    if (!host.patcher.getnamed("source_control").js.loop_busy()) return false;
+    set_status("Finish or discard the current take before opening a Set.");
+    return true;
+}
+loop_set_guard.local = 1;
+
 function read_set(path) {
-    if (typeof path !== "string" || !path || set_busy() || recording_set_guard()) return;
+    if (typeof path !== "string" || !path || set_busy() || recording_set_guard() || loop_set_guard()) return;
     var file, data;
     try {
         file = new File(path, "read");
@@ -701,6 +721,12 @@ function read_set(path) {
         if (file && file.isopen) file.close();
     }
     pendingSet = { path: path, data: data, relinking: false };
+    if (data.version === LOOP_SET_VERSION) {
+        pendingSet.references = [data.source].concat(data.loopSources);
+        pendingSet.resolved = {};
+        resolve_set_loops();
+        return;
+    }
     var source = data.source;
     if (source.kind === "demo" || source.kind === "builtin") {
         begin_set_source();
@@ -718,6 +744,36 @@ function read_set(path) {
     }
 }
 
+function resolve_set_loops() {
+    var opening = pendingSet;
+    var folder = folder_of(opening.path);
+    var refs = opening.references;
+    var paths = [];
+    for (var i = 0; i < refs.length; i++) {
+        var ref = refs[i];
+        if (!ref || ref.kind !== "file") {
+            paths.push(null);
+            continue;
+        }
+        var key = JSON.stringify(ref.path);
+        var relative = ref.relative && folder + ref.relative;
+        var candidate = opening.resolved[key] || (relative && file_exists(relative) ? relative :
+            file_exists(ref.path) ? ref.path : "");
+        if (!candidate) {
+            opening.relinking = true;
+            opening.relinkKey = key;
+            set_status("Locate " + (i === 0 ? "shared source" : "Loop " + i) + " · " + file_name(ref.path));
+            host.patcher.getnamed("set_relink_dialog").message("bang");
+            return;
+        }
+        opening.resolved[key] = candidate;
+        paths.push(candidate);
+    }
+    set_status("Opening " + file_name(opening.path) + "…");
+    host.patcher.getnamed("source_control").js.open_set_loops(paths[0], opening.data.source.id || null, paths.slice(1));
+}
+resolve_set_loops.local = 1;
+
 function file_exists(path) {
     var file = new File(path, "read");
     if (!file.isopen) return false;
@@ -727,7 +783,7 @@ function file_exists(path) {
 file_exists.local = 1;
 
 function valid_set(data) {
-    if (!data || data.format !== SET_FORMAT || data.version !== SET_VERSION ||
+    if (!data || data.format !== SET_FORMAT || (data.version !== SET_VERSION && data.version !== LOOP_SET_VERSION) ||
         !data.source || !valid_pattern(data.current, LFO_COUNT) ||
         !Array.isArray(data.slots) || data.slots.length !== SLOT_COUNT ||
         !data.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, LFO_COUNT); }) ||
@@ -739,13 +795,20 @@ function valid_set(data) {
             !in_range(data.globalSpeed[0], 0.5, 2) || !index_valid(data.globalSpeed[1], 2))) ||
         (data.selectedSlot !== -1 &&
             (!index_valid(data.selectedSlot, SLOT_COUNT) || !data.slots[data.selectedSlot]))) return false;
+    if (data.version === LOOP_SET_VERSION &&
+        (!Array.isArray(data.loopSources) || data.loopSources.length !== VOICE_COUNT ||
+            !data.loopSources.every(function (ref) { return ref === null || valid_file_reference(ref); }))) return false;
     var source = data.source;
     return source.kind === "demo" ||
         (source.kind === "builtin" && host.patcher.getnamed("source_control").js.valid_builtin_demo(source.id)) ||
-        (source.kind === "file" && typeof source.path === "string" && source.path.length > 0 &&
-            (source.relative === undefined || (typeof source.relative === "string" &&
-                source.relative.length > 0 && !/^(\/|\\)|:|(^|[\/\\])\.\.([\/\\]|$)/.test(source.relative))));
+        valid_file_reference(source);
 }
+function valid_file_reference(source) {
+    return !!source && source.kind === "file" && typeof source.path === "string" && source.path.length > 0 &&
+        (source.relative === undefined || (typeof source.relative === "string" &&
+            source.relative.length > 0 && !/^(\/|\\)|:|(^|[\/\\])\.\.([\/\\]|$)/.test(source.relative)));
+}
+valid_file_reference.local = 1;
 valid_set.local = 1;
 
 function gesture_clip_valid(clip, x, y, minimumX, minimumY) {
@@ -781,6 +844,17 @@ function relink_set(path) {
     if (!pendingSet || !pendingSet.relinking) return;
     if (recording_set_guard()) {
         pendingSet = null;
+        return;
+    }
+    if (pendingSet.references) {
+        if (!file_exists(path)) {
+            pendingSet = null;
+            set_status("Couldn’t open the replacement sample.");
+            return;
+        }
+        pendingSet.resolved[pendingSet.relinkKey] = path;
+        pendingSet.relinking = false;
+        resolve_set_loops();
         return;
     }
     pendingSet.relinking = false;

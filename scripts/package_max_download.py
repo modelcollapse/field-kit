@@ -46,10 +46,12 @@ and Output device. Enable audio. In Input, choose the left and right channels. F
 Input gain adjusts both channels from −60 to +18 dB and starts at 0 dB.
 The two post-gain peak meters show the recording levels with peak hold
 and a red overload indicator.
-Click Record source and watch for the red RECORDING badge and timer.
-Click Stop source to use the take in all four loops.
-Recording stops automatically after 60 seconds. Click Save source WAV… before
-saving a Set with the take or replacing it with a different source.
+Select a loop and click Record for Loop N. The current loops keep playing.
+Click Stop recording and choose Use on Loop N or Discard. Takes are limited to
+60 seconds. Select the recorded loop and choose Save Loop WAV… before saving a Set.
+In the loop editor, Copy to Loop… shares the source and copies its range while
+keeping the destination’s settings. Replace audio… stages a file for that loop.
+Load audio… in the Source drawer still loads a shared source for all four loops.
 
 To use MIDI Learn, choose a port under MIDI In, pick a control and click Learn.
 Move an absolute CC knob or fader, or use a note or momentary CC for buttons.

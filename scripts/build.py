@@ -13,6 +13,7 @@ from build_drift_modulation import DRIFT_MOD_TARGETS, append_drift_modulation
 from build_fx import DIALS as FX_DIALS
 from build_io import add_io_setup
 from build_working_folders import add_working_folders
+from build_loop_audio import add_loop_audio
 from build_master_meter import append_master_meter
 from build_performance_layout import PERFORMANCE_WINDOW_HEIGHT, layout_performance
 from build_mix_scene_strip import append_mix_scene_strip
@@ -227,8 +228,8 @@ def source_input(p):
     p.connect("demo", 0, "demo_message")
     p.connect("demo_message", 0, "source_control")
     for name, text, column, command, hint in (
-        ("input_record_button", "Record source", 15, "toggle_input_record",
-         "Record the selected inputs as a new source for all four loops."),
+        ("input_record_button", "Record for Loop 1", 15, "toggle_loop_record",
+         "Record the selected inputs for the loop you are editing."),
         ("input_save_button", "Save source WAV…", 18, "choose_input_save",
          "Save the current input take so a Set can reopen it."),
     ):
@@ -853,6 +854,7 @@ def build():
     p.obj("standalone", "standalone @bundleidentifier audio.poeticstate.fieldkit @preffilename FieldKit @gensupport 1 @cefsupport 0", 30, 2080, outs=0)
 
     p.obj("source_control", "js fk_source.js", 24, 808, outs=4, types=["list"] * 4)
+    add_loop_audio(p, Patch(), VERSION)
     p.obj("initialize", "loadmess initialize", 200, 808, types=[""])
     p.connect("initialize", 0, "source_control")
     p.obj("audio_file", "opendialog", 400, 808, outs=2, types=["", "bang"])
@@ -877,7 +879,6 @@ def build():
     p.obj("dsp_enabled", "prepend dsp_enabled", 1130, 846, ins=2)
     p.connect("dsp_state", 0, "dsp_enabled")
     p.connect("dsp_enabled", 0, "source_control")
-    p.obj("source_rate", "sig~ 0.", 880, 846, types=["signal"])
 
     for name, label, col, selector, width in (
         ("play", "▶  Play all", 0, "play_all", 3),
@@ -1031,7 +1032,8 @@ def build():
         p.obj(f"run_{voice}", "sig~ 0.", 925, y, types=["signal"])
         p.obj(f"wave_edit_revision_{voice}", "sig~ 0.", 1030, y + 108, types=["signal"])
         p.connect(f"run_{voice}", 0, f"voice_{voice}", 9)
-        p.connect("source_rate", 0, f"voice_{voice}", 10)
+        p.obj(f"source_rate_{voice}", "sig~ 0.", 1030, y + 142, types=["signal"])
+        p.connect(f"source_rate_{voice}", 0, f"voice_{voice}", 10)
         p.connect("pitch_scale_signal", 0, f"voice_{voice}", 11)
         p.connect(f"wave_edit_revision_{voice}", 0, f"voice_{voice}", 12)
         p.connect(f"voice_{voice}", 7, "loop_fade_voice", voice)

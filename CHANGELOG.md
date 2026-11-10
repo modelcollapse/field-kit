@@ -1,5 +1,10 @@
 # Field Kit changelog
 
+## v0.8.17
+
+- Record a take for the selected loop while all current loops continue playing. Confirm or discard before swapping the audio.
+- Copy audio and its range to another loop, or stage a replacement file for one loop. Sets can remember separate loop audio files.
+
 ## v0.8.16
 
 - Drifting Memory starts with Advanced open in Mix.

@@ -19,6 +19,7 @@ var fitTask = new Task(fit_full_screen, this);
 var scopeFitTask = new Task(fit_scope_popout, this);
 var scopeOpenTask = new Task(show_scope_popout, this);
 var foldersOpenTask = new Task(show_working_folders, this);
+var loopTakeOpenTask = new Task(show_loop_take, this);
 var ioOpenTask = new Task(show_io_setup, this);
 var fieldOpenTask = new Task(show_stereo_field, this);
 var scopeSize = [];
@@ -223,6 +224,15 @@ function show_working_folders() {
     patch.getnamed("set_writer").message("folder_get");
 }
 show_working_folders.local = 1;
+
+function open_loop_take() {
+    open_popout(loopTakeOpenTask);
+}
+
+function show_loop_take() {
+    patch.getnamed("loop_take_window").message("open");
+}
+show_loop_take.local = 1;
 
 function open_io_setup() {
     open_popout(ioOpenTask);
@@ -454,6 +464,7 @@ function msg_int(index) {
     paint_patch(patch.getnamed("sequence_panel").subpatcher(), sections.scenes, palette);
     paint_patch(patch.getnamed("io_setup_panel").subpatcher(), sections.input, palette);
     paint_patch(patch.getnamed("working_folders_panel").subpatcher(), sections.source_files, palette);
+    paint_patch(patch.getnamed("loop_take_panel").subpatcher(), sections.source_files, palette);
     var tuner = patch.getnamed("tuner_panel").subpatcher();
     paint_patch(tuner, panel, palette);
     send_theme(tuner.getnamed("tuner_canvas"), inset.concat(ink, palette[5], accent, control));

@@ -12,6 +12,8 @@ const sourceState = {
     playing: [true, false, true, false],
     normalPlaying: false,
     path: '/test/audio.wav',
+    get_set_loops() { return [null, null, null, null]; },
+    loop_busy() { return false; },
     get_set_source() { return { kind: 'file', path: this.path }; },
     valid_builtin_demo(id) { return id === 'glass-circuit' || id === 'tidal-lanterns'; },
 };

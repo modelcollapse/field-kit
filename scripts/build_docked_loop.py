@@ -6,7 +6,9 @@ _DOCK_HEIGHT = 310
 # Relative to the dock. Keep each group on its existing theme surface.
 _DOCK_RECTS = {
     "surface_editor_playback": (0, 0, 408, 104),
-    "inspector_title": (12, 7, 384, 23),
+    "inspector_title": (12, 7, 144, 23),
+    "loop_copy": (160, 9, 117, 21),
+    "loop_replace": (282, 9, 114, 21),
     "inspector_label_start": (12, 34, 64, 17),
     "inspector_label_end": (84, 34, 64, 17),
     "inspector_label_direction": (156, 34, 120, 17),

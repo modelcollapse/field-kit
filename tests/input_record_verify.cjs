@@ -261,7 +261,7 @@ for (let voice = 1; voice <= 4; voice++) {
     assert(sent(`voice_${voice}`, 'source', 'field-kit-set-source-1'));
     assert(sent(`wave_${voice}`, 'set', 'field-kit-set-source-1'));
 }
-assert(sent('source_rate', sampleRate));
+assert(sent('source_rate_1', sampleRate));
 assert(sent('normal_right_channel', 2));
 assert(Math.abs(regions.at(-1)[2] - trim[3] * 1000 / sampleRate) < 1e-9);
 assert.equal(host.get_set_source(), null, 'an unsaved recording has no Set file path');
