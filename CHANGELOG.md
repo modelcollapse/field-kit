@@ -1,5 +1,11 @@
 # Field Kit changelog
 
+## v0.8.19
+
+- Record and Import buttons show the destination from Send to.
+- Loop recording shows the destination of a staged take or file while the header prompts you to confirm or discard.
+- Match the recording and import button typography within the existing layout.
+
 ## v0.8.18
 
 - Choose Selected loop, a specific loop, or All loops from the same Send to menu for recording and importing.

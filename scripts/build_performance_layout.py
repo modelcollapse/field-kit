@@ -76,12 +76,13 @@ def layout_performance(p, parameter):
     p.add("loop_destination_label", "comment", rect, view=rect, outs=0, text="Send to", fontsize=11, **drawer)
     boxes["input_level_label"].update(text="Input level", fontsize=11)
     boxes["input_record_state"]["fontsize"] = 11
-    boxes["input_save_button"]["fontsize"] = 10
+    for name in ("load", "input_record_button", "input_save_button"):
+        boxes[name]["fontsize"] = 10
     boxes["set_status"]["fontsize"] = 10
     backdrop("surface_source_files", [906, 120, 170, 102], **drawer)
     for name, title, x, width in (
         ("drawer_input_title", "Input", 310, 110),
-        ("drawer_capture_title", "Source recording", 674, 211),
+        ("drawer_capture_title", "Loop recording", 674, 211),
     ):
         rect = [x, 128, width, 22]
         p.add(name, "comment", rect, view=rect, outs=0, text=title,

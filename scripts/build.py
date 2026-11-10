@@ -217,8 +217,9 @@ def source_input(p):
           text="00:00.0", fontface=1, textjustification=2,
           hint="Elapsed audio captured in the current or last input take.")
     button_y = INPUT_TOP + 35
-    action(p, "load", "Import audio…", 0, "import_loop_audio", 3,
-           view=[28, button_y, 126, 28])
+    action(p, "load", "Import to Loop 1…", 0, "import_loop_audio", 3,
+           view=[28, button_y, 126, 28],
+           hint="Choose an audio file for the destination shown on the button.")
     target_rect = [160, INPUT_TOP + 8, 120, 24]
     p.add("loop_destination", "umenu", target_rect, view=target_rect, outs=3, types=["int", "", ""],
           items=["Selected loop", ",", "Loop 1", ",", "Loop 2", ",", "Loop 3", ",", "Loop 4", ",", "All loops"],
@@ -236,9 +237,9 @@ def source_input(p):
     p.connect("demo", 0, "demo_message")
     p.connect("demo_message", 0, "source_control")
     for name, text, column, command, hint in (
-        ("input_record_button", "Record for Loop 1", 15, "toggle_loop_record",
+        ("input_record_button", "Record to Loop 1", 15, "toggle_loop_record",
          "Record the selected inputs for the destination in the Source drawer."),
-        ("input_save_button", "Save source WAV…", 18, "choose_input_save",
+        ("input_save_button", "Save Loop WAV…", 18, "choose_input_save",
          "Save the current input take so a Set can reopen it."),
     ):
         control = action(p, name, text, column, command, 3, hint=hint,

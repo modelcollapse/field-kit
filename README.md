@@ -7,13 +7,13 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-The v0.8.18 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.19 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.18](CHANGELOG.md).
+[See what's new in v0.8.19](CHANGELOG.md).
 
-![Field Kit v0.8.18 playing four demo loops with All loops selected in the Send to menu](docs/screenshots/field-kit-standalone.jpg)
+![Field Kit v0.8.19 playing four demo loops while Loop recording shows a take ready for all loops](docs/screenshots/field-kit-standalone.jpg)
 
-The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Use **Send to** and **Import audio…** to stage your own sample for a loop or all four. The same drawer holds audio setup, source recording, and Set files.
+The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Use **Send to** and the **Import to…** button to stage your own sample for a loop or all four. The same drawer holds audio setup, loop recording, and Set files.
 
 Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header. Each theme uses related background shades to separate source setup, the mixer, loop controls, effects, and recording.
 
@@ -23,7 +23,7 @@ In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to 
 
 ## Working folders
 
-Open **Source, Input & Files → Working folders…** to choose the starting locations for **Import audio…**, **Replace audio…**, **Save Loop WAV…**, and **Record mix…**. Field Kit remembers the two folder choices across launches. When present, the default folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
+Open **Source, Input & Files → Working folders…** to choose the starting locations for the **Import to…** button, **Replace audio…**, **Save Loop WAV…**, and **Record mix…**. Field Kit remembers the two folder choices across launches. When present, the default folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
 
 ![Working folders with separate import and recording locations and a Choose button for each](docs/screenshots/field-kit-working-folders.jpg)
 
@@ -31,10 +31,10 @@ Open **Source, Input & Files → Working folders…** to choose the starting loc
 
 1. Open **Source, Input & Files**, open **Audio & MIDI Setup…**, and select your interface in **Input device** and **Output device**. Click **Enable audio**. In **Input**, choose the left and right channels. Select the same channel on both sides for a mono source.
 2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
-3. In **Send to**, choose **Selected loop**, an explicit loop number, or **All loops**. Click **Record**. The current loops keep playing while you capture up to 60 seconds. Click **Stop recording**, then confirm the destination or choose **Discard**.
+3. In **Send to**, choose **Selected loop**, an explicit loop number, or **All loops**. Click **Record to** followed by the displayed destination. The current loops keep playing while you capture up to 60 seconds. Click **Stop recording**, then check **Loop recording** for the destination awaiting confirmation. Choose **Use on** to confirm or **Discard** to keep the current loop audio.
 4. With the new loop selected, click **Save Loop WAV…** before saving a Set. One saved WAV is enough for any copies that share the take.
 
-![A take for all loops waits for confirmation while the four existing demo loops continue playing](docs/screenshots/field-kit-take-ready.jpg)
+![The take confirmation window with Use on all loops and Discard buttons](docs/screenshots/field-kit-take-ready.jpg)
 
 ## MIDI Learn
 
@@ -50,7 +50,7 @@ Select a mapped control and click **Clear** to remove its assignment. MIDI input
 2. Use **In %** and **Out %** to enter the bounds precisely. Choose **Forward**, **Reverse**, or **Ping-pong** and adjust the dials.
 3. **Fade ms** blends each pass into the next. **Fade preview** shows the two gain curves and the overlap duration. The live duration reflects short-loop limits, speed, and modulation. **Filter** is flat at zero. Turn left to cut highs or right to cut lows.
 
-In the selected loop editor, choose **Copy to Loop…** to copy the audio and range to another loop while keeping the destination’s playback and mixer settings. **Replace audio…** lets you choose a file and confirm or discard it while your loops continue playing. Confirming a replacement starts the new audio with its full range. **Import audio…** in the Source drawer uses the same **Send to** menu as the recorder. **All loops** starts each loop on a different quarter of the same audio. A single loop starts with the full range.
+In the selected loop editor, choose **Copy to Loop…** to copy the audio and range to another loop while keeping the destination’s playback and mixer settings. **Replace audio…** lets you choose a file and confirm or discard it while your loops continue playing. Confirming a replacement starts the new audio with its full range. The **Import to…** button in the Source drawer uses the same **Send to** menu as the recorder. **All loops** starts each loop on a different quarter of the same audio. A single loop starts with the full range.
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 

@@ -35237,9 +35237,10 @@
             32
           ],
           "mode": 0,
-          "text": "Import audio…",
-          "texton": "Import audio…",
+          "text": "Import to Loop 1…",
+          "texton": "Import to Loop 1…",
           "parameter_enable": 0,
+          "hint": "Choose an audio file for the destination shown on the button.",
           "outlettype": [
             "",
             ""
@@ -35252,7 +35253,8 @@
             28
           ],
           "annotation": "source_drawer",
-          "hidden": 1
+          "hidden": 1,
+          "fontsize": 10
         }
       },
       {
@@ -35423,8 +35425,8 @@
             32
           ],
           "mode": 0,
-          "text": "Record for Loop 1",
-          "texton": "Record for Loop 1",
+          "text": "Record to Loop 1",
+          "texton": "Record to Loop 1",
           "parameter_enable": 0,
           "hint": "Record the selected inputs for the destination in the Source drawer.",
           "outlettype": [
@@ -35440,7 +35442,8 @@
           ],
           "active": 0,
           "annotation": "source_drawer",
-          "hidden": 1
+          "hidden": 1,
+          "fontsize": 10
         }
       },
       {
@@ -35493,8 +35496,8 @@
             32
           ],
           "mode": 0,
-          "text": "Save source WAV…",
-          "texton": "Save source WAV…",
+          "text": "Save Loop WAV…",
+          "texton": "Save Loop WAV…",
           "parameter_enable": 0,
           "hint": "Save the current input take so a Set can reopen it.",
           "outlettype": [
@@ -37199,7 +37202,7 @@
             211,
             22
           ],
-          "text": "Source recording",
+          "text": "Loop recording",
           "fontsize": 15,
           "fontface": 1,
           "annotation": "source_drawer",

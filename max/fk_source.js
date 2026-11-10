@@ -421,10 +421,15 @@ function loop_file_name(path) {
 }
 loop_file_name.local = 1;
 
+function loop_target_name(voice) {
+    return voice === WINDOWS + 1 ? "all loops" : "Loop " + voice;
+}
+loop_target_name.local = 1;
+
 function stage_loop_entry(voice, entry) {
     loopPending = {state: "staged", voice: voice, entry: entry, range: [0, 100]};
     var panel = host.patcher.getnamed("loop_take_panel").subpatcher();
-    var destination = voice === WINDOWS + 1 ? "all loops" : "Loop " + voice;
+    var destination = loop_target_name(voice);
     var caption = "Use on " + destination;
     panel.getnamed("take_title").message("set", "New audio for " + destination);
     panel.getnamed("take_detail").message("set", entry.name + " · " + (entry.frames / entry.sampleRate).toFixed(2) + " s");
@@ -525,7 +530,7 @@ function update_loop_buttons() {
     send("loop_replace", "active", !busy && ready ? 1 : 0);
     send("load", "active", !busy && ready ? 1 : 0);
     send("loop_destination", "ignoreclick", busy ? 1 : 0);
-    var saveCaption = entry ? "Save Loop WAV…" : "Save source WAV…";
+    var saveCaption = !entry && ready && !sourceDemo && !sourcePath ? "Save source WAV…" : "Save Loop WAV…";
     send("input_save_button", "text", saveCaption);
     send("input_save_button", "texton", saveCaption);
     send("input_save_button", "active", !busy && ready &&
@@ -843,10 +848,15 @@ read_timeout.local = 1;
 function update_status() {
     var recording = inputTake && inputTake.state === "recording";
     var capturing = recording && inputTake.started;
+    var staged = loopPending && loopPending.state === "staged";
     if (recording) {
-        label("input_record_state", capturing ? "● RECORDING" : "Starting…");
+        label("input_record_state", capturing ? (inputTake.voice ?
+            "Recording to " + loop_target_name(inputTake.voice) : "Recording") : "Starting…");
     } else if (inputTake) {
         label("input_record_state", "Preparing take…");
+    } else if (staged) {
+        label("input_record_state", (loopPending.entry.path ? "File" : "Take") +
+            " ready · " + loop_target_name(loopPending.voice));
     } else if (inputWritePath || loopWrite) {
         label("input_record_state", "Saving WAV…");
     } else if (!audioOn || audioStarting) {
@@ -859,11 +869,13 @@ function update_status() {
     } else {
         send("input_record_state", "bgcolor", 0, 0, 0, 0);
     }
-    var destination = loopDestination || inspectedWindow;
-    var inputButton = recording ? "Stop recording" :
-        destination === WINDOWS + 1 ? "Record for All" : "Record for Loop " + destination;
+    var destination = loop_target_name(loopDestination || inspectedWindow);
+    var inputButton = recording ? "Stop recording" : "Record to " + destination;
+    var importButton = "Import to " + destination + "…";
     send("input_record_button", "text", inputButton);
     send("input_record_button", "texton", inputButton);
+    send("load", "text", importButton);
+    send("load", "texton", importButton);
     send("input_record_button", "active", recording || (audioOn && !audioStarting &&
         inputSampleRate > 0 && inputCount > 0 && !loop_busy()) ? 1 : 0);
     update_loop_buttons();
@@ -876,8 +888,8 @@ function update_status() {
         label("status", recording ? "● Recording · Click Stop recording." : "Preparing recorded audio…");
     } else if (inputWritePath) {
         label("status", "Saving recorded source…");
-    } else if (loopPending && loopPending.state === "staged") {
-        label("status", "Take ready · Confirm or discard.");
+    } else if (staged) {
+        label("status", (loopPending.entry.path ? "File" : "Take") + " ready · Confirm or discard.");
     } else if (pendingPath) {
         label("status", (queuedWindows || queuedNormal) ? "Loading audio… Playback queued." : "Loading audio…");
     } else if (audioStarting) {
@@ -887,12 +899,12 @@ function update_status() {
     } else if (normalPlaying) {
         label("status", "Playing original sample");
     } else if (count) {
-        label("status", count + " of " + WINDOWS + " windows playing");
+        label("status", count + " of " + WINDOWS + " loops playing");
     } else if (ready) {
         label("status", sourceDemo ? "Click Play all to hear the demo." :
             sourcePath ? "Ready · Click Play all." : "Input ready · Save a WAV to keep the take.");
     } else if (bufferName) {
-        label("status", "Choose Load audio… or Demos…");
+        label("status", "Choose a demo to get started.");
     }
 }
 update_status.local = 1;

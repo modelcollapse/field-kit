@@ -84,10 +84,10 @@ for (let voice = 1; voice <= 4; voice++) {
     assert(sent(`run_${voice}`, 1));
     assert(sent(`playhead_gate_${voice}`, 1));
 }
-assert(sent('status', 'set', '4 of 4 windows playing'));
+assert(sent('status', 'set', '4 of 4 loops playing'));
 host.edit_play(3, 0);
 assert(sent('run_3', 0));
-assert(sent('status', 'set', '3 of 4 windows playing'));
+assert(sent('status', 'set', '3 of 4 loops playing'));
 
 trace.length = 0;
 host.wave_mouse(3, 0.8, 0, 1);
