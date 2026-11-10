@@ -47,8 +47,7 @@ Input gain adjusts both channels from −60 to +18 dB and starts at 0 dB.
 The two post-gain peak meters show the recording levels with peak hold
 and a red overload indicator.
 Choose Selected loop, a loop number, or All loops in Send to. Click the Record to button.
-The current loops keep playing. Click Stop recording. Loop recording shows which take needs confirmation. Choose Use on or Discard. Takes are limited to
-60 seconds. Select the recorded loop and choose Save Loop WAV… before saving a Set.
+The current loops keep playing. Click Stop recording. Loop recording shows which take needs confirmation. Choose Use on or Discard. Recording continues until you stop it, subject to available storage. Select the recorded loop and choose Save Loop WAV… before saving a Set.
 In the loop editor, Copy to Loop… shares the source and copies its range while
 keeping the destination’s settings. Replace audio… stages a file for that loop.
 The Import to… button in the Source drawer uses the same Send to menu. All loops uses

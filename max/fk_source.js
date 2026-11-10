@@ -15,7 +15,6 @@ var DEMOS = [
 var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "filter", "level", "pan"];
 var BUFFER_OBJECTS = ["buffer", "set_buffer"];
 var INFO_OBJECTS = ["source_info", "set_source_info"];
-var INPUT_LIMIT_SECONDS = 60;
 var NORMAL_FADE_MS = 16;
 var host = this;
 var bufferIds = new Global("field_kit_buffer_ids");
@@ -46,6 +45,7 @@ var inputCount = -1;
 var inputChannels = [1, 2];
 var INPUT_MENUS = ["input_left", "input_right"];
 var inputTake = null;
+var inputRequest = 0;
 var inputWritePath = "";
 var ready = false;
 var audioOn = false;
@@ -76,9 +76,9 @@ var commitSet = new Task(commit_set_source, host);
 var waitForAudio = new Task(audio_timeout, host);
 var settleAudio = new Task(audio_settled, host);
 var commitWave = new Task(commit_wave_edits, host);
-var inputLimit = new Task(stop_input_record, host);
-var inputReply = new Task(input_record_timeout, host);
-var inputCommit = new Task(commit_input_record, host);
+var inputPrepare = new Task(input_prepare_timeout, host);
+var inputWatch = new Task(watch_input_progress, host);
+var inputFinish = new Task(finish_input_record, host);
 var inputSaveTimeout = new Task(input_save_failed, host);
 var loopReadTimeout = new Task(loop_read_expired, host);
 var loopSwitch = new Task(commit_loop_switch, host);
@@ -352,8 +352,8 @@ function stage_loop_file(path) {
     start_loop_read(path, slot, voice);
 }
 
-function start_loop_read(path, slot, voice) {
-    loopPending = {state: "reading", voice: voice, slot: slot, path: path};
+function start_loop_read(path, slot, voice, recordedBytes) {
+    loopPending = {state: "reading", voice: voice, slot: slot, path: path, recordedBytes: recordedBytes};
     send("loop_buffer_" + slot, "sizeinsamps", 1);
     loopReadTimeout.schedule(12000);
     send("loop_buffer_" + slot, "replace", path);
@@ -383,7 +383,10 @@ function loop_buffer_ready(slot, sampleRate) {
     loopReadTimeout.cancel();
     var audio = new Buffer(loopBuffers[slot]);
     var frames = audio.framecount();
-    if (!isFinite(sampleRate) || sampleRate <= 0 || !isFinite(frames) || frames < 2 || audio.channelcount() < 1) {
+    var channels = audio.channelcount();
+    var recorded = loopPending.recordedBytes;
+    if (!isFinite(sampleRate) || sampleRate <= 0 || !isFinite(frames) || frames < 2 ||
+        channels < 1 || (recorded && (channels !== 2 || frames * 6 !== recorded))) {
         fail_loop_read(false);
         return;
     }
@@ -394,6 +397,11 @@ function loop_buffer_ready(slot, sampleRate) {
         loopPending = null;
         read_next_set_loop();
     } else {
+        if (recorded) {
+            send("set_writer", "remove_input_temp", path);
+            entry.path = "";
+            entry.name = "Recorded take";
+        }
         stage_loop_entry(loopPending.voice, entry);
     }
 }
@@ -405,6 +413,7 @@ loop_read_expired.local = 1;
 
 function fail_loop_read(late) {
     if (!loopPending || loopPending.state !== "reading") return;
+    var failed = loopPending;
     if (late) lateLoopReads[loopPending.slot] = true;
     loopPending = null;
     if (loopSet) {
@@ -412,7 +421,12 @@ function fail_loop_read(late) {
         send("pattern_control", "set_source_loaded", 0);
     }
     update_status();
-    label("status", "Couldn’t load the loop audio.");
+    if (failed.recordedBytes) {
+        send("status", "hint", failed.path);
+        label("status", "Couldn’t stage take · WAV kept.");
+    } else {
+        label("status", "Couldn’t load the loop audio.");
+    }
 }
 fail_loop_read.local = 1;
 
@@ -853,6 +867,8 @@ function update_status() {
         label("input_record_state", capturing ? (inputTake.voice ?
             "Recording to " + loop_target_name(inputTake.voice) : "Recording") : "Starting…");
     } else if (inputTake) {
+        label("input_record_state", inputTake.state === "allocating" ? "Starting…" : "Preparing take…");
+    } else if (loopPending && loopPending.state === "reading" && loopPending.recordedBytes) {
         label("input_record_state", "Preparing take…");
     } else if (staged) {
         label("input_record_state", (loopPending.entry.path ? "File" : "Take") +
@@ -913,6 +929,10 @@ function input_sample_rate(rate) {
     if (typeof rate === "number" && isFinite(rate) && rate > 0 && rate !== inputSampleRate) {
         inputSampleRate = rate;
         if (inputTake && inputTake.state === "recording") stop_input_record();
+        else if (inputTake && inputTake.state === "allocating") {
+            inputPrepare.cancel();
+            input_prepare_timeout();
+        }
         update_status();
     }
 }
@@ -950,124 +970,120 @@ function set_input_channel(outletNumber, index) {
 }
 
 function toggle_loop_record() {
-    toggle_input_record(loopDestination || inspectedWindow);
-}
-
-function toggle_input_record(voice) {
     if (inputTake) {
         if (inputTake.state === "recording") stop_input_record();
         return;
     }
-    if (!bufferName || loop_busy() || !audioOn ||
-        audioStarting || !inputSampleRate || inputCount < 1) {
-        return;
-    }
-    var target = voice ? pool_slot() : 1 - activeBuffer;
+    if (!ready || loop_busy() || !audioOn || audioStarting || !inputSampleRate || inputCount < 1) return;
+    var target = pool_slot();
     if (target < 0) {
         label("status", "No space to stage another take.");
         return;
     }
-    var frames = Math.round(inputSampleRate * INPUT_LIMIT_SECONDS);
-    var object = voice ? "loop_buffer_" + target : BUFFER_OBJECTS[target];
-    send(object, "sr", inputSampleRate);
-    send(object, "sizeinsamps", frames, 2);
-    send(object, "clear");
-    send("input_recorder", "set", voice ? loopBuffers[target] : bufferNames[target]);
-    send("input_recorder", "reset");
-    send("input_progress", "bang");
-    inputTake = {
-        state: "recording", target: target, frames: frames, voice: voice,
-        sampleRate: inputSampleRate, started: false, tenths: 0
-    };
+    inputTake = {state: "allocating", request: ++inputRequest, target: target,
+        voice: loopDestination || inspectedWindow};
     label("input_record_time", "00:00.0");
-    send("input_recorder", 1);
-    inputLimit.schedule(INPUT_LIMIT_SECONDS * 1000);
+    send("status", "hint", "");
     update_status();
-    send("input_clock", "start");
+    inputPrepare.schedule(5000);
+    send("set_writer", "create_input_temp", inputRequest);
 }
 
-function stop_input_record() {
-    if (!inputTake || inputTake.state !== "recording") return;
-    inputLimit.cancel();
-    inputTake.state = "stopping";
-    send("input_clock", "stop");
+function input_temp_ready(request, path) {
+    if (!inputTake || inputTake.state !== "allocating" || inputTake.request !== request) {
+        if (path) send("set_writer", "remove_input_temp", path);
+        return;
+    }
+    inputPrepare.cancel();
+    if (!path || !audioOn) {
+        if (path) send("set_writer", "remove_input_temp", path);
+        input_prepare_timeout();
+        return;
+    }
+    inputTake.state = "recording";
+    inputTake.path = path;
+    inputTake.lastElapsed = null;
+    inputTake.lastProgress = Date.now();
+    inputTake.tenths = 0;
+    send("input_recorder", "samptype", "int24");
+    send("input_recorder", "open", "wave", path);
+    send("input_recorder", 1);
+    send("input_clock", "start");
+    inputWatch.schedule(300);
     update_status();
-    inputReply.schedule(500);
+}
+
+function input_prepare_timeout() {
+    inputTake = null;
+    update_status();
+    label("status", "Couldn’t prepare the loop recording.");
+}
+input_prepare_timeout.local = 1;
+
+function stop_input_record() {
+    if (!inputTake) return;
+    if (inputTake.state === "allocating") {
+        inputPrepare.cancel();
+        input_prepare_timeout();
+        return;
+    }
+    if (inputTake.state !== "recording") return;
+    inputWatch.cancel();
+    inputTake.state = "stopping";
+    inputTake.attempts = 0;
+    send("input_clock", "stop");
     send("input_recorder", 0);
-    send("input_progress", "bang");
+    update_status();
+    inputFinish.schedule(150);
 }
 stop_input_record.local = 1;
 
-function input_elapsed_phase(phase) {
+function input_elapsed(ms) {
     if (!inputTake || inputTake.state !== "recording" ||
-        typeof phase !== "number" || !isFinite(phase) || phase <= 0) return;
+        typeof ms !== "number" || !isFinite(ms) || ms < 0) return;
+    var previous = inputTake.lastElapsed;
+    inputTake.lastElapsed = ms;
+    if (previous === null || ms <= previous) return;
+    inputTake.lastProgress = Date.now();
     if (!inputTake.started) {
         inputTake.started = true;
         update_status();
     }
-    update_input_time(Math.min(phase, 1) * inputTake.frames);
-}
-
-function update_input_time(frames) {
-    var tenths = Math.floor(frames * 10 / inputTake.sampleRate);
+    var tenths = Math.floor(ms / 100);
     if (tenths <= inputTake.tenths) return;
     inputTake.tenths = tenths;
-    var minutes = ("0" + Math.floor(tenths / 600)).slice(-2);
+    var minutes = Math.floor(tenths / 600);
     var seconds = ("0" + Math.floor(tenths / 10) % 60).slice(-2);
-    label("input_record_time", minutes + ":" + seconds + "." + tenths % 10);
-}
-update_input_time.local = 1;
-
-function input_record_progress(phase) {
-    if (!inputTake || inputTake.state !== "stopping") return;
-    inputReply.cancel();
-    var frames = Math.min(inputTake.frames, Math.round(phase * inputTake.frames) + 1);
-    if (!isFinite(frames) || frames < 2) {
-        input_record_timeout();
-        return;
-    }
-    inputTake.state = "committing";
-    update_input_time(frames);
-    send(inputTake.voice ? "loop_buffer_" + inputTake.target : BUFFER_OBJECTS[inputTake.target],
-        "crop_samples", 0, frames);
-    if (!inputTake.voice) {
-        stop_all();
-        commitWave.cancel();
-        pendingWaveEdits = 0;
-    }
-    inputCommit.schedule(40);
+    label("input_record_time", (minutes < 10 ? "0" : "") + minutes + ":" + seconds + "." + tenths % 10);
 }
 
-function input_record_timeout() {
-    inputTake = null;
-    update_status();
-    label("status", "No input captured. Try a longer take.");
+function watch_input_progress() {
+    if (Date.now() - inputTake.lastProgress > 1800) stop_input_record();
+    else inputWatch.schedule(300);
 }
-input_record_timeout.local = 1;
+watch_input_progress.local = 1;
 
-function commit_input_record() {
+function finish_input_record() {
     var take = inputTake;
-    var buffer = new Buffer(take.voice ? loopBuffers[take.target] : bufferNames[take.target]);
-    var frames = buffer.framecount();
-    var channels = buffer.channelcount();
-    if (!isFinite(frames) || frames < 2 || channels !== 2) {
-        input_record_timeout();
-        return;
+    var bytes = input_wav_bytes(take.path);
+    if (bytes >= 12 && bytes % 6 === 0) {
+        inputTake = null;
+        start_loop_read(take.path, take.target, take.voice, bytes);
+    } else if (++take.attempts < 8) {
+        inputFinish.schedule(150);
+    } else {
+        inputTake = null;
+        update_status();
+        if (bytes === 0 || bytes === 6) {
+            send("set_writer", "remove_input_temp", take.path);
+            label("status", "No take saved · Check disk space and audio input.");
+        } else {
+            send("status", "hint", take.path);
+            label("status", "Couldn’t read take · WAV kept.");
+        }
     }
-    inputTake = null;
-    if (take.voice) {
-        stage_loop_entry(take.voice, {slot: take.target, path: "", frames: frames,
-            sampleRate: take.sampleRate, name: "Recorded take"});
-        return;
-    }
-    finish_loop_set();
-    bind_source(take.target);
-    sourceDemo = null;
-    sourcePath = "";
-    activate_source(take.sampleRate, frames, channels, "Recorded input");
-    send(BUFFER_OBJECTS[1 - activeBuffer], "sizeinsamps", 1);
 }
-commit_input_record.local = 1;
+finish_input_record.local = 1;
 
 function choose_input_save() {
     var entry = loopSources[inspectedWindow - 1];
@@ -1117,26 +1133,43 @@ function finish_input_save() {
 finish_input_save.local = 1;
 
 function has_input_audio(path, expectedBytes) {
+    return expectedBytes >= 6 && input_wav_bytes(path) === expectedBytes;
+}
+has_input_audio.local = 1;
+
+function input_wav_bytes(path) {
     var file = new File(path, "read");
-    if (!file.isopen) return false;
+    if (!file.isopen) return 0;
     try {
-        if (file.eof < 44 + expectedBytes || file.readstring(4) !== "RIFF") return false;
+        var container = file.readstring(4);
         file.position = 8;
-        if (file.readstring(4) !== "WAVE") return false;
+        if ((container !== "RIFF" && container !== "RF64") || file.readstring(4) !== "WAVE") return -1;
         file.byteorder = "little";
+        var extended = 0;
         while (file.position + 8 <= file.eof) {
             var chunk = file.readstring(4);
-            var size = file.readint32(1)[0];
-            if (size < 0 || file.position + size > file.eof) return false;
-            if (chunk === "data") return size === expectedBytes;
-            file.position += size + (size % 2);
+            var size = file.readint32(1)[0] >>> 0;
+            var start = file.position;
+            if (chunk === "data") {
+                var bytes = container === "RF64" && size === 0xffffffff ? extended : size;
+                return start + bytes <= file.eof ? bytes : -1;
+            }
+            if (start + size + size % 2 > file.eof) return -1;
+            if (chunk === "ds64" && container === "RF64" && size >= 28) {
+                file.position = start + 8;
+                var words = file.readint32(2);
+                extended = (words[0] >>> 0) + (words[1] >>> 0) * 4294967296;
+            }
+            file.position = start + size + size % 2;
         }
-        return false;
+        return -1;
+    } catch (_) {
+        return -1;
     } finally {
         file.close();
     }
 }
-has_input_audio.local = 1;
+input_wav_bytes.local = 1;
 
 function input_save_failed() {
     inputSaveTimeout.cancel();
@@ -1222,8 +1255,7 @@ function audio_timeout() {
 audio_timeout.local = 1;
 
 function start_queued_playback() {
-    if ((!queuedWindows && !queuedNormal) || !ready || audioStarting || pendingSet ||
-        (inputTake && inputTake.state === "committing")) {
+    if ((!queuedWindows && !queuedNormal) || !ready || audioStarting || pendingSet) {
         return;
     }
     if (!audioOn) {

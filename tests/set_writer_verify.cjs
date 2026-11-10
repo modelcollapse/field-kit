@@ -9,11 +9,11 @@ const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "../max/fk_set_writer.js"), "utf8");
 
 function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
-    let handler;
+    const handlers = {};
     let response;
     const maxApi = {
         addHandler(name, callback) {
-            if (name === "commit_set") handler = callback;
+            handlers[name] = callback;
         },
         outlet(...args) {
             response = args;
@@ -21,14 +21,21 @@ function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
         post() {},
     };
     vm.runInNewContext(source, {
-        require: name => ({fs: fileApi, path: pathApi, os: {homedir: () => dir}, "max-api": maxApi})[name],
+        require: name => ({fs: fileApi, path: pathApi, os: {homedir: () => dir, tmpdir: () => dir}, "max-api": maxApi})[name],
         process: {platform, env: {}},
     });
-    return (staged, destination, success) => {
+    function write(staged, destination, success) {
         response = null;
-        handler(staged, destination);
+        handlers.commit_set(staged, destination);
         assert.deepEqual(response, ["set_written", success, staged]);
+    }
+    write.createTake = (request) => {
+        handlers.create_input_temp(request);
+        assert.deepEqual(response.slice(0, 2), ["input_temp_ready", request]);
+        return response[2];
     };
+    write.removeTake = handlers.remove_input_temp;
+    return write;
 }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "field-kit-writer-"));
@@ -41,6 +48,16 @@ try {
     write(staging, destination, 1);
     assert.equal(fs.readFileSync(destination, "utf8"), "next");
     assert.equal(fs.existsSync(staging), false);
+    const firstTake = write.createTake(1);
+    const secondTake = write.createTake(2);
+    assert.notEqual(firstTake, secondTake);
+    fs.writeFileSync(firstTake, "take");
+    write.removeTake(destination);
+    assert.equal(fs.readFileSync(destination, "utf8"), "next");
+    write.removeTake(firstTake);
+    assert.equal(fs.existsSync(path.dirname(firstTake)), false);
+    assert.equal(fs.existsSync(path.dirname(secondTake)), true);
+    write.removeTake(secondTake);
 
     fs.writeFileSync(staging, "pending");
     write(staging, staging, 0);

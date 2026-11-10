@@ -177,4 +177,27 @@ function saveFolder(key, value) {
 
 maxApi.addHandler("folder_get", () => showFolders());
 maxApi.addHandler("folder_choose", saveFolder);
+
+const inputTemps = new Set();
+maxApi.addHandler("create_input_temp", (request) => {
+    let filename = "";
+    try {
+        const folder = fs.mkdtempSync(path.join(os.tmpdir(), "field-kit-take-"));
+        filename = path.join(folder, "Field Kit Take.wav");
+        inputTemps.add(filename);
+    } catch (error) {
+        maxApi.post(`Field Kit could not prepare a loop recording: ${error.message}`);
+    }
+    maxApi.outlet("input_temp_ready", request, filename);
+});
+maxApi.addHandler("remove_input_temp", (filename) => {
+    if (!inputTemps.has(filename)) return;
+    try {
+        fs.rmSync(filename, { force: true });
+        fs.rmdirSync(path.dirname(filename));
+        inputTemps.delete(filename);
+    } catch (error) {
+        maxApi.post(`Field Kit could not remove a temporary recording: ${error.message}`);
+    }
+});
 showFolders();

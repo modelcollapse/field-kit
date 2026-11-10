@@ -1,5 +1,10 @@
 # Field Kit changelog
 
+## v0.8.20
+
+- Remove the 60-second cutoff from Loop recording. Takes write to a temporary stereo WAV until you stop recording.
+- Keep current loops playing through recording and confirmation. Save confirmed takes with **Save Loop WAV…**.
+
 ## v0.8.19
 
 - Record and Import buttons show the destination from Send to.

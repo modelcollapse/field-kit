@@ -3916,14 +3916,14 @@
           "varname": "file_preferences_route",
           "maxclass": "newobj",
           "numinlets": 1,
-          "numoutlets": 2,
+          "numoutlets": 3,
           "patching_rect": [
             2425,
             2160,
-            166,
+            285,
             22
           ],
-          "text": "routepass folder_paths"
+          "text": "routepass folder_paths input_temp_ready"
         }
       },
       {
@@ -35886,15 +35886,15 @@
           "id": "obj-766",
           "varname": "input_recorder",
           "maxclass": "newobj",
-          "numinlets": 4,
+          "numinlets": 2,
           "numoutlets": 1,
           "patching_rect": [
             2260,
             832,
-            180,
+            89,
             22
           ],
-          "text": "record~ fk-unbound-set 2",
+          "text": "sfrecord~ 2",
           "outlettype": [
             "signal"
           ]
@@ -35903,36 +35903,36 @@
       {
         "box": {
           "id": "obj-767",
-          "varname": "input_progress",
+          "varname": "input_recorder_unload",
           "maxclass": "newobj",
-          "numinlets": 2,
+          "numinlets": 1,
           "numoutlets": 1,
           "patching_rect": [
-            2260,
+            2165,
             864,
-            82,
+            68,
             22
           ],
-          "text": "peakamp~ 0",
+          "text": "freebang",
           "outlettype": [
-            "float"
+            "bang"
           ]
         }
       },
       {
         "box": {
           "id": "obj-768",
-          "varname": "input_progress_message",
-          "maxclass": "newobj",
+          "varname": "input_recorder_close",
+          "maxclass": "message",
           "numinlets": 2,
           "numoutlets": 1,
           "patching_rect": [
-            2260,
+            2165,
             896,
-            215,
+            38,
             22
           ],
-          "text": "prepend input_record_progress"
+          "text": "0"
         }
       },
       {
@@ -36116,10 +36116,10 @@
           "patching_rect": [
             2470,
             896,
-            201,
+            159,
             22
           ],
-          "text": "prepend input_elapsed_phase"
+          "text": "prepend input_elapsed"
         }
       },
       {
@@ -38829,6 +38829,18 @@
           "source": [
             "obj-148",
             1
+          ],
+          "destination": [
+            "obj-29",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-148",
+            2
           ],
           "destination": [
             "obj-84",
@@ -48751,6 +48763,30 @@
       {
         "patchline": {
           "source": [
+            "obj-767",
+            0
+          ],
+          "destination": [
+            "obj-768",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-768",
+            0
+          ],
+          "destination": [
+            "obj-766",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-765",
             0
           ],
@@ -48841,42 +48877,6 @@
           "destination": [
             "obj-766",
             1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-766",
-            0
-          ],
-          "destination": [
-            "obj-767",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-767",
-            0
-          ],
-          "destination": [
-            "obj-768",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-768",
-            0
-          ],
-          "destination": [
-            "obj-29",
-            0
           ]
         }
       },

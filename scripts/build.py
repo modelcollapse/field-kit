@@ -267,9 +267,11 @@ def source_input(p):
     modulated_gain(p, "input_gain", "input_gain_signal", 0, -60, 18, 24, 2750, 691)
 
     p.obj("input_adc", "adc~ 1 2", 2260, 736, outs=2, types=["signal", "signal"])
-    p.obj("input_recorder", "record~ fk-unbound-set 2", 2260, 832, ins=4, types=["signal"])
-    p.obj("input_progress", "peakamp~ 0", 2260, 864, ins=2, types=["float"])
-    p.obj("input_progress_message", "prepend input_record_progress", 2260, 896, ins=2)
+    p.obj("input_recorder", "sfrecord~ 2", 2260, 832, ins=2, types=["signal"])
+    p.obj("input_recorder_unload", "freebang", 2165, 864, types=["bang"])
+    p.add("input_recorder_close", "message", [2165, 896, 38, 22], ins=2, text="0")
+    p.connect("input_recorder_unload", 0, "input_recorder_close")
+    p.connect("input_recorder_close", 0, "input_recorder")
     for channel, side in enumerate(("L", "R")):
         y = INPUT_TOP + 34 + 17 * channel
         label_rect = [532, y - 1, 16, 16]
@@ -286,11 +288,8 @@ def source_input(p):
         p.connect("input_gain_signal", 0, trimmed, 1)
         p.connect(trimmed, 0, meter)
         p.connect(trimmed, 0, "input_recorder", channel)
-    p.connect("input_recorder", 0, "input_progress")
-    p.connect("input_progress", 0, "input_progress_message")
-    p.connect("input_progress_message", 0, "source_control")
     p.obj("input_clock", "snapshot~ 100 @active 0", 2470, 864, ins=2, types=["float"])
-    p.obj("input_clock_message", "prepend input_elapsed_phase", 2470, 896, ins=2)
+    p.obj("input_clock_message", "prepend input_elapsed", 2470, 896, ins=2)
     p.connect("input_recorder", 0, "input_clock")
     p.connect("input_clock", 0, "input_clock_message")
     p.connect("input_clock_message", 0, "source_control")
@@ -410,10 +409,11 @@ def pattern_controls(p):
     p.connect("set_relink_result", 0, "pattern_control")
     p.connect("set_relink_cancel", 0, "pattern_control")
     p.obj("set_writer", "node.script fk_set_writer.js @autostart 1", 2425, 2125, outs=2)
-    p.obj("file_preferences_route", "routepass folder_paths", 2425, 2160, outs=2)
+    p.obj("file_preferences_route", "routepass folder_paths input_temp_ready", 2425, 2160, outs=3)
     p.connect("set_writer", 0, "file_preferences_route")
     p.connect("file_preferences_route", 0, "source_control")
-    p.connect("file_preferences_route", 1, "pattern_control")
+    p.connect("file_preferences_route", 1, "source_control")
+    p.connect("file_preferences_route", 2, "pattern_control")
     add_working_folders(p, Patch(), VERSION)
     sequence_controls(p)
 
