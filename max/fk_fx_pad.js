@@ -19,7 +19,6 @@ var targets = [
 ];
 var axes = [1, 2];
 var fxOn = false;
-var enableButton = [238, 13, 104, 25];
 var dragging = false;
 var publishing = false;
 var armed = false;
@@ -29,6 +28,7 @@ var playback = null;
 var FRAME_MS = 20;
 var RETURN_MS = 100;
 var RECORD_LIMIT_MS = 30000;
+var RECORD_COLOR = "FFAB9E";
 var motionClock = new Task(motionFrame, this);
 motionClock.interval = FRAME_MS;
 
@@ -125,9 +125,10 @@ function formatValue(target, value) {
 }
 
 function motionControls() {
+    var captureActive = armed || recording;
     return [
-        { text: recording ? "Recording" : armed ? "Armed" : "Record", enabled: !recording,
-          color: armed || recording ? "FFAB9E" : null, action: record_motion },
+        { text: recording ? "● Recording" : armed ? "● Armed" : "● Record", enabled: !recording,
+          color: captureActive ? RECORD_COLOR : null, border: RECORD_COLOR, action: record_motion },
         { text: "Play", enabled: !!clip && !recording && !playback,
           color: playback ? colors.accent : null, action: play_motion },
         { text: "Stop", enabled: !!(armed || recording || playback), action: stopGesture },
@@ -142,9 +143,34 @@ function paintMotionControls(grid) {
         var width = grid.buttonPitch - grid.buttonGap;
         var fill = control.color || (control.enabled ? colors.grid : colors.inset);
         var text = control.color ? colors.inset : control.enabled ? colors.ink : colors.muted;
-        rectangle(x, grid.buttonTop, width, grid.buttonHeight, fill);
+        if (control.border && !control.color) {
+            rectangle(x, grid.buttonTop, width, grid.buttonHeight, control.border);
+            rectangle(x + 1, grid.buttonTop + 1, width - 2, grid.buttonHeight - 2, colors.inset);
+            text = control.border;
+        } else {
+            rectangle(x, grid.buttonTop, width, grid.buttonHeight, fill);
+        }
         label(control.text, x + (width - mgraphics.text_measure(control.text)[0]) / 2, grid.buttonTop + 17, text);
     });
+}
+
+function paintMotionStatus(grid) {
+    var caption = "No gesture recorded";
+    var ink = colors.muted;
+    if (recording) {
+        var elapsed = Math.min(RECORD_LIMIT_MS, Math.max(0, Date.now() - recording.start));
+        caption = "Recording · " + (elapsed / 1000).toFixed(1) + " s · Release to save";
+        ink = RECORD_COLOR;
+    } else if (armed) {
+        caption = "Armed · Drag the pad, then release to save";
+        ink = RECORD_COLOR;
+    } else if (clip) {
+        var length = clip.duration < 100 ? "<0.1 s" : (clip.duration / 1000).toFixed(1) + " s";
+        var pair = targets[clip.axes[0]].name + " + " + targets[clip.axes[1]].name;
+        caption = (playback ? "Playing · " : "Gesture saved · ") + length + " · " + pair;
+        if (playback) ink = colors.accent;
+    }
+    label(caption, grid.buttonLeft, grid.buttonTop + grid.buttonHeight + 15, ink);
 }
 
 function paint() {
@@ -161,14 +187,10 @@ function paint() {
     mgraphics.set_font_size(19);
     label("Effects pad", 24, 33, colors.ink);
     mgraphics.set_font_size(12);
-    var fxLabel = fxOn ? "FX on" : "Enable FX";
-    rectangle(enableButton[0], enableButton[1], enableButton[2], enableButton[3],
-              fxOn ? colors.accent : colors.grid);
-    label(fxLabel, enableButton[0] + (enableButton[2] - mgraphics.text_measure(fxLabel)[0]) / 2,
-          enableButton[1] + 17, fxOn ? colors.inset : colors.ink);
     label("X", 24, 66, colors.accent);
     label("Y", 218, 66, colors.accent);
     paintMotionControls(grid);
+    paintMotionStatus(grid);
 
     rectangle(grid.left, grid.top, width, height, colors.inset);
     for (var step = 0; step <= 4; step++) {
@@ -190,14 +212,8 @@ function paint() {
     label(xMax, grid.right - mgraphics.text_measure(xMax)[0], grid.bottom + 17, colors.muted);
     label("X · " + xTarget.name + "  " + formatValue(xTarget, xTarget.value), 24, grid.height - 34, colors.ink);
     label("Y · " + yTarget.name + "  " + formatValue(yTarget, yTarget.value), 218, grid.height - 34, colors.ink);
-    var caption = fxOn ? "Drag to blend the assigned effects. The dials follow."
-                      : "Turn on FX above to hear the assigned effects.";
-    if (recording) caption = "Release to save motion.";
-    else if (armed) caption = "Drag the pad to record motion.";
-    else if (clip) {
-        var length = clip.duration < 100 ? "<0.1 s" : (clip.duration / 1000).toFixed(1) + " s";
-        caption = (playback ? "Looping " : "Recorded motion · ") + length;
-    }
+    var caption = fxOn ? "Record captures one drag across the pad, up to 30 s."
+                      : "Turn on Main FX above to hear the assigned effects.";
     label(caption, 24, grid.height - 12, colors.muted);
 }
 
@@ -316,7 +332,14 @@ function motionFrame() {
     var now = Date.now();
     if (recording) {
         if (now - recording.start >= RECORD_LIMIT_MS) finishRecording(now);
-        else sampleRecording(now, false);
+        else {
+            sampleRecording(now, false);
+            var tenths = Math.floor((now - recording.start) / 100);
+            if (tenths !== recording.tenths) {
+                recording.tenths = tenths;
+                mgraphics.redraw();
+            }
+        }
     }
     if (!playback) return;
     var elapsed = Math.max(0, now - playback.start);
@@ -327,11 +350,6 @@ function motionFrame() {
 
 function onclick(x, y) {
     var grid = bounds();
-    if (x >= enableButton[0] && x < enableButton[0] + enableButton[2] &&
-        y >= enableButton[1] && y < enableButton[1] + enableButton[3]) {
-        outlet(0, "fx_enabled", fxOn ? 0 : 1);
-        return;
-    }
     if (y >= grid.buttonTop && y < grid.buttonTop + grid.buttonHeight && x >= grid.buttonLeft) {
         var offset = x - grid.buttonLeft;
         var control = motionControls()[Math.floor(offset / grid.buttonPitch)];
@@ -344,7 +362,7 @@ function onclick(x, y) {
     dragging = true;
     movePad(x, y, grid);
     if (capture) {
-        recording = { axes: axes.slice(), start: Date.now(), samples: [currentPoint(0)] };
+        recording = { axes: axes.slice(), start: Date.now(), samples: [currentPoint(0)], tenths: 0 };
         motionClock.repeat();
         mgraphics.redraw();
     }
@@ -353,9 +371,13 @@ function onclick(x, y) {
 function ondrag(x, y, button) {
     if (!dragging) return;
     movePad(x, y, bounds());
+    var now = Date.now();
+    // Max can deliver drag events between or before scheduled Task frames.
+    // Sample those events as well, so a path that returns to its start survives.
+    if (recording && button) sampleRecording(now, true);
     if (!button) {
         dragging = false;
-        if (recording) finishRecording(Date.now());
+        if (recording) finishRecording(now);
     }
 }
 
@@ -368,6 +390,7 @@ function onresize() {
 }
 
 clamp.local = bounds.local = color.local = rectangle.local = rule.local = label.local = 1;
-formatValue.local = motionControls.local = paintMotionControls.local = publishMenus.local = stopGesture.local = 1;
+formatValue.local = motionControls.local = paintMotionControls.local = paintMotionStatus.local = 1;
+publishMenus.local = stopGesture.local = 1;
 moveAxis.local = publishPoint.local = movePad.local = currentPoint.local = 1;
 sampleRecording.local = finishRecording.local = interpolate.local = clipPoint.local = motionFrame.local = 1;

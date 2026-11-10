@@ -90,12 +90,19 @@ def layout_performance(p, parameter):
                  "pattern_banks", "sequence_open", *(f"pattern_{i}" for i in range(1, 9))):
         move_to_y(name, boxes[name]["presentation_rect"][1] + pattern_shift)
 
-    place("surface_mixer", [8, 176, 226, 310])
-    place("surface_playback", [240, 176, 420, 310])
+    scene_rect = boxes["sequence_panel"]["presentation_rect"]
+    move_to_y("sequence_panel", 182)
+    backdrop("surface_scenes", [8, 176, 1068, scene_rect[3] + 12], hidden=1)
+    place("surface_mixer", [8, 176, 318, 310])
+    place("surface_playback", [332, 176, 328, 310])
     place("mixer_heading", [18, 184, 110, 22])
     place("mixer_clear_solo", [160, 183, 64, 22])
-    place("row_heading", [249, 184, 157, 22])
-    place("wave_heading", [408, 186, 242, 20], text="Click to select · Drag to set range", fontsize=11)
+    for key, caption, x in (("echo", "Echo %", 230), ("room", "Room %", 278)):
+        rect = [x, 186, 42, 19]
+        p.add(f"mixer_{key}_sends_label", "comment", rect, view=rect, outs=0,
+              text=caption, fontsize=10, fontface=1, textjustification=1)
+    place("row_heading", [341, 184, 157, 22])
+    place("wave_heading", [499, 186, 151, 20], text="Drag to set loop range", fontsize=11)
     for voice in range(1, 5):
         y = 213 + 67 * (voice - 1)
         for name, x, offset, width, height in (
@@ -108,7 +115,9 @@ def layout_performance(p, parameter):
             ("mixer_level_value", 101, 35, 43, 19),
             ("mixer_pan", 149, 35, 37, 19),
             ("meter", 191, 36, 33, 16),
-            ("wave", 242, 2, 410, 58),
+            ("echo_send", 230, 23, 42, 22),
+            ("room_send", 278, 23, 42, 22),
+            ("wave", 334, 2, 318, 58),
         ):
             place(f"{name}_{voice}", [x, y + offset, width, height])
     layout_loop_editor(p)
@@ -122,6 +131,5 @@ def layout_performance(p, parameter):
         move_to_y(name, 641)
     place("surface_modulation", [8, 670, 1068, 224])
     backdrop("surface_visuals", [8, 670, 1068, 224], hidden=1)
-    for name in ("sequence_panel", "patchbay", "visuals_panel", "performance_mix",
-                 "performance_sends", "drifting_memory"):
+    for name in ("patchbay", "visuals_panel", "performance_mix", "performance_sends", "drifting_memory"):
         move_to_y(name, 676)

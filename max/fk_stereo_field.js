@@ -15,9 +15,18 @@ var ink;
 
 var FRAME_MS = 20;
 var RETURN_MS = 100;
-var MOTION_TOP = 101;
-var MOTION_HEIGHT = 25;
+var BUTTON_HEIGHT = 25;
+var PRESET_COUNT = 4;
+var PRESET_TOP = 10;
+var PRESET_LEFT = 100;
+var PRESET_SLOT_WIDTH = 42;
+var PRESET_STORE_LEFT = PRESET_LEFT + PRESET_COUNT * PRESET_SLOT_WIDTH + 8;
+var PRESET_STORE_WIDTH = 82;
+var LOOP_TABS_TOP = 48;
+var READOUT_TOP = 85;
+var MOTION_TOP = 139;
 var RECORD_LIMIT_MS = 30000;
+var presets = { armed: false, active: 0, stored: [false, false, false, false], status: "Shift-click to store" };
 var loops = [
     { pan: -45, level: 70, clip: null, playback: null },
     { pan: -15, level: 70, clip: null, playback: null },
@@ -86,6 +95,14 @@ function select(loop) {
     mgraphics.redraw();
 }
 
+function field_presets(armed, active, stored1, stored2, stored3, stored4, status) {
+    presets.armed = armed === 1;
+    presets.active = active;
+    presets.stored = [stored1 === 1, stored2 === 1, stored3 === 1, stored4 === 1];
+    presets.status = status || "Shift-click to store";
+    mgraphics.redraw();
+}
+
 function window_active(active) {
     windowClock.cancel();
     if (!active) return;
@@ -93,7 +110,7 @@ function window_active(active) {
         var controller = patcher.getnamed("stereo_field_thispatcher");
         if (controller && controller.valid) {
             windowConfigured = true;
-            controller.message("window", "constrain", 540, 420, 4096, 4096);
+            controller.message("window", "constrain", 540, 458, 4096, 4096);
             controller.message("window", "exec");
         }
     }
@@ -128,7 +145,7 @@ function bounds() {
     return {
         width: width, height: height,
         left: 64, right: Math.max(65, width - 24),
-        top: 151, bottom: Math.max(152, height - 49),
+        top: 189, bottom: Math.max(190, height - 49),
         tabLeft: 14, tabWidth: (width - 28) / loops.length,
         motionWidth: (width - 28) / 5.2,
         markerRadius: clamp(11 + (Math.min(width, height) - 346) / 50, 11, 16)
@@ -182,6 +199,27 @@ function marker(loop, grid) {
     label(String(loop), point[0], point[1] + 3.5, active ? ink.field : accent, true);
 }
 
+function paintPresets(grid) {
+    var baseline = PRESET_TOP + 16;
+    label("Field presets", grid.tabLeft, baseline, ink.text);
+    for (var index = 0; index < PRESET_COUNT; index++) {
+        var x = PRESET_LEFT + index * PRESET_SLOT_WIDTH;
+        var active = presets.active === index + 1;
+        var available = presets.armed || presets.stored[index];
+        var background = active ? ink.accent : available ? ink.button : ink.field;
+        var foreground = active ? ink.field : available ? ink.text : ink.muted;
+        var text = String(index + 1) + (presets.stored[index] ? "  •" : "");
+        rectangle(x + 1, PRESET_TOP, PRESET_SLOT_WIDTH - 2, BUTTON_HEIGHT, background);
+        label(text, x + PRESET_SLOT_WIDTH / 2, baseline, foreground, true);
+    }
+    rectangle(PRESET_STORE_LEFT, PRESET_TOP, PRESET_STORE_WIDTH, BUTTON_HEIGHT, presets.armed ? ink.accent : ink.button);
+    label(presets.armed ? "Cancel" : "Store preset", PRESET_STORE_LEFT + PRESET_STORE_WIDTH / 2, baseline,
+          presets.armed ? ink.field : ink.text, true);
+    mgraphics.set_font_size(10);
+    label(presets.status, PRESET_STORE_LEFT + PRESET_STORE_WIDTH + 10, baseline, ink.muted);
+    mgraphics.set_font_size(11);
+}
+
 function motionControls() {
     var track = loops[selected - 1];
     var ready = armed === selected;
@@ -203,7 +241,7 @@ function paintMotion(grid) {
         var activeInk = index === 0 ? ink.record : ink.accent;
         var background = control.active ? activeInk : control.enabled ? ink.button : ink.field;
         var foreground = control.active ? ink.field : control.enabled ? ink.text : ink.muted;
-        rectangle(x + 1, MOTION_TOP, grid.motionWidth - 2, MOTION_HEIGHT, background);
+        rectangle(x + 1, MOTION_TOP, grid.motionWidth - 2, BUTTON_HEIGHT, background);
         label(control.text, x + grid.motionWidth / 2, MOTION_TOP + 16, foreground, true);
     }
     var track = loops[selected - 1];
@@ -235,11 +273,11 @@ function paintTrail(grid) {
 }
 
 function readout(heading, value, x, width) {
-    rectangle(x, 47, width, 44, ink.field);
+    rectangle(x, READOUT_TOP, width, 44, ink.field);
     mgraphics.set_font_size(10);
-    label(heading, x + 12, 63, ink.muted);
+    label(heading, x + 12, READOUT_TOP + 16, ink.muted);
     mgraphics.set_font_size(16);
-    label(value, x + 12, 82, ink.text);
+    label(value, x + 12, READOUT_TOP + 35, ink.text);
 }
 
 function percent(value) {
@@ -251,14 +289,15 @@ function paint() {
     rectangle(0, 0, grid.width, grid.height, ink.background);
     mgraphics.select_font_face("Arial");
     mgraphics.set_font_size(11);
+    paintPresets(grid);
 
     for (var loop = 1; loop <= loops.length; loop++) {
         var x = grid.tabLeft + grid.tabWidth * (loop - 1);
         var active = loop === selected;
-        rectangle(x + 1, 10, grid.tabWidth - 2, 25, active ? ink.accent : ink.button);
+        rectangle(x + 1, LOOP_TABS_TOP, grid.tabWidth - 2, BUTTON_HEIGHT, active ? ink.accent : ink.button);
         var track = loops[loop - 1];
         var status = track.playback ? "  ▶" : track.clip ? "  •" : "";
-        label("Loop " + loop + status, x + grid.tabWidth / 2, 26, active ? ink.field : ink.text, true);
+        label("Loop " + loop + status, x + grid.tabWidth / 2, LOOP_TABS_TOP + 16, active ? ink.field : ink.text, true);
     }
 
     var track = loops[selected - 1];
@@ -453,15 +492,23 @@ function publishPosition(loop, pan, level) {
     }
 }
 
-function onclick(x, y) {
+function onclick(x, y, button, mod1, shift) {
     var grid = bounds();
     drag = null;
-    if (y >= 10 && y <= 35 && x >= grid.tabLeft && x < grid.width - grid.tabLeft) {
+    if (y >= PRESET_TOP && y < PRESET_TOP + BUTTON_HEIGHT) {
+        if (x >= PRESET_LEFT && x < PRESET_LEFT + PRESET_COUNT * PRESET_SLOT_WIDTH) {
+            outlet(0, "field_preset_slot", 1 + Math.floor((x - PRESET_LEFT) / PRESET_SLOT_WIDTH), shift ? 1 : 0);
+        } else if (x >= PRESET_STORE_LEFT && x < PRESET_STORE_LEFT + PRESET_STORE_WIDTH) {
+            outlet(0, "field_preset_arm");
+        }
+        return;
+    }
+    if (y >= LOOP_TABS_TOP && y < LOOP_TABS_TOP + BUTTON_HEIGHT && x >= grid.tabLeft && x < grid.width - grid.tabLeft) {
         select(1 + Math.floor((x - grid.tabLeft) / grid.tabWidth));
         outlet(0, "select", selected);
         return;
     }
-    if (y >= MOTION_TOP && y <= MOTION_TOP + MOTION_HEIGHT && x >= grid.tabLeft) {
+    if (y >= MOTION_TOP && y < MOTION_TOP + BUTTON_HEIGHT && x >= grid.tabLeft) {
         var control = motionControls()[Math.floor((x - grid.tabLeft) / grid.motionWidth)];
         if (control && control.enabled) control.action();
         return;
@@ -520,7 +567,7 @@ fitWindow.local = 1;
 colour.local = label.local = rectangle.local = rule.local = marker.local = 1;
 nearLoop.local = moveLoop.local = 1;
 rgba.local = readout.local = percent.local = 1;
-motionControls.local = paintMotion.local = paintTrail.local = 1;
+motionControls.local = paintMotion.local = paintTrail.local = paintPresets.local = 1;
 syncClock.local = armMotion.local = beginRecording.local = recordSample.local = 1;
 finishRecording.local = playMotion.local = stopSelected.local = clearMotion.local = 1;
 interpolate.local = pointAt.local = motionFrame.local = publishPosition.local = 1;

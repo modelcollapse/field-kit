@@ -2,7 +2,7 @@
 
 
 def stereo_field_window(field, version):
-    width, height = 780, 600
+    width, height = 780, 638
     canvas = [12, 44, width - 24, height - 80]
     help_rect = [12, 12, 370, 22]
     close_rect = [width - 90, 11, 78, 23]

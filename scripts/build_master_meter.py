@@ -42,7 +42,7 @@ def append_master_meter(p, left, top, ceiling):
         p.obj(hold, f"delay {CLIP_HOLD_MS}", x, 2110, ins=2, types=["bang"])
         p.obj(clear, "t 0", x, 2140, types=["int"])
         p.obj(state, "change 0", x + 90, 2170, outs=3, types=["", "int", "int"])
-        p.connect(f"pattern_level_{side}", 0, peak)
+        p.connect("pattern_transition", index, peak)
         p.connect(peak, 0, compare)
         p.connect(compare, 0, overload)
         p.connect(overload, 0, trigger)

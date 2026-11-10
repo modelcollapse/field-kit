@@ -168,10 +168,10 @@ def build():
                   hint="Choose a loop window or route to Main FX, Drifting Memory, master or input gain.")
     target = menu("fk_mod_target", DESTINATIONS, 9, 3)
     depth = control("live.dial", 12, 2, 2, 2, numoutlets=2, outlettype=["float", "float"],
-                    appearance=3, showname=0, shownumber=1,
+                    appearance=3, needlemode=2, showname=0, shownumber=1,
                     varname="fk_mod_depth", **param("Route depth", 1, -100, 100, 0))
     rate = control("live.dial", 6, 2, 1, 2, numoutlets=2, outlettype=["float", "float"],
-                   appearance=3, showname=0, shownumber=1, hint="LFO rate in hertz",
+                   appearance=3, needlemode=1, showname=0, shownumber=1, hint="LFO rate in hertz",
                    varname="fk_mod_rate",
                    **param("Selected LFO rate", 0, 0.01, 20, RATES[0], units="%.2f Hz"))
     shape = menu("fk_mod_shape", SHAPES, 3, 3)

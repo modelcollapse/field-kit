@@ -478,6 +478,7 @@
             "float"
           ],
           "appearance": 3,
+          "needlemode": 2,
           "showname": 0,
           "shownumber": 1,
           "varname": "fk_mod_depth",
@@ -522,6 +523,7 @@
             "float"
           ],
           "appearance": 3,
+          "needlemode": 1,
           "showname": 0,
           "shownumber": 1,
           "hint": "LFO rate in hertz",

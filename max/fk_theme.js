@@ -7,6 +7,7 @@ var patch = this.patcher;
 var fullScreen = false;
 var wideLayout = false;
 var activeWorkspace = 0;
+var workspaceBeforeScenes = 0;
 var driftAdvanced = false;
 var sourceDrawerOpen = false;
 var sourceDrawerHeight = 0;
@@ -18,6 +19,11 @@ var scopeFitTask = new Task(fit_scope_popout, this);
 var scopeOpenTask = new Task(show_scope_popout, this);
 var fieldOpenTask = new Task(show_stereo_field, this);
 var scopeSize = [];
+var interfacePalette = null;
+var mainFxEnabled = false;
+var mainFxUsesSends = false;
+var driftEnabled = false;
+var mainFxDialKeys = ["tone", "echo", "time_ms", "repeats", "space", "decay"];
 var sideColumnX = 1084;
 var sideColumnWidth = 320;
 var wideFrameWidth = sideColumnX + sideColumnWidth + 8;
@@ -104,8 +110,13 @@ function loadbang() {
 function workspace(view) {
     if (view < 0 || view > 4 || view !== Math.floor(view)) return;
     var sceneLayoutChanged = (activeWorkspace === 1) !== (view === 1);
+    if (sceneLayoutChanged && view === 1) workspaceBeforeScenes = activeWorkspace;
     activeWorkspace = view;
     patch.getnamed("workspace_view").message("set", view);
+    var sceneButton = patch.getnamed("sequence_open");
+    var sceneLabel = view === 1 ? "Hide sequencer ▴" : "Scene sequencer ▾";
+    sceneButton.message("text", sceneLabel);
+    sceneButton.message("texton", sceneLabel);
     update_mix_panels();
     if (sceneLayoutChanged) {
         remember_layout();
@@ -115,12 +126,18 @@ function workspace(view) {
     update_workspace_panels();
 }
 
+function toggle_scene_drawer() {
+    workspace(activeWorkspace === 1 ? workspaceBeforeScenes : 1);
+}
+
 function update_workspace_panels() {
     patch.getnamed("sequence_panel").hidden = activeWorkspace !== 1;
+    patch.getnamed("surface_scenes").hidden = activeWorkspace !== 1;
     patch.getnamed("patchbay").hidden = activeWorkspace !== 2;
     patch.getnamed("visuals_panel").hidden = !wideLayout && activeWorkspace !== 3;
     patch.getnamed("surface_visuals").hidden = !wideLayout;
-    patch.getnamed("surface_modulation").hidden = activeWorkspace === 4 || (wideLayout && activeWorkspace === 3);
+    patch.getnamed("surface_modulation").hidden = activeWorkspace === 1 || activeWorkspace === 4 ||
+        (wideLayout && activeWorkspace === 3);
 }
 update_workspace_panels.local = 1;
 
@@ -144,6 +161,21 @@ update_mix_panels.local = 1;
 function drift_control_visible(name, visible) {
     var control = patch.getnamed("drifting_memory").subpatcher().getnamed(name);
     if (control && control.valid) control.hidden = visible !== 1;
+}
+
+function fx_power(value) {
+    mainFxEnabled = value === 1;
+    if (interfacePalette) paint_main_fx();
+}
+
+function fx_send_mode(value) {
+    mainFxUsesSends = value === 1;
+    if (interfacePalette) paint_main_fx();
+}
+
+function drift_power(value) {
+    driftEnabled = value === 1;
+    if (interfacePalette) paint_drift_fx();
 }
 
 function source_drawer(value) {
@@ -235,13 +267,10 @@ function remember_layout() {
         sourceDrawerHeight = drawer[3];
         anchor.hidden = true;
     }
-    var mixer = patch.getnamed("surface_mixer").getboxattr("presentation_rect");
+    var scenes = patch.getnamed("surface_scenes").getboxattr("presentation_rect");
     var tabs = patch.getnamed("surface_workspace").getboxattr("presentation_rect");
-    var lower = patch.getnamed("surface_modulation").getboxattr("presentation_rect");
-    var tabsBottom = tabs[1] + tabs[3];
     remember_rects(patch, "main", drawer, {
-        top: mixer[1], bottom: tabsBottom,
-        lift: mixer[1] - lower[1], shift: lower[1] + lower[3] - tabsBottom
+        top: scenes[1], bottom: tabs[1] + tabs[3], shift: scenes[3] + 8
     });
     ["mix_fx", "recorder", "performance_mix", "performance_sends", "drifting_memory",
         "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
@@ -264,9 +293,9 @@ function remember_rects(target, panel, drawer, sceneDock) {
         var alternate = wideLayoutRects[panel];
         var wideRect = alternate && alternate[box.varname];
         var sceneOffset = 0;
-        if (sceneDock && !isDrawerControl) {
-            if (box.varname === "sequence_panel" || box.varname === "surface_modulation") sceneOffset = sceneDock.lift;
-            else if (rect[1] >= sceneDock.top && rect[1] < sceneDock.bottom) sceneOffset = sceneDock.shift;
+        if (sceneDock && !isDrawerControl && box.varname !== "sequence_panel" && box.varname !== "surface_scenes" &&
+            rect[1] >= sceneDock.top && rect[1] < sceneDock.bottom) {
+            sceneOffset = sceneDock.shift;
         }
         windowLayout.push({
             box: box, rect: rect.slice(), wideRect: wideRect,
@@ -384,6 +413,7 @@ function msg_int(index) {
     if (index < 0 || index >= schemes.length) return;
     var scheme = schemes[index];
     var palette = scheme.colors.map(rgba);
+    interfacePalette = palette;
     var sections = {};
     Object.keys(scheme.sections).forEach(function (name) {
         sections[name] = rgba(scheme.sections[name]);
@@ -419,6 +449,8 @@ function msg_int(index) {
     }
     paint_patch(patch.getnamed("recorder").subpatcher(), sections.capture, palette);
     paint_patch(patch.getnamed("drifting_memory").subpatcher(), sections.mix, palette, sections);
+    paint_main_fx();
+    paint_drift_fx();
     var modulation = patch.getnamed("patchbay").subpatcher();
     paint_patch(modulation, sections.modulation, palette);
     send_theme(modulation.getnamed("fk_lfo_preview"), inset.concat(control, selection, accent));
@@ -435,6 +467,40 @@ function rgba(hex) {
 }
 rgba.local = 1;
 
+function paint_main_fx() {
+    var effects = patch.getnamed("mix_fx").subpatcher();
+    var pad = effects.getnamed("fx_pad_panel");
+    if (pad && pad.valid) paint_controls(pad.subpatcher(), ["fx_pad_enabled"], false);
+    var amountLabel = mainFxUsesSends ? "Return %" : "Mix %";
+    effects.getnamed("fx_label_echo").message("set", amountLabel);
+    effects.getnamed("fx_label_space").message("set", amountLabel);
+    mainFxDialKeys.forEach(function (key) {
+        paint_controls(effects, ["fx_" + key, "fx_label_" + key], !mainFxEnabled);
+    });
+    var overview = patch.getnamed("performance_sends").subpatcher();
+    paint_controls(overview, ["performance_fx_echo", "performance_fx_space"], !mainFxEnabled);
+    var sends = ["inspect_echo_send", "inspect_room_send", "mixer_echo_sends_label", "mixer_room_sends_label"];
+    for (var voice = 1; voice <= 4; voice++) sends.push("echo_send_" + voice, "room_send_" + voice);
+    paint_controls(patch, sends, !mainFxEnabled || !mainFxUsesSends);
+}
+paint_main_fx.local = 1;
+
+function paint_drift_fx() {
+    var strip = patch.getnamed("performance_mix").subpatcher();
+    paint_controls(strip, ["drift_strip_mix", "drift_strip_feedback", "drift_strip_drift"], !driftEnabled);
+    var advanced = patch.getnamed("drifting_memory").subpatcher();
+    paint_controls(advanced, ["blur", "width", "pitch", "drive", "dynamics"], !driftEnabled);
+}
+paint_drift_fx.local = 1;
+
+function paint_controls(target, names, dim) {
+    names.forEach(function (name) {
+        var control = target.getnamed(name);
+        if (control && control.valid) paint(control, interfacePalette, null, dim);
+    });
+}
+paint_controls.local = 1;
+
 function paint_patch(target, background, palette, sections) {
     target.message.apply(target, ["locked_bgcolor"].concat(background));
     target.apply(function (obj) {
@@ -448,7 +514,7 @@ function paint_patch(target, background, palette, sections) {
 }
 paint_patch.local = 1;
 
-function paint(obj, palette, sections) {
+function paint(obj, palette, sections, dim) {
     var canvas = palette[0], panel = palette[1], inset = palette[2], control = palette[3];
     var ink = palette[4], muted = palette[5], accent = palette[6], selection = palette[7];
     var name = obj.varname;
@@ -458,7 +524,7 @@ function paint(obj, palette, sections) {
         // The input recorder supplies its own white text for the red badge.
         if (name === "input_record_state") return;
         colors = { textcolor: name === "title" ? accent :
-            (/status$|_help$|^help$|wave_heading|source_label|record_file|record_format/.test(name) ? muted : ink) };
+            (dim || /status$|_help$|^help$|wave_heading|source_label|record_file|record_format/.test(name) ? muted : ink) };
         break;
     case "panel":
         if (/^loop_row_/.test(name)) return;
@@ -467,6 +533,21 @@ function paint(obj, palette, sections) {
         break;
     case "live.text":
         if (/^pattern_([1-8]|store)$|^mixer_(mute|solo)_/.test(name)) return;
+        if (name === "fx_pad_enabled") {
+            var powerCaption = mainFxEnabled ? "Main FX · On" : "Main FX · Off";
+            var powerFill = mainFxEnabled ? accent : inset;
+            var powerText = mainFxEnabled ? canvas : ink;
+            obj.message("text", powerCaption);
+            obj.message("texton", powerCaption);
+            colors = { activebgcolor: powerFill, activebgoncolor: powerFill,
+                activetextcolor: powerText, activetextoncolor: powerText, bordercolor: accent };
+            break;
+        }
+        if (name === "fx_enabled" || name === "drift_strip_enabled") {
+            colors = { activebgcolor: inset, activetextcolor: ink,
+                activebgoncolor: accent, activetextoncolor: canvas, bordercolor: accent };
+            break;
+        }
         colors = { activebgcolor: name === "play" ? accent : control,
             activetextcolor: name === "play" ? canvas : ink,
             activebgoncolor: accent, activetextoncolor: canvas,
@@ -479,7 +560,7 @@ function paint(obj, palette, sections) {
         colors = { bgcolor: control, arrowbgcolor: control, arrowcolor: muted, textcolor: ink };
         break;
     case "live.numbox":
-        colors = { activebgcolor: name === "input_gain" ? control : inset, textcolor: ink };
+        colors = { activebgcolor: name === "input_gain" ? control : inset, textcolor: dim ? muted : ink };
         break;
     case "flonum":
         colors = { bgcolor: inset, textcolor: ink, trianglecolor: muted };
@@ -488,8 +569,9 @@ function paint(obj, palette, sections) {
         colors = { slidercolor: inset, tricolor: accent, trioncolor: ink };
         break;
     case "live.dial":
-        colors = { activedialcolor: control, activefgdialcolor: accent,
-            activeneedlecolor: ink, textcolor: ink };
+        var arc = dim ? control.map(function (channel, i) { return (channel + muted[i]) * 0.5; }) : accent;
+        colors = { activedialcolor: arc, activefgdialcolor: control,
+            activeneedlecolor: dim ? muted : ink, textcolor: dim ? muted : ink };
         break;
     case "live.tab":
         colors = { activebgcolor: control, activebgoncolor: accent, textcolor: ink, textoncolor: canvas };

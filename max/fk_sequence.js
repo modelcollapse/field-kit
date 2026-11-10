@@ -9,7 +9,6 @@ var START_POLL_MS = 40;
 var host = this;
 var settings = defaults();
 var run = null;
-var launcherText = "";
 var clock = new Task(tick, host);
 
 function defaults() {
@@ -95,13 +94,7 @@ function render(status, now) {
     send(panel, "seq_next", "active", run && run.stepStart !== null ? 1 : 0);
     for (var index = 0; index < STEP_COUNT; index++) {
         var current = run && run.index === index;
-        send(panel, "seq_step_label_" + index, "set", (current ? "▶ " : "") + (index + 1));
-    }
-    var launcher = run ? "Sequencer running…" : "Scene sequencer…";
-    if (launcher !== launcherText) {
-        launcherText = launcher;
-        send(host.patcher, "sequence_open", "text", launcher);
-        send(host.patcher, "sequence_open", "texton", launcher);
+        send(panel, "seq_step_label_" + index, "set", (current ? "▶ " : "") + "Step " + (index + 1));
     }
     renderMix(typeof now === "number" ? now : Date.now());
 }

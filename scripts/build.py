@@ -14,8 +14,9 @@ from build_fx import DIALS as FX_DIALS
 from build_master_meter import append_master_meter
 from build_performance_layout import PERFORMANCE_WINDOW_HEIGHT, layout_performance
 from build_mix_scene_strip import append_mix_scene_strip
-from build_mix_sends import PERFORMANCE_SENDS, append_sends_strip
+from build_mix_sends import append_sends_strip
 from build_mix_workspace import append_drifting_strip, append_drifting_taps
+from build_pattern_fade import append_pattern_fade
 from build_stereo_field_window import stereo_field_window
 from build_visuals import build as build_visuals, stereo_scope_window
 
@@ -308,16 +309,7 @@ def pattern_controls(p):
         return rect
 
     p.obj("pattern_control", "js fk_patterns.js", 1550, 2010, outs=0)
-    p.obj("pattern_gain", "line~ 1.", 1550, 2120, ins=2, outs=2, types=["signal", "bang"])
-    p.obj("pattern_gain_sample", "snapshot~ 5 @active 0", 1550, 2155, ins=2, types=["float"])
-    p.obj("pattern_gain_zero", "sel 0.", 1550, 2190, outs=2, types=["bang", "float"])
-    p.obj("pattern_gain_defer", "deferlow", 1550, 2225, types=["bang"])
-    p.add("pattern_gain_ready", "message", [1550, 2260, 95, 22], ins=2, text="recall_silent")
-    p.connect("pattern_gain", 0, "pattern_gain_sample")
-    p.connect("pattern_gain_sample", 0, "pattern_gain_zero")
-    p.connect("pattern_gain_zero", 0, "pattern_gain_defer")
-    p.connect("pattern_gain_defer", 0, "pattern_gain_ready")
-    p.connect("pattern_gain_ready", 0, "pattern_control")
+    append_pattern_fade(p, Patch)
     p.obj("pattern_dsp", "prepend recall_dsp", 1550, 2295, ins=2)
     p.connect("dsp_state", 0, "pattern_dsp")
     p.connect("pattern_dsp", 0, "pattern_control")
@@ -423,27 +415,26 @@ def sequence_controls(p):
         panel.connect(route, 0, "sequence_commands")
 
     for name, text, rect in (
-        ("seq_title", "Scene sequencer", [8, 2, 208, 24]),
-        ("seq_help", "Each scene recalls its numbered pattern slot. Skip omits the step.", [224, 5, 820, 20]),
-        ("seq_bpm_label", "BPM", [8, 38, 40, 18]),
-        ("seq_beats_label", "Beats / bar", [122, 38, 74, 18]),
-        ("seq_status", "Stopped", [650, 38, 394, 20]),
+        ("seq_title", "Scene sequencer", [8, 3, 142, 25]),
+        ("seq_bpm_label", "BPM", [152, 8, 34, 18]),
+        ("seq_beats_label", "Beats/bar", [256, 8, 61, 18]),
+        ("seq_status", "Stopped", [690, 4, 354, 29]),
     ):
         panel.add(name, "comment", rect, view=rect, outs=0, text=text, textcolor=SLATE_INK,
-                  **({"fontsize": 18, "fontface": 1} if name == "seq_title" else {"fontsize": 11}))
+                  **({"fontsize": 15, "fontface": 1} if name == "seq_title" else {"fontsize": 11}))
 
-    control("seq_bpm", "live.numbox", [50, 34, 64, 26], "set_bpm", ["float", "float"],
+    control("seq_bpm", "live.numbox", [188, 4, 60, 24], "set_bpm", ["float", "float"],
             parameter_mappable=0, **parameter("Sequence BPM", 120, 20, 300, units="%.1f"))
-    control("seq_beats", "live.numbox", [200, 34, 45, 26], "set_beats", ["float", "float"],
+    control("seq_beats", "live.numbox", [319, 4, 41, 24], "set_beats", ["float", "float"],
             parameter_mappable=0, **parameter("Sequence beats per bar", 4, 1, 12, integer=True))
-    control("seq_repeat", "live.text", [255, 34, 110, 26], "set_repeat", ["int", ""],
+    control("seq_repeat", "live.text", [370, 4, 88, 24], "set_repeat", ["int", ""],
             mode=1, text="Repeat off", texton="Repeat on", parameter_mappable=0,
             **parameter("Sequence repeat", 1, 0, 1, options=["Off", "On"]))
 
     for command, label, hint, rect in (
-        ("start", "Start", "Start at the first step with a stored scene.", [376, 34, 76, 26]),
-        ("stop", "Stop", "Stop scene changes and keep the current pattern.", [460, 34, 76, 26]),
-        ("next", "Next bar", "Advance to the next scene at the next bar.", [544, 34, 96, 26]),
+        ("start", "Start", "Start at the first step with a stored scene.", [468, 4, 56, 24]),
+        ("stop", "Stop", "Stop scene changes and keep the current pattern.", [532, 4, 56, 24]),
+        ("next", "Next bar", "Advance to the next scene at the next bar.", [596, 4, 84, 24]),
     ):
         name = "seq_" + command
         panel.add(name, "live.text", rect, view=rect, outs=2, types=["bang", ""], mode=0,
@@ -457,24 +448,25 @@ def sequence_controls(p):
     scene_items = [atom for scene in scenes for atom in (scene, ",")][:-1]
     for index in range(8):
         x = 8 + 130 * index
-        rect = [x, 83, 124, 22]
+        rect = [x, 36, 76, 19]
         panel.add(f"seq_step_label_{index}", "comment", rect, view=rect, outs=0,
-                  text=str(index + 1), textcolor=SLATE_INK, fontface=1, textjustification=1)
-        control(f"seq_slot_{index}", "umenu", [x, 109, 124, 26], f"set_step {index}", ["int", "", ""],
+                  text=f"Step {index + 1}", textcolor=SLATE_INK, fontface=1)
+        control(f"seq_slot_{index}", "umenu", [x, 56, 76, 24], f"set_step {index}", ["int", "", ""],
                 items=scene_items, allowdrag=0, parameter_enable=0,
-                hint="Choose the stored pattern slot to recall at this step.")
-        rect = [x, 147, 36, 20]
+                hint="Choose a stored pattern or select Skip to omit this step.")
+        rect = [x + 82, 36, 42, 19]
         panel.add(f"seq_bars_label_{index}", "comment", rect, view=rect, outs=0,
-                  text="Bars", textcolor=SLATE_INK)
-        control(f"seq_bars_{index}", "live.numbox", [x + 40, 143, 84, 26], f"set_bars {index}", ["float", "float"],
-                parameter_mappable=0, **parameter(f"Step {index + 1} bars", 4, 1, 32, integer=True))
+                  text="Bars", textcolor=SLATE_INK, textjustification=1, fontsize=10)
+        control(f"seq_bars_{index}", "live.numbox", [x + 82, 56, 42, 24], f"set_bars {index}", ["float", "float"],
+                parameter_mappable=0, hint="Set the length of this step in bars.",
+                **parameter(f"Step {index + 1} bars", 4, 1, 32, integer=True))
 
     launcher = [688, PATTERNS_TOP + 1, 124, 28]
     p.add("sequence_open", "live.text", launcher, view=launcher, outs=2, types=["bang", ""], mode=0,
-          text="Scene sequencer…", texton="Scene sequencer…", parameter_enable=0,
-          hint="Open the scene sequencer below Patterns.")
-    p.add("sequence_open_message", "message", [2710, 2300, 94, 22], ins=2, text="workspace 1")
-    rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
+          text="Scene sequencer ▾", texton="Scene sequencer ▾", parameter_enable=0,
+          hint="Show or hide the scene sequencer below Patterns.")
+    p.add("sequence_drawer_command", "message", [2710, 2300, 138, 22], ins=2, text="toggle_scene_drawer")
+    rect = [MARGIN, PLAYBACK_TOP, TRACKS * TRACK - GUTTER, 88]
     p.add("sequence_panel", "bpatcher", rect, view=rect, ins=0, types=[""],
           embed=1, hidden=1, border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0,
           lockeddragscroll=0, clickthrough=0, bgmode=0,
@@ -483,8 +475,8 @@ def sequence_controls(p):
                        toolbarvisible=0, locked_bgcolor=SLATE_PANEL,
                        boxes=panel.boxes, lines=panel.lines))
     p.obj("sequence_control", "js fk_sequence.js", 2710, 2402, outs=0)
-    p.connect("sequence_open", 0, "sequence_open_message")
-    p.connect("sequence_open_message", 0, "theme_control")
+    p.connect("sequence_open", 0, "sequence_drawer_command")
+    p.connect("sequence_drawer_command", 0, "theme_control")
     p.connect("sequence_panel", 0, "sequence_control")
 
     label = [MARGIN, WORKSPACE_TOP, 100, 20]
@@ -560,10 +552,7 @@ def performance_mix(p):
     append_sends_strip(sends, parameter)
     workspace_panel("performance_sends", sends, MARGIN + PERFORMANCE_RIGHT_OFFSET,
                     PERFORMANCE_RIGHT_WIDTH, 1, [""])
-    p.obj("performance_send_edit", "route " + " ".join(PERFORMANCE_SENDS), 3570, 1780,
-          outs=len(PERFORMANCE_SENDS) + 1, types=[""] * (len(PERFORMANCE_SENDS) + 1))
-    p.connect("performance_sends", 0, "performance_send_edit")
-    p.connect("performance_send_edit", len(PERFORMANCE_SENDS), "mix_fx", 7 + FX_MOD_CHANNELS)
+    p.connect("performance_sends", 0, "mix_fx", 7 + FX_MOD_CHANNELS)
     p.connect("mix_fx", 4 + FX_MOD_CHANNELS, "performance_sends")
 
 
@@ -609,7 +598,9 @@ def window_controls(p):
             x, width, short = INSPECTOR_DIALS[key]
             rect = [x, EDITOR_TOP + 25, width, 72]
             p.add(name, "live.dial", rect, outs=2, types=["float", "float"], view=rect,
-                  appearance=3, showname=1, shownumber=1,
+                  appearance=3, needlemode=2 if low < 0 < high else 1,
+                  showname=1, shownumber=1,
+                  **({"hint": "Turn clockwise to add drive. At 0%, drive is off."} if key == "drive" else {}),
                   **parameter(f"Selected {key}", initial, low, high, short=short,
                               unit_style=5 if key.endswith("_send") else 0,
                               units="%.2f" if key == "rate" else None))
@@ -623,7 +614,7 @@ def window_controls(p):
     p.add("inspect_filter_type", "live.tab", rect, view=rect, outs=3, types=["int", "", "float"],
           fontsize=10, multiline=0, num_lines_patching=1, num_lines_presentation=1, parameter_mappable=0,
           hint="Choose the filter for this loop. Low-pass cuts highs. High-pass cuts lows. Flat centers the sweep.",
-          **parameter("Selected filter type", 1, 0, 2, options=["Low-pass", "Flat", "High-pass"]))
+          **parameter("Selected filter type", 1, 0, 2, options=["Low-pass", "Flat (off)", "High-pass"]))
     p.obj("edit_inspect_filter_type", "prepend inspector_filter_type", 1760, 684, ins=2)
     p.connect("inspect_filter_type", 0, "edit_inspect_filter_type")
     p.connect("edit_inspect_filter_type", 0, "source_control")
@@ -678,10 +669,17 @@ def stereo_field(p):
     p.connect("pad_motion_stop", 0, "stereo_field_panel")
     p.connect("pad_motion_stop", 0, "mix_fx", 2 + FX_MOD_CHANNELS)
 
-    p.obj("stereo_field_position", "route position", 3040, 1970, outs=2)
+    p.obj("stereo_field_position", "route position field_preset_slot field_preset_arm",
+          3040, 1970, ins=4, outs=4)
     p.obj("stereo_field_voice", "route 1 2 3 4", 3040, 2000, outs=5)
     p.connect("stereo_field_panel", 0, "stereo_field_position")
     p.connect("stereo_field_position", 0, "stereo_field_voice")
+    p.obj("stereo_field_preset_slot", "prepend field_preset_slot", 3240, 2000, ins=2)
+    p.add("stereo_field_preset_arm", "message", [3240, 2030, 128, 22], ins=2, text="field_preset_arm")
+    p.connect("stereo_field_position", 1, "stereo_field_preset_slot")
+    p.connect("stereo_field_position", 2, "stereo_field_preset_arm")
+    p.connect("stereo_field_preset_slot", 0, "source_control")
+    p.connect("stereo_field_preset_arm", 0, "source_control")
     p.obj("stereo_field_init", "loadbang", 3040, 2040, types=["bang"])
     for voice, pan in enumerate(DEFAULT_PANS, 1):
         x = 3040 + 150 * (voice - 1)
@@ -758,7 +756,10 @@ def loop_send_gains(p, voice, y):
     for index, key in enumerate(LOOP_SENDS):
         x = 3200 + 135 * index
         name = f"{key}_{voice}"
-        p.add(name, "live.numbox", [x, y, 110, 20], outs=2, types=["float", "float"],
+        effect = key.split("_", 1)[0].capitalize()
+        rect = [x, y, 110, 20]
+        p.add(name, "live.numbox", rect, view=rect, outs=2, types=["float", "float"],
+              hint=f"Feed Loop {voice} into {effect} in Loop sends mode.",
               **parameter(f"Loop {voice} {key.replace('_', ' ')}", 0, 0, 100, unit_style=5))
         p.obj(name + "_percent", "* 0.01", x, y + 28, ins=2)
         p.obj(name + "_ramp", "pack 0. 20.", x, y + 56, ins=2)
@@ -778,11 +779,6 @@ def loop_send_gains(p, voice, y):
         p.connect(name + "_ramp", 0, name + "_base_gain")
         p.connect(name, 0, name + "_sync")
         p.connect(name + "_sync", 0, "source_control")
-        mirror = name + "_performance_sync"
-        p.obj(mirror, "prepend " + name, x, y + 145, ins=2)
-        p.connect(name, 0, mirror)
-        p.connect(mirror, 0, "performance_sends")
-        p.connect("performance_send_edit", PERFORMANCE_SENDS.index(name), name)
 
 
 def drifting_memory(p):
@@ -931,6 +927,14 @@ def build():
                    enablehscroll=0, enablevscroll=0, lockeddragscroll=0)
     drifting_memory(p)
     performance_mix(p)
+    p.obj("fx_appearance_route", "route fx_enabled fx_mode enabled", 3740, 1815, outs=4)
+    p.connect("mix_fx", 4 + FX_MOD_CHANNELS, "fx_appearance_route")
+    p.connect("drifting_memory", 4, "fx_appearance_route")
+    for outlet, selector in enumerate(("fx_power", "fx_send_mode", "drift_power")):
+        name = "fx_appearance_" + selector
+        p.obj(name, f"prepend {selector}", 3740 + 145 * outlet, 1850, ins=2)
+        p.connect("fx_appearance_route", outlet, name)
+        p.connect(name, 0, "theme_control")
     mix_visuals(p)
     p.obj("normal_voice", "play~ fk-unbound 2", 1100, 1800, outs=3,
           types=["signal", "signal", "bang"])
@@ -961,14 +965,12 @@ def build():
         p.connect("drifting_memory", channel, mix)
         p.connect(blend, 0, mix, 1)
         p.obj("master_" + suffix, "*~", 360 + 140 * channel, 1840, ins=2, types=["signal"])
-        p.obj("pattern_level_" + suffix, "*~", 360 + 140 * channel, 1862, ins=2, types=["signal"])
         p.obj("output_" + suffix, f"clip~ {-master_output_ceiling} {master_output_ceiling}",
               360 + 140 * channel, 1880, ins=3, types=["signal"])
         p.connect(mix, 0, "master_" + suffix)
         p.connect("master_gain", 0, "master_" + suffix, 1)
-        p.connect("master_" + suffix, 0, "pattern_level_" + suffix)
-        p.connect("pattern_gain", 0, "pattern_level_" + suffix, 1)
-        p.connect("pattern_level_" + suffix, 0, "output_" + suffix)
+        p.connect("master_" + suffix, 0, "pattern_transition", channel)
+        p.connect("pattern_transition", channel, "output_" + suffix)
         p.connect("output_" + suffix, 0, "dac", channel)
         p.connect("output_" + suffix, 0, "recorder", channel)
         p.connect("output_" + suffix, 0, "visuals_panel", channel)

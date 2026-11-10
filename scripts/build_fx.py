@@ -15,6 +15,8 @@ DIALS = (
 )
 SEND_INPUTS = ("Echo send left", "Echo send right", "Room send left", "Room send right")
 PERFORMANCE_FX_CONTROLS = ("fx_mode", "fx_enabled", "fx_echo", "fx_space")
+FX_POWER = dict(mode=1, text="Main FX · Off", texton="Main FX · On", fontface=1,
+                hint="Turn Tone, Echo and Room on or off.")
 
 # Turn-on defaults match the parameters in the native controls. Gen handles
 # smoothing so moving a dial or switching bypass does not jump the audio.
@@ -262,7 +264,16 @@ def effects_pad(p, enabled, tone, echo, room):
         panel.cord(default, select)
         panel.cord(select, menu)
 
-    button_rect = [428, 0, 96, 20]
+    # A momentary button toggles the canonical switch. The theme reflects
+    # that switch's state directly, even when the pad window is closed.
+    power = panel.add("live.text", [16, 586, 112, 25], view=[208, 13, 134, 25],
+                      outs=2, types=["bang", ""], varname="fx_pad_enabled",
+                      parameter_enable=0, **dict(FX_POWER, mode=0, texton=FX_POWER["text"]))
+    power_command = panel.add("message", [16, 617, 100, 22], ins=2, text="fx_toggle")
+    panel.cord(power, power_command)
+    panel.cord(power_command, destination)
+
+    button_rect = [558, 0, 110, 20]
     button = p.add("live.text", button_rect, outs=2, types=["bang", ""], view=button_rect,
                    varname="fx_pad_open", mode=0, text="FX pad…", texton="FX pad…",
                    parameter_enable=0, hint="Blend two effects and record pad movements.")
@@ -278,7 +289,7 @@ def effects_pad(p, enabled, tone, echo, room):
     p.cord(window, subpatch)
     p.cord(motion, subpatch)
 
-    edit = p.obj("route tone echo space fx_enabled", 0, 520, 204, outs=5, types=[""] * 5)
+    edit = p.obj("route tone echo space fx_toggle", 0, 520, 204, outs=5, types=[""] * 5)
     state = p.obj("pak 0 20 18", 164, 424, 82, ins=3, types=["list"])
     state_message = p.obj("prepend source", 164, 456, 105, ins=2)
     bypass_message = p.obj("prepend enabled", 294, 456, 114, ins=2)
@@ -325,7 +336,7 @@ def build():
                      index=channels + 2 + offset, comment=name)
         p.cord(send, gen, inlet=channels + offset)
 
-    mode_rect = [86, 0, 94, 20]
+    mode_rect = [206, 0, 100, 20]
     mode = p.add("umenu", mode_rect, view=mode_rect, outs=3, types=["int", "", ""],
                  varname="fx_mode", items=["Full mix", ",", "Loop sends"], parameter_enable=0,
                  hint="Feed Echo and Room from the full mix or the individual loop sends.")
@@ -335,10 +346,9 @@ def build():
     p.cord(mode, set_mode)
     p.cord(set_mode, gen)
 
-    switch = [532, 0, 136, 20]
-    enabled = p.add("live.text", switch, view=switch, outs=2, types=["", ""],
-                    mode=1, text="Enable FX", texton="FX on", varname="fx_enabled",
-                    hint="Switch Tone, Echo and Room in or out. Drifting Memory has its own switch.",
+    switch = [86, 0, 112, 20]
+    enabled = p.add("live.text", switch, view=switch, outs=2, types=["int", ""],
+                    varname="fx_enabled", **FX_POWER,
                     **parameter("FX enabled", "FX", 0, 0, 1, options=("Off", "On")))
     prefix = p.obj("prepend enabled", 0, 265, 108, ins=2)
     p.cord(enabled, prefix)
@@ -355,9 +365,13 @@ def build():
         p.cord(modulation, gen, inlet=index - 1)
         p.cord(gen, effective, outlet=index - 1)
 
-        rect = [slot * dial_pitch, 48, dial_pitch - gutter, 68]
+        caption = [slot * dial_pitch, 47, dial_pitch - gutter, 15]
+        p.add("comment", caption, view=caption, outs=0, varname="fx_label_" + key,
+              text=label, textjustification=1, fontsize=10, ignoreclick=1)
+        rect = [slot * dial_pitch, 61, dial_pitch - gutter, 55]
         dial = p.add("live.dial", rect, view=rect, outs=2, types=["float", "float"],
-                     appearance=3, showname=1, shownumber=1, varname="fx_" + key, hint=hint,
+                     appearance=3, needlemode=2 if low < 0 < high else 1,
+                     showname=0, shownumber=1, varname="fx_" + key, hint=hint,
                      # Max integer parameters support only 256 distinct values.
                      **parameter(title, label, initial, low, high, integer=key not in ("time_ms", "decay"),
                                  units={"time_ms": "%.0f", "decay": "%.2f"}.get(key)))
@@ -368,14 +382,14 @@ def build():
 
     effects_pad(p, enabled, dials["tone"], dials["echo"], dials["space"])
 
-    stereo_rect = [312, 0, 108, 20]
+    stereo_rect = [440, 0, 110, 20]
     stereo_button = p.add("live.text", stereo_rect, outs=2, types=["bang", ""], view=stereo_rect,
                           varname="stereo_field_open", mode=0, text="Stereo field…", texton="Stereo field…",
                           parameter_enable=0, hint="Place and record the pan and level of each loop.")
     stereo_open = p.add("outlet", [720, 370, 26, 26], index=channels + 1, comment="Open Stereo field")
     p.cord(stereo_button, stereo_open)
 
-    drifting_rect = [188, 0, 116, 20]
+    drifting_rect = [314, 0, 118, 20]
     drifting = p.add("live.text", drifting_rect, outs=2, types=["bang", ""], view=drifting_rect,
                      varname="drifting_delay_open", mode=0, text="Drifting Memory", texton="Drifting Memory",
                      parameter_enable=0, hint="Show Drifting Memory and its advanced controls in Mix.")

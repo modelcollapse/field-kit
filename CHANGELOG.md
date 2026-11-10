@@ -1,5 +1,13 @@
 # Field Kit changelog
 
+## v0.8.2
+
+- Pattern clicks and scene changes crossfade from a short buffer of the outgoing stereo mix into the new pattern. The loop editor's Fade ms still controls the loop seam.
+- Echo and Room sends sit on each mixer strip and stay visible with Drifting Memory Advanced open. The main dials read Mix in Full mix and Return in Loop sends.
+- Main FX and Drifting Memory start off. They have visible On and Off switches, and their editable dials dim while bypassed. The FX pad shares the Main FX switch.
+- The shorter Scene Sequencer keeps all eight steps below Patterns. Its launcher opens and closes it without interrupting a running sequence.
+- Store four pan and level arrangements in Stereo Field and keep them with a Set. The FX pad gives its Record button and capture status a dedicated row.
+
 ## v0.8.1
 
 - Choose Glass Circuit, Tidal Lanterns, or the original demo in Source, Input & Files. The two new demos start four aligned loops and set Scenes to their tempo.

@@ -20,9 +20,7 @@ var SET_VERSION = 1;
 var PATTERN_HINT = "Click to recall. Shift-click to store.";
 // Allow all eight slots to hold eight full curves with unrounded values.
 var MAX_BANK_BYTES = 8 * 1024 * 1024;
-var RECALL_FADE_OUT_MS = 20;
 var RECALL_SETTLE_MS = 24;
-var RECALL_FADE_IN_MS = 30;
 var EMPTY_BUTTON = [0.25, 0.25, 0.25, 1];
 var STORED_BUTTON = [0.40, 0.29, 0.09, 1];
 var SELECTED_BUTTON = [0.92, 0.62, 0.08, 1];
@@ -74,7 +72,8 @@ var pendingSet = null;
 var writingSet = null;
 var writeTimeout = null;
 var pendingRecall = null;
-var restoreLevel = new Task(restore_recall_level, host);
+var recallStage = "idle";
+var releaseTail = new Task(release_recall_tail, host);
 for (var index = 0; index < SLOT_COUNT; index++) {
     slots.push(null);
 }
@@ -250,55 +249,96 @@ function capture_pattern() {
 capture_pattern.local = 1;
 
 function request_recall(index) {
-    var startFade = !pendingRecall;
     pendingRecall = { index: index, pattern: slots[index] };
     if (!host.patcher.getnamed("source_control").js.audioOn) {
-        finish_recall(0);
-    } else if (startFade) {
-        restoreLevel.cancel();
-        host.patcher.getnamed("pattern_gain").message("list", 0, RECALL_FADE_OUT_MS);
-        host.patcher.getnamed("pattern_gain_sample").message("start");
+        recall_dsp(0);
+    } else if (recallStage === "idle") {
+        begin_pending_recall();
     }
 }
 request_recall.local = 1;
 
-function recall_silent() {
-    finish_recall(RECALL_FADE_IN_MS);
+function begin_pending_recall() {
+    var source = host.patcher.getnamed("source_control").js;
+    if (source.normalPlaying || source.normalStopping || source.playing.some(Boolean)) {
+        recallStage = "covering";
+        host.patcher.getnamed("pattern_transition_command").message(1);
+        host.patcher.getnamed("pattern_transition_sample").message("start");
+    } else {
+        // A stopped transport must never replay the previous loop audio.
+        apply_pending_recall();
+    }
+}
+begin_pending_recall.local = 1;
+
+function recall_phase(phase) {
+    if (phase === 1 && recallStage === "covering") {
+        // The buffer now supplies both channels. Apply settings off the audible path.
+        recallStage = "settling";
+        try {
+            apply_pending_recall();
+        } finally {
+            releaseTail.schedule(RECALL_SETTLE_MS);
+        }
+    } else if (phase === 0 && (recallStage === "fading" || recallStage === "draining")) {
+        if (recallStage === "draining") host.patcher.getnamed("pattern_transition_command").message(0);
+        recallStage = "idle";
+        host.patcher.getnamed("pattern_transition_sample").message("stop");
+        // Only the latest request survives a burst of clicks during the fade.
+        if (pendingRecall) begin_pending_recall();
+    }
 }
 
 function recall_dsp(state) {
-    if (!state && pendingRecall) finish_recall(0);
+    if (state) {
+        if (recallStage === "idle") host.patcher.getnamed("pattern_transition_command").message(0);
+    } else {
+        try {
+            apply_pending_recall();
+        } finally {
+            cancel_recall(false);
+        }
+    }
 }
 
-function finish_recall(fadeIn) {
+function apply_pending_recall() {
     if (!pendingRecall) return;
     var recall = pendingRecall;
     pendingRecall = null;
-    if (fadeIn) host.patcher.getnamed("pattern_gain_sample").message("stop");
-    try {
-        apply_pattern(recall.pattern);
-        lastSlot = recall.index;
-        bank_status("Pattern " + (recall.index + 1) + " recalled.");
-        render_slots();
-    } finally {
-        if (fadeIn) restoreLevel.schedule(RECALL_SETTLE_MS);
-        else cancel_recall();
+    apply_pattern(recall.pattern);
+    lastSlot = recall.index;
+    bank_status("Pattern " + (recall.index + 1) + " recalled.");
+    render_slots();
+}
+apply_pending_recall.local = 1;
+
+function release_recall_tail() {
+    if (recallStage !== "settling") return;
+    recallStage = "fading";
+    host.patcher.getnamed("pattern_transition_command").message(0);
+}
+release_recall_tail.local = 1;
+
+function cancel_recall(audioOn, discardHistory) {
+    if (audioOn === undefined) audioOn = host.patcher.getnamed("source_control").js.audioOn;
+    releaseTail.cancel();
+    pendingRecall = null;
+    if (!audioOn) {
+        recallStage = "idle";
+        host.patcher.getnamed("pattern_transition_sample").message("stop");
+        host.patcher.getnamed("pattern_transition_command").message(2);
+    } else if (discardHistory || recallStage !== "idle") {
+        var wasIdle = recallStage === "idle";
+        recallStage = "draining";
+        host.patcher.getnamed("pattern_transition_command").message(-1);
+        if (wasIdle) host.patcher.getnamed("pattern_transition_sample").message("start");
     }
 }
-finish_recall.local = 1;
-
-function restore_recall_level() {
-    host.patcher.getnamed("pattern_gain").message("list", 1, RECALL_FADE_IN_MS);
-}
-restore_recall_level.local = 1;
-
-function cancel_recall() {
-    restoreLevel.cancel();
-    pendingRecall = null;
-    host.patcher.getnamed("pattern_gain_sample").message("stop");
-    restore_recall_level();
-}
 cancel_recall.local = 1;
+
+function transport_stopped() {
+    cancel_recall(true, true);
+}
 
 function apply_pattern(pattern) {
     var patch = host.patcher;
@@ -542,7 +582,8 @@ function write_set(path) {
     var data = {
         format: SET_FORMAT, version: SET_VERSION, source: source,
         slots: snapshot, current: current, selectedSlot: lastSlot,
-        sequence: host.patcher.getnamed("sequence_control").js.sequence_snapshot()
+        sequence: host.patcher.getnamed("sequence_control").js.sequence_snapshot(),
+        fieldPresets: host.patcher.getnamed("source_control").js.field_presets_snapshot()
     };
     var stage = folder + ".field-kit-" + Date.now() + "-" + Math.floor(Math.random() * 1e9) + ".tmp";
     try {
@@ -669,6 +710,7 @@ function valid_set(data) {
         !Array.isArray(data.slots) || data.slots.length !== SLOT_COUNT ||
         !data.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, LFO_COUNT); }) ||
         (data.sequence !== undefined && !host.patcher.getnamed("sequence_control").js.sequence_valid(data.sequence)) ||
+        !host.patcher.getnamed("source_control").js.field_presets_valid(data.fieldPresets) ||
         (data.selectedSlot !== -1 &&
             (!index_valid(data.selectedSlot, SLOT_COUNT) || !data.slots[data.selectedSlot]))) return false;
     var source = data.source;
@@ -720,6 +762,7 @@ function set_source_loaded(ok) {
     activeSetPath = opened.path;
     bankDirty = false;
     host.patcher.getnamed("sequence_control").js.restore_sequence(opened.data.sequence);
+    host.patcher.getnamed("source_control").js.field_presets_restore(opened.data.fieldPresets);
     set_armed(false);
     render_slots();
     status(PATTERN_HINT);

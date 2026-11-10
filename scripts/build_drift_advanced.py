@@ -113,7 +113,10 @@ def layout_drift_advanced(drift, parameter):
             if caption:
                 label(name, caption, rect, hidden=index != 0, fontsize=10 if name.endswith("_help") else 11)
             else:
-                present(named[name], rect, hidden=index != 0)
+                control = named[name]
+                if control["maxclass"] == "live.dial":
+                    control["needlemode"] = 2 if name == "dynamics" else 1
+                present(control, rect, hidden=index != 0)
 
     route = add("drift_advanced_page_select", "newobj", [1764, 234, 89, 22], ins=4,
                 outputs=("bang", "bang", "bang", ""), text="sel 0 1 2")

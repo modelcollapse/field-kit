@@ -397,7 +397,8 @@ for (const [item, id, file, name, tempo, sectionFrames] of [
         assert(sent(`direction_${voice}`, 0));
         assert(sent(`fade_${voice}`, 0));
     }
-    assert(!trace.some(([target]) => /^(pan_|level_|fx_|master$|mixer_control$|pattern_control$)/.test(target)));
+    assert(!trace.some(([target, selector]) => /^(pan_|level_|fx_|master$|mixer_control$)/.test(target) ||
+        (target === 'pattern_control' && selector !== 'transport_stopped')));
 }
 
 trace.length = 0;

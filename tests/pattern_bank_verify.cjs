@@ -153,7 +153,7 @@ for (const [name, value] of Object.entries({
 for (let i = 1; i <= 8; i++) addControl('pattern_' + i, 0);
 for (const name of ['pattern_store', 'pattern_status', 'set_status', 'pattern_save_dialog', 'pattern_load_dialog',
                     'set_save_dialog', 'set_open_dialog', 'set_relink_dialog', 'set_writer',
-                    'pattern_gain', 'pattern_gain_sample']) addControl(name, 0);
+                    'pattern_transition_command', 'pattern_transition_sample', 'stereo_field_canvas']) addControl(name, 0);
 const named = name => {
     if (name === 'source_control') return source;
     if (name === 'sequence_control') return sequencer;
@@ -161,6 +161,7 @@ const named = name => {
     if (name === 'mix_fx') return { subpatcher: () => ({ getnamed: key => controls[key] }) };
     if (name === 'drifting_memory') return { subpatcher: () => ({ getnamed: key => controls['drifting.' + key] }) };
     if (name === 'mixer_control') return mixer;
+    if (name === 'stereo_field_panel') return { subpatcher: () => ({ getnamed: () => controls.stereo_field_canvas }) };
     if (name === 'recorder') return { subpatcher: () => ({ getnamed: () => ({ js: recorderState }) }) };
     if (controls[name]) return controls[name];
     throw new Error('Unexpected control ' + name);
@@ -190,6 +191,10 @@ function File(path, mode) {
 const host = vm.createContext({ patcher: { getnamed: named }, File,
     Task: function () { this.schedule = () => {}; this.cancel = () => {}; } });
 vm.runInContext(readFileSync(join(__dirname, '..', 'max', 'fk_patterns.js'), 'utf8'), host);
+const field = vm.createContext({ patcher: { getnamed: named }, Global: function () {},
+    Task: function () {}, arrayfromargs: args => Array.from(args) });
+vm.runInContext(readFileSync(join(__dirname, '..', 'max', 'fk_source.js'), 'utf8'), field);
+for (const fn of ['field_presets_snapshot', 'field_presets_valid', 'field_presets_restore']) sourceState[fn] = field[fn];
 for (const [key, , , initial] of host.DRIFT_CONTROLS) addControl('drifting.' + key, initial);
 controls['drifting.drift_enabled'].value = 1;
 controls['drifting.drift_mix'].value = 48;
@@ -508,7 +513,15 @@ modState.gains[roomSendRoute] = -22;
 sourceState.path = '/test/sets/Écho.wav';
 controls.pan_1.value = -62;
 host.slot(1, 1);
+field.field_preset_slot(1, 1);
 controls.pan_1.value = 37;
+field.field_preset_arm();
+field.field_preset_slot(4, 0);
+field.field_preset_slot(1, 0);
+assert.equal(controls.pan_1.value, -62);
+assert(messages.some(message => message[0] === 'stereo_field_canvas' && message[1] === 'stop_motion'));
+field.field_preset_slot(4, 0);
+assert.equal(controls.pan_1.value, 37);
 sequenceState.running = true;
 host.write_set('/test/sets/First.json');
 assert.equal(sequenceState.running, true);
@@ -521,6 +534,10 @@ assert.equal(set.source.relative, 'Écho.wav');
 assert.equal(set.slots[0].windows[0].pan, -62);
 assert.equal(set.current.windows[0].pan, 37);
 assert.deepEqual(set.sequence, programmedSequence);
+assert.deepEqual(set.fieldPresets, [
+    [-62, ...set.current.windows.flatMap(w => [w.pan, w.level]).slice(1)],
+    null, null, set.current.windows.flatMap(w => [w.pan, w.level]),
+]);
 assert.equal(set.current.gains[roomSendRoute], -22);
 assert.equal(set.current.globalGains[lastDriftRoute], -75);
 assert.equal(set.current.selection.globalTarget, 21);
@@ -542,6 +559,7 @@ host.write_set('/test/sets/Concurrent.json');
 const [, , concurrentStage] = messages.at(-1);
 controls.pan_1.value = 9;
 host.slot(3, 1);
+field.field_preset_slot(1, 1);
 host.set_written(1, concurrentStage);
 assert.equal(controls.pattern_status.value, 'Pattern 3 stored · bank unsaved');
 assert.equal(controls.set_status.value, 'Set saved · Concurrent.json');
@@ -557,6 +575,13 @@ for (const invalid of [null, { ...programmedSequence, bpm: 0 }]) {
     assert.match(controls.set_status.value, /Couldn’t open/);
     assert.equal(sequenceState.running, true);
 }
+for (const invalid of [null, [null], [[0, 900, 0, 40, 0, 40, 0, 40], null, null, null]]) {
+    const previousSource = requestedSource;
+    files.set('/relocated/Invalid.json', JSON.stringify({ ...set, fieldPresets: invalid }));
+    host.read_set('/relocated/Invalid.json');
+    assert.equal(requestedSource, previousSource);
+    assert.match(controls.set_status.value, /Couldn’t open/);
+}
 host.read_set('/relocated/First.json');
 assert.equal(requestedSource, '/relocated/Écho.wav');
 assert.deepEqual(sequenceState.validations.at(-1), programmedSequence);
@@ -565,6 +590,7 @@ assert.equal(sequenceState.restores.length, 0);
 assert.equal(controls.pan_1.value, 9);
 assert.equal(controls.set_status.value, 'Opening First.json…');
 host.set_source_loaded(0);
+assert.equal(field.field_presets_snapshot()[0][0], 9);
 assert.equal(controls.pattern_3.text, '3 •');
 assert.equal(controls.pan_1.value, 9);
 assert.equal(controls.pattern_status.value, 'Pattern 3 stored · bank unsaved');
@@ -574,6 +600,7 @@ assert.equal(sequenceState.running, true);
 assert.equal(sequenceState.restores.length, 0);
 host.read_set('/relocated/First.json');
 host.set_source_loaded(1);
+assert.deepEqual(JSON.parse(JSON.stringify(field.field_presets_snapshot())), set.fieldPresets);
 assert.deepEqual(sequenceState.restores, [{ data: programmedSequence, pan: 37, slot3: false }]);
 assert.deepEqual(sequenceState.data, programmedSequence);
 assert.equal(sequenceState.running, false);
@@ -605,7 +632,7 @@ host.set_source_loaded(1);
 assert.equal(controls.pan_1.value, 37);
 assert.deepEqual(sequenceState.data, programmedSequence);
 assert.equal(sequenceState.running, false);
-const { sequence: ignoredSequence, ...olderSet } = set;
+const { sequence: ignoredSequence, fieldPresets: ignoredFieldPresets, ...olderSet } = set;
 olderSet.current = { ...olderSet.current, gains: oldLoopGains, globalGains: oldGlobalGains,
                      selection: { window: 0, lfo: 7, target: 0, globalTarget: 7 } };
 olderSet.slots = olderSet.slots.slice();
@@ -618,6 +645,7 @@ host.read_set('/test/sets/Older.json');
 assert.equal(sequenceState.validations.length, validatedSequences);
 assert.deepEqual(sequenceState.data, programmedSequence);
 host.set_source_loaded(1);
+assert.deepEqual(Array.from(field.field_presets_snapshot()), [null, null, null, null]);
 assert.equal(sequenceState.restores.at(-1).data, undefined);
 assert.deepEqual(sequenceState.data, blankSequence);
 assert.equal(sequenceState.running, false);
@@ -639,33 +667,57 @@ assert.equal(modState.globalGains[lastDriftRoute], 0);
 recorderState.state = 'recording';
 host.open_set();
 assert.match(controls.set_status.value, /Stop recording/);
-console.log('PASS Set round-trip, transactional sequence restore, older Sets, relocation, relink and cancel');
+console.log('PASS Set round-trip, Stereo Field presets, transactional sequence restore, older Sets, relocation, relink and cancel');
 
 sourceState.audioOn = true;
+sourceState.playing[0] = true;
 controls.pan_1.value = 13;
 host.slot(2, 1);
 controls.pan_1.value = 37;
 host.slot(1);
 assert.equal(controls.pan_1.value, 37);
 assert.deepEqual(messages.slice(-2), [
-    ['pattern_gain', 'list', 0, 20],
-    ['pattern_gain_sample', 'start'],
+    ['pattern_transition_command', 1],
+    ['pattern_transition_sample', 'start'],
 ]);
 sequenceState.running = true;
 host.sequence_recall(2);
 assert.equal(sequenceState.running, true);
 assert.equal(controls.pan_1.value, 37);
-host.recall_silent();
+host.recall_phase(2);
+assert.equal(controls.pan_1.value, 37);
+host.recall_phase(1);
 assert.equal(controls.pan_1.value, 13);
-host.restore_recall_level();
-assert.deepEqual(messages.at(-1), ['pattern_gain', 'list', 1, 30]);
+host.release_recall_tail();
+assert.deepEqual(messages.at(-1), ['pattern_transition_command', 0]);
+host.slot(2);
+host.slot(1);
+assert.equal(controls.pan_1.value, 13);
+host.recall_phase(0);
+assert.deepEqual(messages.slice(-2), [
+    ['pattern_transition_command', 1],
+    ['pattern_transition_sample', 'start'],
+]);
+host.recall_phase(1);
+assert.equal(controls.pan_1.value, -62);
+sourceState.playing.fill(false);
+host.transport_stopped();
+assert.deepEqual(messages.at(-1), ['pattern_transition_command', -1]);
+host.release_recall_tail();
+assert.deepEqual(messages.at(-1), ['pattern_transition_command', -1]);
+host.recall_phase(0);
+host.slot(2);
+assert.equal(controls.pan_1.value, 13);
+assert.equal(host.recallStage, 'idle');
+sourceState.playing[0] = true;
 host.slot(1);
 sourceState.audioOn = false;
 host.recall_dsp(0);
 assert.equal(controls.pan_1.value, -62);
-host.recall_silent();
+assert.deepEqual(messages.at(-1), ['pattern_transition_command', 2]);
+host.recall_phase(1);
 assert.equal(controls.pan_1.value, -62);
-console.log('PASS live recall waits for silence, coalesces manual and sequenced recalls and recovers if DSP stops');
+console.log('PASS buffered recall waits for DSP, queues the latest click and recovers on transport and DSP stops');
 
 // Built-in references are portable; older Sets keep the original demo reference.
 recorderState.state = 'idle';

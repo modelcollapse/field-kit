@@ -38,7 +38,7 @@ saving a Set with the take or replacing it with a different source.
 
 Click a loop number or waveform to focus the editor beside the waveforms. Drag the waveform to set
 the range. Fade preview shows how the outgoing and incoming audio overlap.
-Choose Low-pass, Flat, or High-pass directly under Filter type. Switch between
+Choose Low-pass, Flat (off), or High-pass directly under Filter type. Drive is off at 0%. Switch between
 Low-pass and High-pass to keep the same strength, or drag Filter sweep to move
 continuously through all three.
 
@@ -46,25 +46,30 @@ Click Stereo field… beside FX pad… in the Main FX header. Each dot is one lo
 Resize the window by dragging an edge.
 Drag left or right to pan, and up or down to set level.
 Select a loop tab to see its pan and level above the pad.
+Shift-click a Field preset slot or click Store preset and choose a slot to save all
+four pan and level pairs. Click a filled slot to recall. Save Set keeps these presets.
 Click Record, drag and release the dot, then click Play to loop the gesture.
 Each loop keeps its own gesture. Use Stop or Clear for the selected loop.
 
-In Main FX, choose Full mix for shared processing, or Loop sends and adjust Echo
-and Room sends in the Mix workspace. The four rows edit each loop; Return level
-edits the same Echo and Room mix controls as the Main FX dials.
+Field Kit starts dry. Main FX and Drifting Memory dials dim while the effects are
+off and remain editable. In Main FX, choose Full mix for shared processing with
+Mix % dials. Choose Loop sends and adjust Echo and Room on each mixer strip to
+send those loops to the effects. The main dials then read Return % and set how
+much comes back into the mix. The selected loop editor mirrors the mixer strip.
 Open FX pad and choose Tone tilt, Echo mix, or Room mix for each axis.
 X starts on Echo mix and Y starts on Room mix. Drag right or up to increase the value.
-Tone tilt goes from dark through neutral to bright. Click Enable FX in the pad or the Main FX header to hear the result.
-Click Record, drag and release, then click Play to loop the recorded effect pair.
+Tone tilt goes from dark through neutral to bright. Click Main FX · Off in the pad or the Main FX header to turn it on.
+Click ● Record, drag and release, then click Play to loop the recorded effect pair.
+The status below the buttons shows the capture time and the saved effect pair.
 Stop holds the current values. Clear erases the gesture. Both pads keep gestures
 while the patch is open. Stop all and recalling a pattern stop the gestures.
 Sets and patterns save the control values, but do not store the gestures.
 
-In Mix, enable Drifting Memory, play your loops and choose All under Arm capture.
+In Mix, click Drift · Off to enable Drifting Memory, play your loops and choose All under Arm capture.
 The default Two Delays / Small mode returns after about 2½ seconds. Memory shows
 the signal in the delay. Wet return shows how much the delay adds to the mix.
 Use Mix to blend it in and Off to stop writing. Advanced shows Time, Texture, and
-I/O controls beside the delay. Hide advanced brings back Loop sends. The delay
+I/O controls beside the delay. The mixer sends stay visible and the delay
 keeps playing either way. The Main FX shortcut opens the same drawer.
 Hold freezes the current memory. Cut Tail clears it and sets capture to Off while
 the dry mix keeps playing. Release Hold and arm a bank to capture again.
@@ -81,12 +86,14 @@ Applied value shows what the destination receives while audio is on.
 The lower left graph shows the selected LFO shape. Choose Breakpoint or click Use curve
 to edit that LFO's own curve. The lower right graph shows the live signal while audio is on.
 
-Playback, loop range edits, and pattern recalls use short fade-out and fade-in transitions.
-Fade ms controls the crossfade at the loop seam. Pitch snap treats the sample at 1×
+During playback, pattern and scene recalls crossfade a short buffer of the old mix
+into the new mix over 100 ms. Fade ms separately controls the crossfade at the loop seam.
+Pitch snap treats the sample at 1×
 as the tonic and snaps Speed ×, including speed modulation, to the selected scale.
 
 Click a filled pattern to recall it. Shift-click a square to store the current mix.
-Open Scene sequencer… beside Banks to show Scenes directly below Patterns. Set BPM and
+Click Scene sequencer beside Banks to show the eight steps below Patterns. Click
+Hide sequencer in the same spot to close it while the sequence keeps playing. Set BPM and
 Beats/bar once, then choose a scene and how many bars to hold it in each step.
 Start plays the first available scene. Next bar advances at the next bar line.
 Repeat starts the list again after the last step. Stop holds the current scene.

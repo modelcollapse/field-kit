@@ -4,6 +4,7 @@ inlets = 1;
 outlets = 4;
 
 var WINDOWS = 4;
+var FIELD_PRESET_COUNT = 4;
 var ALL_WINDOWS = (1 << WINDOWS) - 1;
 var DEFAULT_POSITIONS = [[0, 25], [25, 50], [50, 75], [75, 100]];
 var DEMOS = [
@@ -57,6 +58,9 @@ var waveTheme = null;
 var waveRevisions = [0, 0, 0, 0];
 var pendingWaveEdits = 0;
 var playing = [false, false, false, false];
+var fieldPresets = [null, null, null, null];
+var fieldPresetArmed = false;
+var fieldPresetSelected = 0;
 var boot = new Task(boot_source, host);
 var read = new Task(read_source, host);
 var waitForRead = new Task(read_timeout, host);
@@ -951,8 +955,86 @@ function stop_pad_motion() {
     send("pad_motion_stop", "bang");
 }
 
+function field_presets_snapshot() {
+    return fieldPresets.map(function (preset) { return preset ? preset.slice() : null; });
+}
+
+function valid_field_preset(preset) {
+    return Array.isArray(preset) && preset.length === 2 * WINDOWS &&
+        preset.every(function (value, i) {
+            return typeof value === "number" && isFinite(value) &&
+                value >= (i % 2 === 0 ? -100 : 0) && value <= 100;
+        });
+}
+valid_field_preset.local = 1;
+
+function field_presets_valid(slots) {
+    return slots === undefined || (Array.isArray(slots) && slots.length === FIELD_PRESET_COUNT &&
+        slots.every(function (preset) { return preset === null || valid_field_preset(preset); }));
+}
+
+function field_presets_restore(slots) {
+    if (!field_presets_valid(slots)) return;
+    fieldPresets = slots === undefined ? [null, null, null, null] :
+        slots.map(function (preset) { return preset ? preset.slice() : null; });
+    fieldPresetArmed = false;
+    fieldPresetSelected = 0;
+    render_field_presets("Shift-click to store");
+}
+
+function field_message() {
+    var canvas = host.patcher.getnamed("stereo_field_panel").subpatcher().getnamed("canvas");
+    canvas.message.apply(canvas, arrayfromargs(arguments));
+}
+field_message.local = 1;
+
+function render_field_presets(status) {
+    field_message("field_presets", fieldPresetArmed ? 1 : 0, fieldPresetSelected,
+                  fieldPresets[0] ? 1 : 0, fieldPresets[1] ? 1 : 0, fieldPresets[2] ? 1 : 0,
+                  fieldPresets[3] ? 1 : 0, status);
+}
+render_field_presets.local = 1;
+
+function field_preset_arm() {
+    fieldPresetArmed = !fieldPresetArmed;
+    render_field_presets(fieldPresetArmed ? "Choose a slot to store" : "Shift-click to store");
+}
+
+function field_preset_slot(slot, shift) {
+    if (typeof slot !== "number" || slot % 1 !== 0 || slot < 1 || slot > FIELD_PRESET_COUNT) return;
+    if (fieldPresetArmed || shift === 1) {
+        var values = [];
+        for (var i = 1; i <= WINDOWS; i++) {
+            values.push(control_value("pan_" + i, 0), control_value("level_" + i, 70));
+        }
+        if (!valid_field_preset(values)) {
+            render_field_presets("Positions not ready");
+            return;
+        }
+        fieldPresets[slot - 1] = values;
+        fieldPresetSelected = slot;
+        fieldPresetArmed = false;
+        render_field_presets("Stored " + slot + " · Save Set to keep");
+        return;
+    }
+    var preset = fieldPresets[slot - 1];
+    if (!preset) {
+        render_field_presets("Slot " + slot + " is empty");
+        return;
+    }
+    // An active field gesture would otherwise overwrite the recalled positions.
+    field_message("stop_motion");
+    for (var voice = 1; voice <= WINDOWS; voice++) {
+        send("pan_" + voice, preset[2 * (voice - 1)]);
+        send("level_" + voice, preset[2 * (voice - 1) + 1]);
+    }
+    fieldPresetSelected = slot;
+    render_field_presets("Recalled " + slot);
+}
+
 function stop_all() {
     send("sequence_control", "stop");
+    if (audioOn) send("pattern_control", "transport_stopped");
     stop_pad_motion();
     queuedWindows = 0;
     stop_normal();

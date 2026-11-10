@@ -46,12 +46,12 @@ def append_drifting_strip(panel, parameter):
     label("record_label", "Arm capture", [190, 44, 199, 18])
     label("capture_help", "Capture Off lets the tail play.", [212, 181, 177, 18])
 
-    control("advanced", "live.text", [333, 9, 122, 28], ["int", ""],
+    control("advanced", "live.text", [463, 9, 125, 28], ["int", ""],
             text="Advanced", texton="Hide advanced", mode=1, parameter_mappable=0,
             hint="Show or hide advanced Drifting Memory controls beside this strip.",
             **parameter("Drifting Memory Advanced view", 0, 0, 1, options=["Off", "On"]))
-    control("enabled", "live.text", [463, 9, 125, 28], ["int", ""],
-            text="Enable effect", texton="Effect on", mode=1, parameter_mappable=0,
+    control("enabled", "live.text", [225, 9, 144, 28], ["int", ""],
+            text="Drift · Off", texton="Drift · On", fontface=1, mode=1, parameter_mappable=0,
             hint="Enable the delay in the main mix. Bypassing it retains the memory.",
             **parameter("Mix workspace delay enabled", 0, 0, 1, options=["Off", "On"]))
     control("mode", "umenu", [12, 64, 163, 26], ["int", "", ""],
@@ -68,7 +68,7 @@ def append_drifting_strip(panel, parameter):
         ("drift", "Drift", 264, 45, 100, "Set how much the delay moves."),
     ):
         control(selector, "live.dial", [x, 103, 94, 68], ["float", "float"],
-                appearance=3, showname=1, shownumber=1, parameter_mappable=0, hint=hint,
+                appearance=3, needlemode=1, showname=1, shownumber=1, parameter_mappable=0, hint=hint,
                 **parameter(f"Mix workspace delay {name.lower()}", initial, 0, high,
                             short=name, unit_style=5))
 
