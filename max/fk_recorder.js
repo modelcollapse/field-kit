@@ -41,8 +41,13 @@ renderTime.local = 1;
 
 function render() {
     var recording = state === "recording";
-    send("record_button", "active", dspOn && state === "idle" ? 1 : 0);
-    send("stop_button", "active", state === "starting" || recording ? 1 : 0);
+    var canStop = state === "starting" || recording;
+    var caption = canStop ? "Stop recording" : "Record mix…";
+    send("record_button", "text", caption);
+    send("record_button", "texton", caption);
+    send("record_button", "hint", canStop ? "Finish and save the mix recording." :
+        "Choose where to save a WAV of the final mix.");
+    send("record_button", "active", canStop || (dspOn && state === "idle") ? 1 : 0);
     if (recording && normalStatusColor === null) {
         normalStatusColor = host.patcher.getnamed("record_status").getattr("textcolor");
         send("record_status", "bgcolor", 0.64, 0.10, 0.16, 1);
@@ -170,9 +175,11 @@ function checkProgress() {
 }
 checkProgress.local = 1;
 
-function stop_record() {
+function toggle_record() {
     if (state === "starting" || state === "recording") {
         stopTake("");
+    } else {
+        choose();
     }
 }
 

@@ -26,11 +26,11 @@ START_HERE = """FIELD KIT for Max
 3. Click Play all to hear the original demo. In Source, Input & Files, open Demos… for Glass Circuit (120 BPM) or Tidal Lanterns (75 BPM), or choose Load audio… for your own sample.
 4. Choose Slate, Moss, or Ember from Theme in the header.
 
-In Transport, Speed changes all four loops from half to double speed. Scale
-keeps their relative speeds. Match plays every loop at the displayed speed.
-Choose Tape to change pitch with speed, or Pitch Lock to keep pitch steady
-while changing global speed. Scale holds each loop’s pitch at 1× global speed.
-Match holds the source pitch. Save Set keeps the speed and modes.
+In Transport, Speed changes all four loops from half to double speed.
+Relative speed multiplies each loop’s own speed. Same speed plays every loop
+at the displayed speed. Choose Tape to change pitch with speed, or Pitch Lock
+to keep pitch steady. Relative speed holds each loop’s pitch at 1× global speed.
+Same speed holds the source pitch. Save Set keeps the speed and modes.
 Open Visuals and set the Tuner source to Live input L, Live input R, or Selected loop.
 Enable audio and play one note at a time. The display shows the nearest note,
 frequency and cents relative to A4 = 440 Hz.
@@ -95,7 +95,8 @@ keeps playing either way. The Main FX shortcut opens the same drawer.
 Hold freezes the current memory. Cut Tail clears it and sets capture to Off while
 the dry mix keeps playing. Release Hold and arm a bank to capture again.
 Mix recording includes Drifting Memory. Click Record mix… beside Main FX to save
-the final stereo output to a WAV, and Stop mix when you finish.
+the final stereo output to a WAV. Click the same button when it reads Stop
+recording to finish and save the take.
 The L and R master meters show each output channel. A red CLIP light identifies
 the channel that hit the output ceiling. Lower Master if either light comes on.
 

@@ -22,11 +22,11 @@ def layout_performance_top(p, parameter):
     p.add("global_speed", "live.numbox", speed, view=speed, outs=2, types=["float", "float"],
           hint="Change the speed of all four loops together. Double-click to type a value.",
           **parameter("Global speed multiplier", 1, 0.5, 2, unit_style=9, units="%.2f"))
-    mode = [200, 58, 51, 20]
+    mode = [200, 58, 100, 20]
     p.add("speed_mode", "live.menu", mode, view=mode, outs=3, types=["int", "", "float"],
-          hint="Scale preserves each loop's speed ratio. Match plays every loop at the same speed.",
-          **parameter("Global speed mode", 0, 0, 1, options=["Scale", "Match"]))
-    pitch_mode = [255, 58, 120, 20]
+          hint="Relative speed multiplies each loop’s own speed. Same speed plays all four at the displayed Speed.",
+          **parameter("Global speed mode", 0, 0, 1, options=["Relative speed", "Same speed"]))
+    pitch_mode = [304, 58, 71, 20]
     p.add("pitch_lock", "live.menu", pitch_mode, view=pitch_mode, outs=3, types=["int", "", "float"],
           hint="Tape changes pitch with Speed. Pitch Lock keeps pitch steady as you change Speed.",
           **parameter("Global pitch mode", 0, 0, 1, options=["Tape", "Pitch Lock"]))

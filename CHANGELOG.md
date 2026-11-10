@@ -1,5 +1,10 @@
 # Field Kit changelog
 
+## v0.8.13
+
+- Record mix changes to Stop recording during a take.
+- Global speed modes are now labeled Relative speed and Same speed.
+
 ## v0.8.12
 
 - Echo and Room sends live in the four mixer strips. Main FX holds the routing mode and the Mix or Return levels. The FX routing panel now shows status, and the loop editor gives the Fade preview more room.

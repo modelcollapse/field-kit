@@ -34144,10 +34144,10 @@
           "patching_rect": [
             200,
             58,
-            51,
+            100,
             20
           ],
-          "hint": "Scale preserves each loop's speed ratio. Match plays every loop at the same speed.",
+          "hint": "Relative speed multiplies each loop’s own speed. Same speed plays all four at the displayed Speed.",
           "parameter_enable": 1,
           "saved_attribute_attributes": {
             "valueof": {
@@ -34162,8 +34162,8 @@
               "parameter_initial_enable": 1,
               "parameter_unitstyle": 0,
               "parameter_enum": [
-                "Scale",
-                "Match"
+                "Relative speed",
+                "Same speed"
               ]
             }
           },
@@ -34176,7 +34176,7 @@
           "presentation_rect": [
             200,
             58,
-            51,
+            100,
             20
           ]
         }
@@ -34189,9 +34189,9 @@
           "numinlets": 1,
           "numoutlets": 3,
           "patching_rect": [
-            255,
+            304,
             58,
-            120,
+            71,
             20
           ],
           "hint": "Tape changes pitch with Speed. Pitch Lock keeps pitch steady as you change Speed.",
@@ -34221,9 +34221,9 @@
           ],
           "presentation": 1,
           "presentation_rect": [
-            255,
+            304,
             58,
-            120,
+            71,
             20
           ]
         }

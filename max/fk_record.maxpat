@@ -178,7 +178,7 @@
           "texton": "Record mix…",
           "hint": "Choose where to save a WAV of the final mix.",
           "outlettype": [
-            "",
+            "bang",
             ""
           ],
           "presentation": 1,
@@ -203,7 +203,7 @@
           ],
           "numinlets": 2,
           "numoutlets": 1,
-          "text": "choose",
+          "text": "toggle_record",
           "outlettype": [
             ""
           ]
@@ -212,57 +212,6 @@
       {
         "box": {
           "id": "obj-9",
-          "varname": "stop_button",
-          "maxclass": "live.text",
-          "patching_rect": [
-            153,
-            21,
-            91,
-            21
-          ],
-          "numinlets": 1,
-          "numoutlets": 2,
-          "mode": 0,
-          "active": 0,
-          "parameter_enable": 0,
-          "text": "Stop mix",
-          "texton": "Stop mix",
-          "hint": "Finish and save the mix recording.",
-          "outlettype": [
-            "",
-            ""
-          ],
-          "presentation": 1,
-          "presentation_rect": [
-            153,
-            21,
-            91,
-            21
-          ]
-        }
-      },
-      {
-        "box": {
-          "id": "obj-10",
-          "varname": "stop_button_message",
-          "maxclass": "message",
-          "patching_rect": [
-            153,
-            150,
-            90,
-            22
-          ],
-          "numinlets": 2,
-          "numoutlets": 1,
-          "text": "stop_record",
-          "outlettype": [
-            ""
-          ]
-        }
-      },
-      {
-        "box": {
-          "id": "obj-11",
           "varname": "save_dialog",
           "maxclass": "newobj",
           "patching_rect": [
@@ -283,7 +232,7 @@
       },
       {
         "box": {
-          "id": "obj-12",
+          "id": "obj-10",
           "varname": "chosen_path",
           "maxclass": "newobj",
           "patching_rect": [
@@ -302,7 +251,7 @@
       },
       {
         "box": {
-          "id": "obj-13",
+          "id": "obj-11",
           "varname": "cancel_dialog",
           "maxclass": "message",
           "patching_rect": [
@@ -321,7 +270,7 @@
       },
       {
         "box": {
-          "id": "obj-14",
+          "id": "obj-12",
           "varname": "writer",
           "maxclass": "newobj",
           "patching_rect": [
@@ -340,7 +289,7 @@
       },
       {
         "box": {
-          "id": "obj-15",
+          "id": "obj-13",
           "varname": "audio_left",
           "maxclass": "inlet",
           "patching_rect": [
@@ -360,7 +309,7 @@
       },
       {
         "box": {
-          "id": "obj-16",
+          "id": "obj-14",
           "varname": "audio_right",
           "maxclass": "inlet",
           "patching_rect": [
@@ -380,7 +329,7 @@
       },
       {
         "box": {
-          "id": "obj-17",
+          "id": "obj-15",
           "varname": "elapsed_sample",
           "maxclass": "newobj",
           "patching_rect": [
@@ -399,7 +348,7 @@
       },
       {
         "box": {
-          "id": "obj-18",
+          "id": "obj-16",
           "varname": "elapsed_message",
           "maxclass": "newobj",
           "patching_rect": [
@@ -418,7 +367,7 @@
       },
       {
         "box": {
-          "id": "obj-19",
+          "id": "obj-17",
           "varname": "rec_dsp",
           "maxclass": "newobj",
           "patching_rect": [
@@ -440,7 +389,7 @@
       },
       {
         "box": {
-          "id": "obj-20",
+          "id": "obj-18",
           "varname": "enabled_message",
           "maxclass": "newobj",
           "patching_rect": [
@@ -459,7 +408,7 @@
       },
       {
         "box": {
-          "id": "obj-21",
+          "id": "obj-19",
           "varname": "rec_load",
           "maxclass": "newobj",
           "patching_rect": [
@@ -478,7 +427,7 @@
       },
       {
         "box": {
-          "id": "obj-22",
+          "id": "obj-20",
           "varname": "rec_defer",
           "maxclass": "newobj",
           "patching_rect": [
@@ -497,7 +446,7 @@
       },
       {
         "box": {
-          "id": "obj-23",
+          "id": "obj-21",
           "varname": "rec_unload",
           "maxclass": "newobj",
           "patching_rect": [
@@ -516,7 +465,7 @@
       },
       {
         "box": {
-          "id": "obj-24",
+          "id": "obj-22",
           "varname": "close_writer",
           "maxclass": "message",
           "patching_rect": [
@@ -574,6 +523,18 @@
       {
         "patchline": {
           "source": [
+            "obj-9",
+            2
+          ],
+          "destination": [
+            "obj-11",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "obj-10",
             0
           ],
@@ -590,30 +551,6 @@
             0
           ],
           "destination": [
-            "obj-12",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-11",
-            2
-          ],
-          "destination": [
-            "obj-13",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-12",
-            0
-          ],
-          "destination": [
             "obj-6",
             0
           ]
@@ -626,7 +563,31 @@
             0
           ],
           "destination": [
-            "obj-6",
+            "obj-12",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-14",
+            0
+          ],
+          "destination": [
+            "obj-12",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-12",
+            0
+          ],
+          "destination": [
+            "obj-15",
             0
           ]
         }
@@ -638,7 +599,7 @@
             0
           ],
           "destination": [
-            "obj-14",
+            "obj-16",
             0
           ]
         }
@@ -650,19 +611,7 @@
             0
           ],
           "destination": [
-            "obj-14",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-14",
-            0
-          ],
-          "destination": [
-            "obj-17",
+            "obj-6",
             0
           ]
         }
@@ -710,7 +659,7 @@
             0
           ],
           "destination": [
-            "obj-6",
+            "obj-17",
             0
           ]
         }
@@ -734,31 +683,7 @@
             0
           ],
           "destination": [
-            "obj-19",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-23",
-            0
-          ],
-          "destination": [
-            "obj-24",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-24",
-            0
-          ],
-          "destination": [
-            "obj-14",
+            "obj-12",
             0
           ]
         }

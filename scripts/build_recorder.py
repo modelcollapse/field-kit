@@ -32,14 +32,6 @@ def build(output_dir=ROOT):
     def connect(source, target, outlet=0, inlet=0):
         lines.append({"patchline": {"source": [source, outlet], "destination": [target, inlet]}})
 
-    def action(name, label_text, x, width, selector, router, hint):
-        button = box(name, "live.text", [x, 21, width, 21], outputs=("", ""),
-                     visible=True, mode=0, active=0, parameter_enable=0,
-                     text=label_text, texton=label_text, hint=hint)
-        message = box(name + "_message", "message", [x, 150, 90, 22], 2, ("",), text=selector)
-        connect(button, message)
-        connect(message, router)
-
     label("capture_title", "Mix recording", [10, 0, 131, 20], fontsize=15, fontface=1)
     label("record_format", "Stereo WAV · 24-bit", [153, 2, 131, 17], fontsize=11)
     label("record_time", "00:00.0", [287, 0, 84, 20], fontsize=16, fontface=1, textjustification=2)
@@ -47,8 +39,12 @@ def build(output_dir=ROOT):
     label("record_file", "", [10, 61, 361, 16], fontsize=11)
 
     router = obj("rec_controller", "js fk_recorder.js", 240, 216, 120, outputs=())
-    action("record_button", "Record mix…", 10, 135, "choose", router, "Choose where to save a WAV of the final mix.")
-    action("stop_button", "Stop mix", 153, 91, "stop_record", router, "Finish and save the mix recording.")
+    button = box("record_button", "live.text", [10, 21, 135, 21], outputs=("bang", ""),
+                 visible=True, mode=0, active=0, parameter_enable=0,
+                 text="Record mix…", texton="Record mix…", hint="Choose where to save a WAV of the final mix.")
+    toggle = box("record_button_message", "message", [10, 150, 90, 22], 2, ("",), text="toggle_record")
+    connect(button, toggle)
+    connect(toggle, router)
 
     dialog = obj("save_dialog", "savedialog WAVE", 400, 150, 110, outputs=("", "", "bang"))
     chosen = obj("chosen_path", "prepend start_path", 400, 182, 110, 2)

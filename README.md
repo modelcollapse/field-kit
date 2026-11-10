@@ -7,11 +7,11 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-The v0.8.12 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.13 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.12](CHANGELOG.md).
+[See what's new in v0.8.13](CHANGELOG.md).
 
-![Field Kit standalone playing four loops with the docked loop editor, expanded Fade preview, and independent Echo and Room sends](docs/screenshots/field-kit-standalone.jpg)
+![Field Kit v0.8.13 playing four loops with Relative speed selected and the Record mix button ready](docs/screenshots/field-kit-standalone.jpg)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Choose **Load audio…** to play your own sample. The same drawer holds audio setup, source recording, and Set files.
 
@@ -37,9 +37,9 @@ In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to 
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 
-Use **Speed** in Transport to slow down or speed up all four loops from **0.50×** to **2.00×**. **Scale** multiplies their individual speeds after pitch snap, preserving their ratios. **Match** temporarily plays all four at the displayed speed. Switching back to Scale restores each loop’s individual speed setting.
+Use **Speed** in Transport to slow down or speed up all four loops from **0.50×** to **2.00×**. **Relative speed** multiplies each loop’s speed after pitch snap. If two loops are set to 1× and 2×, setting global Speed to 0.50× plays them at 0.50× and 1×. **Same speed** would play both at 0.50×. Switching back to Relative speed uses each loop’s individual speed setting again.
 
-**Tape** changes pitch with speed. Choose **Pitch Lock** to keep pitch steady while you turn the global Speed control. In Scale, this preserves each loop’s pitch at 1× global speed, including any local speed or Pitch Snap settings. In Match, it preserves the source pitch. **Save Set** stores the global speed and both modes. Pattern changes leave them in place.
+**Tape** changes pitch with speed. Choose **Pitch Lock** to keep pitch steady while you turn the global Speed control. In Relative speed, this preserves each loop’s pitch at 1× global speed, including any local speed or Pitch Snap settings. In Same speed, it preserves the source pitch. **Save Set** stores the global speed and both modes. Pattern changes leave them in place.
 
 Open **Visuals** and set the **Tuner** source to **Live input L**, **Live input R**, or **Selected loop**. With audio enabled, play one note at a time. The tuner shows the nearest note, frequency, and cents relative to **A4 = 440 Hz**.
 
@@ -49,7 +49,7 @@ Open **Visuals** and set the **Tuner** source to **Live input L**, **Live input 
 
 Each waveform has a mixer strip with playback, level, pan, mute, solo, a peak meter, and **Echo** and **Room** sends. Click or drag the blue fader under a window’s playback button to set its volume, or edit the percentage box for a precise level. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. Mixer performance controls leave the edit selection in place. **Record mix** captures the resulting master mix.
 
-The **L** and **R** meters in the **Master** strip show each output channel. A red **Clip** light shows which channel hit the output ceiling. Lower **Master** if either light comes on. The **Mix recording** panel below has the record and stop controls, timer, status, and take name.
+The **L** and **R** meters in the **Master** strip show each output channel. A red **Clip** light shows which channel hit the output ceiling. Lower **Master** if either light comes on. The **Mix recording** panel below has the recording button, timer, status, and take name.
 
 Open **Stereo field…** beside **FX pad…** in the **Main FX** header. Drag a window edge to resize the Stereo Field. The tabs select which loop's pan and level are shown above the pad. Drag its dot left or right to pan it, and up or down to change its level. If dots overlap, use the tabs to pick one.
 
@@ -117,7 +117,9 @@ Use **Hold** to freeze what’s in memory. **Cut Tail** clears the captured audi
 
 ![Drifting Memory with live Memory and Wet return meters, Hold and Cut Tail, and the Advanced Time page](docs/screenshots/field-kit-drifting-memory.png)
 
-With audio enabled, click **Record mix…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. The recorder writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click **Stop mix** when the take is finished.
+With audio enabled, click **Record mix…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. The recorder writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click the same button, now labeled **Stop recording**, to finish and save the take.
+
+![Field Kit recording a stereo WAV with Stop recording visible and Same speed selected at 0.75×](docs/screenshots/field-kit-recording.jpg)
 
 ## Build and test
 

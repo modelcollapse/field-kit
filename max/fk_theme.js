@@ -43,7 +43,6 @@ var wideLayoutRects = {
         record_time: [219, 0, 85, 20],
         record_format: [0, 24, 304, 17],
         record_button: [0, 46, 149, 22],
-        stop_button: [157, 46, 147, 22],
         record_status: [0, 71, 304, 18],
         record_file: [0, 91, 304, 17]
     },
