@@ -13,7 +13,7 @@ LAUNCHER = "Open FIELD KIT.maxpat"
 SUPPORT = "Support"
 SUPPORT_PATH = "Patcher:/Support/"
 EMBEDDED_PATCHERS = {"fk_fx.maxpat", "fk_modulation.maxpat", "fk_record.maxpat"}
-SUPPORT_JSUI = {"fk_lfo_preview.js", "fk_loop_fade.js", "fk_stereo_field.js", "fk_fx_pad.js"}
+SUPPORT_JSUI = {"fk_lfo_preview.js", "fk_loop_fade.js", "fk_stereo_field.js", "fk_fx_pad.js", "fk_tuner.js"}
 EMBEDDED_SCRIPTS = {
     "js fk_mod_routes.js": f"js {SUPPORT_PATH}fk_mod_routes.js",
     "js fk_recorder.js": f"js {SUPPORT_PATH}fk_recorder.js",
@@ -25,6 +25,15 @@ START_HERE = """FIELD KIT for Max
 2. Double-click Open FIELD KIT.maxpat. This download requires Max 9.
 3. Click Play all to hear the original demo. In Source, Input & Files, open Demos… for Glass Circuit (120 BPM) or Tidal Lanterns (75 BPM), or choose Load audio… for your own sample.
 4. Choose Slate, Moss, or Ember from Theme in the header.
+
+In Transport, Speed changes all four loops from half to double speed. Scale
+keeps their relative speeds. Match plays every loop at the displayed speed.
+Choose Tape to change pitch with speed, or Pitch Lock to keep pitch steady
+while changing global speed. Scale holds each loop’s pitch at 1× global speed.
+Match holds the source pitch. Save Set keeps the speed and modes.
+Open Visuals and set the Tuner source to Live input L, Live input R, or Selected loop.
+Enable audio and play one note at a time. The display shows the nearest note,
+frequency and cents relative to A4 = 440 Hz.
 
 Open Source, Input & Files. Select your interface in Audio Setup and enable audio. In Input, choose the
 left and right channels. For mono, select the same channel twice.
@@ -48,22 +57,34 @@ Drag left or right to pan, and up or down to set level.
 Select a loop tab to see its pan and level above the pad.
 Shift-click a Field preset slot or click Store preset and choose a slot to save all
 four pan and level pairs. Click a filled slot to recall. Save Set keeps these presets.
-Click Record, drag and release the dot, then click Play to loop the gesture.
-Each loop keeps its own gesture. Use Stop or Clear for the selected loop.
+Click Record and drag the dot. You can release and drag again during the same
+take. Click Finish to save and start looping. At 30 seconds the take finishes
+and loops automatically. Each loop keeps its own gesture. Use Play / Stop to
+control playback or Clear to erase the selected loop’s gesture.
+Click Play paths to start every recorded Stereo Field gesture. Paths already
+running keep their place. Click Stop paths to stop the gestures while the audio
+loops keep playing.
+Click Show all paths to see the recorded paths together in each loop’s color.
+Click Show selected path to focus on the selected loop again.
 
 Field Kit starts dry. Main FX and Drifting Memory dials dim while the effects are
 off and remain editable. In Main FX, choose Full mix for shared processing with
 Mix % dials. Choose Loop sends and adjust Echo and Room on each mixer strip to
 send those loops to the effects. The main dials then read Return % and set how
-much comes back into the mix. The selected loop editor mirrors the mixer strip.
-Open FX pad and choose Tone tilt, Echo mix, or Room mix for each axis.
+much comes back into the mix. FX routing shows the current mode and whether Main FX is on.
+Distortion adds soft clipping to the stereo mix and is off at 0%.
+Open FX pad and choose Tone tilt, Echo mix, Room mix, or Distortion for each axis.
 X starts on Echo mix and Y starts on Room mix. Drag right or up to increase the value.
 Tone tilt goes from dark through neutral to bright. Click Main FX · Off in the pad or the Main FX header to turn it on.
-Click ● Record, drag and release, then click Play to loop the recorded effect pair.
+Click ● Record, drag across the pad as often as you like, then click Finish
+to save and start looping. At 30 seconds the take finishes and loops automatically.
+Play / Stop controls playback of the recorded effect pair.
 The status below the buttons shows the capture time and the saved effect pair.
-Stop holds the current values. Clear erases the gesture. Both pads keep gestures
-while the patch is open. Stop all and recalling a pattern stop the gestures.
-Sets and patterns save the control values, but do not store the gestures.
+In Loop sends, the pad labels these axes Echo return and Room return.
+Stop holds the current values. Clear erases the gesture. Stop all and recalling
+a pattern stop gesture playback. Save Set keeps the recorded FX Pad gesture
+and the Stereo Field gesture for each loop. After opening the Set, click Play
+on a pad to replay its saved gesture.
 
 In Mix, click Drift · Off to enable Drifting Memory, play your loops and choose All under Arm capture.
 The default Two Delays / Small mode returns after about 2½ seconds. Memory shows
@@ -100,7 +121,7 @@ Repeat starts the list again after the last step. Stop holds the current scene.
 Stop all stops the sequencer and the loops. The tempo counts scene bars.
 The scene strip between Transport and Master shows the current scene, next playable
 scene, and bar count. Use Start, Stop, or Next bar while you stay in Mix.
-Switch between Mix, Scenes, Modulation, and Visuals in the lower workspace, or choose
+Switch between Mix, Modulation, and Visuals in the lower workspace, or choose
 Hide to collapse it. Visuals shows left and right frequency histories and a
 stereo scope of the final mix. Click Stereo X/Y… above the scope for a larger
 window. Switch Display to Spectrum for live frequency curves. Use Full screen to fit the workspace to the
@@ -123,6 +144,8 @@ def qualify_support_scripts(patcher):
             box["text"] = EMBEDDED_SCRIPTS[box["text"]]
         if box.get("filename") in SUPPORT_JSUI:
             box["filename"] = SUPPORT_PATH + box["filename"]
+        if box.get("text") == "pfft~ fk_pitch_fft 2048 8":
+            box["text"] = f"pfft~ {SUPPORT_PATH}fk_pitch_fft.maxpat 2048 8"
         if "patcher" in box:
             qualify_support_scripts(box["patcher"])
 

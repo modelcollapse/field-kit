@@ -39,7 +39,7 @@ def layout_performance(p, parameter):
     p.obj("source_drawer_command", "prepend source_drawer", 3240, 1856, ins=2)
     p.connect("source_drawer_toggle", 0, "source_drawer_command")
     p.connect("source_drawer_command", 0, "theme_control")
-    layout_performance_top(p)
+    layout_performance_top(p, parameter)
 
     # This hidden panel supplies the insertion point and expansion height.
     backdrop("source_drawer_anchor", [8, 120, 1068, 108], hidden=1)
@@ -131,5 +131,5 @@ def layout_performance(p, parameter):
         move_to_y(name, 641)
     place("surface_modulation", [8, 670, 1068, 224])
     backdrop("surface_visuals", [8, 670, 1068, 224], hidden=1)
-    for name in ("patchbay", "visuals_panel", "performance_mix", "performance_sends", "drifting_memory"):
+    for name in ("patchbay", "visuals_panel", "performance_mix", "performance_sends", "drifting_memory", "tuner_panel"):
         move_to_y(name, 676)

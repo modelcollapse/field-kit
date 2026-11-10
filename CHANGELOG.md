@@ -1,5 +1,51 @@
 # Field Kit changelog
 
+## v0.8.12
+
+- Echo and Room sends live in the four mixer strips. Main FX holds the routing mode and the Mix or Return levels. The FX routing panel now shows status, and the loop editor gives the Fade preview more room.
+- Stereo Field labels its group gesture control Play paths / Stop paths.
+
+## v0.8.11
+
+- Stereo Field adds a Play all / Stop all button for recorded paths.
+
+## v0.8.10
+
+- Stereo Field adds Show all paths to display the recorded paths together, color-coded by loop.
+
+## v0.8.9
+
+- Stereo Field and FX Pad start looping a gesture as soon as you click Finish. The Play button becomes Stop while playback is running.
+
+## v0.8.8
+
+- The tuner now lives in Visuals alongside the spectrum and stereo scope. In wide full screen, the analyzers stay in the right column.
+
+## v0.8.7
+
+- The tuner is a docked workspace instead of a separate window.
+- The scene sequencer opens from Patterns. The lower workspace selector no longer duplicates it.
+
+## v0.8.6
+
+- Transport adds Pitch Lock beside Tape. It keeps pitch steady while changing global speed in Scale or Match. Sets remember the pitch mode.
+- The selected-loop tuner follows the pitch you hear in either mode.
+
+## v0.8.5
+
+- Transport adds global playback speed with Scale and Match modes. Sets save the setting and pattern changes preserve it.
+- The tuner listens to either live input channel or the selected loop, with note, frequency and cents at A4 = 440 Hz.
+
+## v0.8.4
+
+- Stereo Field and FX Pad keep recording between drags. Stop saves the take. Both pads cap recording at 30 seconds.
+- Main FX adds stereo distortion with a Drive control that can also be assigned to either FX Pad axis.
+
+## v0.8.3
+
+- The FX Pad uses Echo and Room return labels in Loop sends mode, including in its recorded gesture status.
+- Sets save the FX Pad gesture and each loop's Stereo Field gesture. Reopening a Set restores the gestures ready to play.
+
 ## v0.8.2
 
 - Pattern clicks and scene changes crossfade from a short buffer of the outgoing stereo mix into the new pattern. The loop editor's Fade ms still controls the loop seam.

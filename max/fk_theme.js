@@ -8,6 +8,7 @@ var fullScreen = false;
 var wideLayout = false;
 var activeWorkspace = 0;
 var workspaceBeforeScenes = 0;
+var workspaceTabs = [0, 2, 3, 4];
 var driftAdvanced = false;
 var sourceDrawerOpen = false;
 var sourceDrawerHeight = 0;
@@ -23,7 +24,7 @@ var interfacePalette = null;
 var mainFxEnabled = false;
 var mainFxUsesSends = false;
 var driftEnabled = false;
-var mainFxDialKeys = ["tone", "echo", "time_ms", "repeats", "space", "decay"];
+var mainFxDialKeys = ["tone", "distortion", "echo", "time_ms", "repeats", "space", "decay"];
 var sideColumnX = 1084;
 var sideColumnWidth = 320;
 var wideFrameWidth = sideColumnX + sideColumnWidth + 8;
@@ -34,7 +35,8 @@ var wideLayoutRects = {
         surface_capture: [sideColumnX, 176, sideColumnWidth, 128],
         recorder: [sideColumnX + 8, 184, sideColumnWidth - 16, 112],
         surface_visuals: [sideColumnX, 312, sideColumnWidth, 582],
-        visuals_panel: [sideColumnX + 8, 320, sideColumnWidth - 16, 566]
+        visuals_panel: [sideColumnX + 8, 320, sideColumnWidth - 16, 566],
+        tuner_panel: [16, 676, 328, 212]
     },
     recorder: {
         capture_title: [0, 0, 190, 20],
@@ -60,7 +62,7 @@ var schemes = [
             source: "203244", source_files: "293448", input: "26384A", input_capture: "33384A",
             patterns: "2C2C42", mixer: "223141", playback: "192635",
             editor_playback: "293A4D", editor_fx: "34364C", editor_mix: "29384B",
-            editor_sends: "294152", editor_fade: "2A3345",
+            editor_fade: "2A3345",
             effects: "253145", capture: "34384B", master_output: "253A49", workspace: "222B3A",
             modulation: "253247", scenes: "28364B", visuals: "1C293A", mix: "243347",
             mix_scene_strip: "2C3A50",
@@ -75,7 +77,7 @@ var schemes = [
             source: "24372C", source_files: "333C31", input: "2C3D32", input_capture: "373D31",
             patterns: "343A2B", mixer: "24382E", playback: "192923",
             editor_playback: "304135", editor_fx: "3A4031", editor_mix: "2C3C32",
-            editor_sends: "274438", editor_fade: "30392D",
+            editor_fade: "30392D",
             effects: "24352B", capture: "353E33", master_output: "284137", workspace: "1F2E27",
             modulation: "26372E", scenes: "2D3B2F", visuals: "1B2C26", mix: "24372C",
             mix_scene_strip: "314538",
@@ -90,7 +92,7 @@ var schemes = [
             source: "392922", source_files: "3E3033", input: "44322A", input_capture: "4A3334",
             patterns: "422C2E", mixer: "382A24", playback: "2A201D",
             editor_playback: "49352C", editor_fx: "4B3036", editor_mix: "3E3029",
-            editor_sends: "4A3C2D", editor_fade: "382824",
+            editor_fade: "382824",
             effects: "392923", capture: "43322F", master_output: "493C2F", workspace: "2E2321",
             modulation: "3B2A26", scenes: "402E26", visuals: "2B211F", mix: "372921",
             mix_scene_strip: "48352C",
@@ -107,12 +109,16 @@ function loadbang() {
     workspace(0);
 }
 
+function workspace_tab(index) {
+    if (workspaceTabs[index] !== undefined) workspace(workspaceTabs[index]);
+}
+
 function workspace(view) {
     if (view < 0 || view > 4 || view !== Math.floor(view)) return;
     var sceneLayoutChanged = (activeWorkspace === 1) !== (view === 1);
     if (sceneLayoutChanged && view === 1) workspaceBeforeScenes = activeWorkspace;
     activeWorkspace = view;
-    patch.getnamed("workspace_view").message("set", view);
+    patch.getnamed("workspace_view").message("set", workspaceTabs.indexOf(view === 1 ? workspaceBeforeScenes : view));
     var sceneButton = patch.getnamed("sequence_open");
     var sceneLabel = view === 1 ? "Hide sequencer ▴" : "Scene sequencer ▾";
     sceneButton.message("text", sceneLabel);
@@ -134,10 +140,10 @@ function update_workspace_panels() {
     patch.getnamed("sequence_panel").hidden = activeWorkspace !== 1;
     patch.getnamed("surface_scenes").hidden = activeWorkspace !== 1;
     patch.getnamed("patchbay").hidden = activeWorkspace !== 2;
+    patch.getnamed("tuner_panel").hidden = activeWorkspace !== 3;
     patch.getnamed("visuals_panel").hidden = !wideLayout && activeWorkspace !== 3;
     patch.getnamed("surface_visuals").hidden = !wideLayout;
-    patch.getnamed("surface_modulation").hidden = activeWorkspace === 1 || activeWorkspace === 4 ||
-        (wideLayout && activeWorkspace === 3);
+    patch.getnamed("surface_modulation").hidden = activeWorkspace === 1 || activeWorkspace === 4;
 }
 update_workspace_panels.local = 1;
 
@@ -273,7 +279,7 @@ function remember_layout() {
         top: scenes[1], bottom: tabs[1] + tabs[3], shift: scenes[3] + 8
     });
     ["mix_fx", "recorder", "performance_mix", "performance_sends", "drifting_memory",
-        "patchbay", "sequence_panel", "visuals_panel"].forEach(function (name) {
+        "patchbay", "sequence_panel", "visuals_panel", "tuner_panel"].forEach(function (name) {
         remember_rects(patch.getnamed(name).subpatcher(), name);
     });
 }
@@ -425,6 +431,9 @@ function msg_int(index) {
     send_theme(patch.getnamed("pattern_control"), control.concat(selection, accent, ink, canvas));
     send_theme(patch.getnamed("mixer_control"), control.concat(ink));
     paint_patch(patch.getnamed("sequence_panel").subpatcher(), sections.scenes, palette);
+    var tuner = patch.getnamed("tuner_panel").subpatcher();
+    paint_patch(tuner, panel, palette);
+    send_theme(tuner.getnamed("tuner_canvas"), inset.concat(ink, palette[5], accent, control));
     paint_patch(patch.getnamed("visuals_panel").subpatcher(), sections.visuals, palette);
     paint_patch(patch.getnamed("scope_popout_panel").subpatcher(), sections.visuals, palette);
     var performanceMix = patch.getnamed("performance_mix");
@@ -477,9 +486,7 @@ function paint_main_fx() {
     mainFxDialKeys.forEach(function (key) {
         paint_controls(effects, ["fx_" + key, "fx_label_" + key], !mainFxEnabled);
     });
-    var overview = patch.getnamed("performance_sends").subpatcher();
-    paint_controls(overview, ["performance_fx_echo", "performance_fx_space"], !mainFxEnabled);
-    var sends = ["inspect_echo_send", "inspect_room_send", "mixer_echo_sends_label", "mixer_room_sends_label"];
+    var sends = ["mixer_echo_sends_label", "mixer_room_sends_label"];
     for (var voice = 1; voice <= 4; voice++) sends.push("echo_send_" + voice, "room_send_" + voice);
     paint_controls(patch, sends, !mainFxEnabled || !mainFxUsesSends);
 }

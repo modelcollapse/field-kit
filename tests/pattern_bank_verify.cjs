@@ -147,13 +147,27 @@ for (let voice = 1; voice <= 4; voice++) {
     }
 }
 for (const [name, value] of Object.entries({
-    fx_enabled: 1, fx_mode: 1, fx_tone: -8, fx_echo: 60, fx_time_ms: 500, fx_repeats: 77, fx_space: 12, fx_decay: 3.2,
-    pitch_scale: 5, master: -5,
+    fx_enabled: 1, fx_mode: 1, fx_tone: -8, fx_distortion: 34, fx_echo: 60, fx_time_ms: 500, fx_repeats: 77, fx_space: 12, fx_decay: 3.2,
+    pitch_scale: 5, master: -5, global_speed: 1, speed_mode: 0, pitch_lock: 0,
 })) addControl(name, value);
 for (let i = 1; i <= 8; i++) addControl('pattern_' + i, 0);
 for (const name of ['pattern_store', 'pattern_status', 'set_status', 'pattern_save_dialog', 'pattern_load_dialog',
                     'set_save_dialog', 'set_open_dialog', 'set_relink_dialog', 'set_writer',
                     'pattern_transition_command', 'pattern_transition_sample', 'stereo_field_canvas']) addControl(name, 0);
+const fxGesture = { axes: [0, 3], duration: 100, samples: [{ time: 0, x: -100, y: 0 }, { time: 100, x: 100, y: 100 }] };
+const fieldGesture = { duration: 300, samples: [{ time: 0, pan: -90, level: 12 }, { time: 150, pan: 90, level: 90 }] };
+function gesturePad(initial, empty) {
+    let gesture = initial;
+    return {
+        gesture_snapshot: () => structuredClone(gesture),
+        gesture_restore: saved => { gesture = structuredClone(saved ?? empty); },
+    };
+}
+const fxPad = gesturePad(fxGesture, null);
+const fieldPad = gesturePad([fieldGesture, null, null, fieldGesture], [null, null, null, null]);
+controls.stereo_field_canvas.js = fieldPad;
+controls.fx_pad_panel = { subpatcher: () => ({ getnamed: () => ({ js: fxPad }) }) };
+
 const named = name => {
     if (name === 'source_control') return source;
     if (name === 'sequence_control') return sequencer;
@@ -523,6 +537,9 @@ assert(messages.some(message => message[0] === 'stereo_field_canvas' && message[
 field.field_preset_slot(4, 0);
 assert.equal(controls.pan_1.value, 37);
 sequenceState.running = true;
+controls.global_speed.value = 0.75;
+controls.speed_mode.value = 1;
+controls.pitch_lock.value = 1;
 host.write_set('/test/sets/First.json');
 assert.equal(sequenceState.running, true);
 const [, , stage, destination] = messages.at(-1);
@@ -534,10 +551,14 @@ assert.equal(set.source.relative, 'Écho.wav');
 assert.equal(set.slots[0].windows[0].pan, -62);
 assert.equal(set.current.windows[0].pan, 37);
 assert.deepEqual(set.sequence, programmedSequence);
+assert.deepEqual(set.globalSpeed, [0.75, 1]);
+assert.equal(set.pitchLock, 1);
 assert.deepEqual(set.fieldPresets, [
     [-62, ...set.current.windows.flatMap(w => [w.pan, w.level]).slice(1)],
     null, null, set.current.windows.flatMap(w => [w.pan, w.level]),
 ]);
+assert.equal(set.current.effects.fx_distortion, 34);
+assert.deepEqual(set.gestures, { fx: fxGesture, field: [fieldGesture, null, null, fieldGesture] });
 assert.equal(set.current.gains[roomSendRoute], -22);
 assert.equal(set.current.globalGains[lastDriftRoute], -75);
 assert.equal(set.current.selection.globalTarget, 21);
@@ -582,6 +603,19 @@ for (const invalid of [null, [null], [[0, 900, 0, 40, 0, 40, 0, 40], null, null,
     assert.equal(requestedSource, previousSource);
     assert.match(controls.set_status.value, /Couldn’t open/);
 }
+controls.fx_distortion.value = 0;
+fxPad.gesture_restore(null);
+fieldPad.gesture_restore(null);
+for (const invalid of [
+    null,
+    { ...set.gestures, fx: { ...fxGesture, axes: [0, 0] } },
+    { ...set.gestures, fx: { ...fxGesture, samples: [{ time: 0, x: 0, y: -1 }] } },
+    { ...set.gestures, field: [{ ...fieldGesture, duration: 149 }, null, null, null] },
+]) {
+    files.set('/relocated/Invalid.json', JSON.stringify({ ...set, gestures: invalid }));
+    host.read_set('/relocated/Invalid.json');
+    assert.match(controls.set_status.value, /Couldn’t open/);
+}
 host.read_set('/relocated/First.json');
 assert.equal(requestedSource, '/relocated/Écho.wav');
 assert.deepEqual(sequenceState.validations.at(-1), programmedSequence);
@@ -589,7 +623,15 @@ assert.deepEqual(sequenceState.data, changedSequence);
 assert.equal(sequenceState.restores.length, 0);
 assert.equal(controls.pan_1.value, 9);
 assert.equal(controls.set_status.value, 'Opening First.json…');
+controls.global_speed.value = 1.25;
+controls.speed_mode.value = 0;
+controls.pitch_lock.value = 0;
 host.set_source_loaded(0);
+assert.equal(controls.global_speed.value, 1.25);
+assert.equal(controls.pitch_lock.value, 0);
+assert.equal(controls.speed_mode.value, 0);
+assert.equal(fxPad.gesture_snapshot(), null);
+assert.deepEqual(fieldPad.gesture_snapshot(), [null, null, null, null]);
 assert.equal(field.field_presets_snapshot()[0][0], 9);
 assert.equal(controls.pattern_3.text, '3 •');
 assert.equal(controls.pan_1.value, 9);
@@ -601,6 +643,12 @@ assert.equal(sequenceState.restores.length, 0);
 host.read_set('/relocated/First.json');
 host.set_source_loaded(1);
 assert.deepEqual(JSON.parse(JSON.stringify(field.field_presets_snapshot())), set.fieldPresets);
+assert.equal(controls.fx_distortion.value, 34);
+assert.deepEqual(fxPad.gesture_snapshot(), set.gestures.fx);
+assert.equal(controls.global_speed.value, 0.75);
+assert.equal(controls.speed_mode.value, 1);
+assert.equal(controls.pitch_lock.value, 1);
+assert.deepEqual(fieldPad.gesture_snapshot(), set.gestures.field);
 assert.deepEqual(sequenceState.restores, [{ data: programmedSequence, pan: 37, slot3: false }]);
 assert.deepEqual(sequenceState.data, programmedSequence);
 assert.equal(sequenceState.running, false);
@@ -614,6 +662,9 @@ assert.equal(modState.targetIndex, 21);
 host.slot(1);
 assert.equal(controls.pan_1.value, -62);
 assert.equal(controls.set_status.value, 'Set opened · First.json');
+assert.equal(controls.global_speed.value, 0.75);
+assert.equal(controls.speed_mode.value, 1);
+assert.equal(controls.pitch_lock.value, 1);
 
 files.delete('/relocated/Écho.wav');
 sequenceState.data = structuredClone(changedSequence);
@@ -632,8 +683,9 @@ host.set_source_loaded(1);
 assert.equal(controls.pan_1.value, 37);
 assert.deepEqual(sequenceState.data, programmedSequence);
 assert.equal(sequenceState.running, false);
-const { sequence: ignoredSequence, fieldPresets: ignoredFieldPresets, ...olderSet } = set;
-olderSet.current = { ...olderSet.current, gains: oldLoopGains, globalGains: oldGlobalGains,
+const { sequence: ignoredSequence, fieldPresets: ignoredFieldPresets, gestures: ignoredGestures, globalSpeed: ignoredSpeed, pitchLock: ignoredPitchLock, ...olderSet } = set;
+const { fx_distortion: ignoredDistortion, ...olderEffects } = olderSet.current.effects;
+olderSet.current = { ...olderSet.current, effects: olderEffects, gains: oldLoopGains, globalGains: oldGlobalGains,
                      selection: { window: 0, lfo: 7, target: 0, globalTarget: 7 } };
 olderSet.slots = olderSet.slots.slice();
 olderSet.slots[0] = { ...olderSet.slots[0], gains: oldLoopGains, globalGains: oldGlobalGains,
@@ -645,7 +697,13 @@ host.read_set('/test/sets/Older.json');
 assert.equal(sequenceState.validations.length, validatedSequences);
 assert.deepEqual(sequenceState.data, programmedSequence);
 host.set_source_loaded(1);
+assert.equal(controls.fx_distortion.value, 0);
+assert.equal(controls.global_speed.value, 1);
+assert.equal(controls.pitch_lock.value, 0);
+assert.equal(controls.speed_mode.value, 0);
 assert.deepEqual(Array.from(field.field_presets_snapshot()), [null, null, null, null]);
+assert.equal(fxPad.gesture_snapshot(), null);
+assert.deepEqual(fieldPad.gesture_snapshot(), [null, null, null, null]);
 assert.equal(sequenceState.restores.at(-1).data, undefined);
 assert.deepEqual(sequenceState.data, blankSequence);
 assert.equal(sequenceState.running, false);

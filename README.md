@@ -7,11 +7,11 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-The v0.8.2 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.12 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.2](CHANGELOG.md).
+[See what's new in v0.8.12](CHANGELOG.md).
 
-![Field Kit standalone in full screen with four loops playing, the docked loop editor, and live stereo visuals beside the mix recorder](docs/screenshots/field-kit-standalone.jpg)
+![Field Kit standalone playing four loops with the docked loop editor, expanded Fade preview, and independent Echo and Room sends](docs/screenshots/field-kit-standalone.jpg)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Choose **Load audio…** to play your own sample. The same drawer holds audio setup, source recording, and Set files.
 
@@ -37,6 +37,12 @@ In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to 
 
 **Pitch snap** applies to all four windows. Choose a scale to snap the pitch reached by changing **Speed ×**, including speed modulation. The original sample at **1×** is the tonic. Speed and pitch stay linked, as on a tape deck.
 
+Use **Speed** in Transport to slow down or speed up all four loops from **0.50×** to **2.00×**. **Scale** multiplies their individual speeds after pitch snap, preserving their ratios. **Match** temporarily plays all four at the displayed speed. Switching back to Scale restores each loop’s individual speed setting.
+
+**Tape** changes pitch with speed. Choose **Pitch Lock** to keep pitch steady while you turn the global Speed control. In Scale, this preserves each loop’s pitch at 1× global speed, including any local speed or Pitch Snap settings. In Match, it preserves the source pitch. **Save Set** stores the global speed and both modes. Pattern changes leave them in place.
+
+Open **Visuals** and set the **Tuner** source to **Live input L**, **Live input R**, or **Selected loop**. With audio enabled, play one note at a time. The tuner shows the nearest note, frequency, and cents relative to **A4 = 440 Hz**.
+
 **Play original** plays the original sample once at its original speed, with the window mixer and effects bypassed. Switching between original playback and the loop mix uses a short crossfade. **Stop all** stops playback. **Reset** also restores the default loop, mixer, modulation, and effects settings. It keeps the current sample and stored patterns.
 
 ## Mix the four windows
@@ -49,7 +55,7 @@ Open **Stereo field…** beside **FX pad…** in the **Main FX** header. Drag a 
 
 Use **Field presets** to store four arrangements of all four loops' pan and level. Shift-click a slot, or click **Store preset** and pick a slot. Click a filled slot to recall it. Recall stops current Stereo Field movement so the positions stay where you set them. **Save Set…** keeps the presets with your session.
 
-To record movement, select a loop, click **Record**, then drag and release its dot. Click **Play** to repeat the movement, **Stop** to hold the current position, or **Clear** to erase the gesture. Each loop keeps one gesture and can play it alongside the others.
+To record movement, select a loop, click **Record**, then drag its dot as many times as you like. Click **Finish** to save and start looping the take. It also starts looping when it reaches 30 seconds. The **Play / Stop** button controls playback and **Clear** erases the gesture. Each loop keeps one gesture and can play it alongside the others. Click **Play paths** to start every recorded Stereo Field gesture. Paths already running keep their place. Once all recorded paths are running, click **Stop paths** to stop the gestures while the audio loops keep playing. Click **Show all paths** to see the recorded paths together, color-coded to match the numbered loop markers. Click **Show selected path** to focus on one loop.
 
 ## Store patterns
 
@@ -69,9 +75,11 @@ The scene strip at the top, between **Transport** and **Master**, shows the curr
 
 ![The compact Scene Sequencer running four programmed scenes directly below Patterns](docs/screenshots/field-kit-scenes.png)
 
-Use the workspace selector to switch between **Mix**, **Scenes**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Mix recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to collapse the lower panel and focus on the analyzers.
+Use the workspace selector to switch between **Mix**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Mix recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to show the tuner below the workspace tabs while the analyzers stay in the right column.
 
 **Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. Click **Stereo X/Y…** above the scope to open a larger, resizable window. The scope plots left against right. Matching left and right signals trace a rising diagonal. Opening Stereo X/Y or Stereo Field from full screen returns the workspace to a window so you can see both at once.
+
+![The Visuals workspace with live stereo frequency history, Stereo X/Y, and the docked Tuner](docs/screenshots/field-kit-visuals.jpg)
 
 ![The resizable Stereo X/Y window showing the live left and right channels of the final mix](docs/screenshots/field-kit-stereo-scope.png)
 
@@ -89,17 +97,17 @@ The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Bre
 
 Field Kit starts dry with Main FX and Drifting Memory off. Their dimmed dials show the stored values and can still be edited. During loop playback, click **Main FX · Off** beside the Main FX heading to turn on tone, stereo echo, and room reverb. The button fills with the theme color and reads **Main FX · On**. Tone is neutral at zero, and echo time ranges from 45 to 850 ms.
 
-**Full mix** applies Echo and Room to the combined loops. Their dials read **Mix %**. For per-loop routing, select **Loop sends** and turn up **Echo** or **Room** on the desired mixer strip. The main dials read **Return %** and set how much of each effect comes back into the mix. Start with a nonzero return, then raise the send for the loop you want to hear. The loop editor mirrors the selected strip. Sets and patterns remember the mode, returns, and send amounts.
+**Full mix** applies Echo and Room to the combined loops. Their dials read **Mix %**. For per-loop routing, select **Loop sends** and turn up **Echo** or **Room** on the desired mixer strip. The main dials read **Return %** and set how much of each effect comes back into the mix. Start with a nonzero return, then raise the send for the loop you want to hear. The read-only **FX routing** panel shows the current mode and whether Main FX is on. Sets and patterns remember the mode, returns, and send amounts.
 
-![Four mixer strips with independent Echo and Room sends, Main FX return dials, and Drifting Memory Advanced open](docs/screenshots/field-kit-performance-sends.jpg)
+[See the mixer sends, Main FX returns, and read-only routing status together](docs/screenshots/field-kit-performance-sends.jpg).
 
-Open **FX pad…** and use the **X** and **Y** menus to pair Tone tilt, Echo mix, or Room mix. X starts on Echo mix and Y starts on Room mix. Picking the other axis’s effect swaps the pair. Drag right or up to increase the assigned value. Tone tilt moves from dark through neutral to bright. The pad and dials stay in sync.
+Open **FX pad…** and use the **X** and **Y** menus to pair Tone tilt, Echo mix, Room mix, or Distortion. X starts on Echo mix and Y starts on Room mix. Picking the other axis’s effect swaps the pair. Drag right or up to increase the assigned value. Tone tilt moves from dark through neutral to bright. The pad and dials stay in sync.
 
-Click **● Record** in the FX pad to arm it. Drag across the grid and release to save one gesture. The status below the buttons shows elapsed time while you record, then the saved duration and effect pair. **Play** loops the gesture using that pair. **Stop** holds the current values, and **Clear** erases the gesture. Turn on Main FX in the pad or the Main FX header to hear it. Both buttons control the same Tone, Echo, and Room switch. **Close** hides either pad and lets its gestures keep playing. **Stop all**, resetting, or recalling a pattern stops gesture playback. Sets and patterns save control values. Gestures stay in the current session.
+Click **● Record** in the FX pad to arm it. Drag across the grid as many times as you like, then click **Finish** to save and start looping the take. It also starts looping when it reaches 30 seconds. The status below the buttons shows elapsed time while you record, then the saved duration and effect pair. **Play / Stop** starts or stops playback. Stopping holds the current values, and **Clear** erases the gesture. Turn on Main FX in the pad or the Main FX header to hear it. Both buttons control the same effects. **Distortion** adds soft clipping to the stereo mix and is off at 0%. **Close** hides either pad and lets its gestures keep playing. **Stop all**, resetting, or recalling a pattern stops gesture playback. In Loop sends, the FX pad calls the Echo and Room axes **Echo return** and **Room return**. **Save Set** keeps the FX pad gesture and all four Stereo Field gestures. Open the Set and click **Play** on either pad to replay a saved gesture.
 
 | Stereo field | FX pad |
 | --- | --- |
-| ![The resizable Stereo Field window with four preset slots, loop positions, and gesture controls](docs/screenshots/field-kit-stereo-field.png) | ![FX pad playing a recorded Echo and Room gesture with the Record button visible](docs/screenshots/field-kit-fx-pad.png) |
+| ![The Stereo Field window showing all four color-coded paths and the Stop paths button](docs/screenshots/field-kit-stereo-field.png) | ![FX pad playing a recorded Echo and Room gesture with the Record button visible](docs/screenshots/field-kit-fx-pad.png) |
 
 **Drifting Memory** runs at the end of Main FX. In **Mix**, click **Drift · Off** to turn it on, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. The **Memory** meter shows what’s circulating in the delay. **Wet return** shows what the delay adds to the final mix. Use **Mix** to blend it in. Choose **Off** under **Arm capture** to stop recording into memory while the tail plays. Sets and patterns save the effect settings. Captured memory is for the current session.
 

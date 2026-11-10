@@ -13,6 +13,7 @@ RUNTIME_ASSETS = {
         TOP_LEVEL: "patcher",
         "fk_modulation.maxpat": "patcher",
         "fk_fx.maxpat": "patcher",
+        "fk_pitch_fft.maxpat": "patcher",
         "fk_record.maxpat": "patcher",
     },
     "code": {
@@ -20,6 +21,7 @@ RUNTIME_ASSETS = {
         "fk_mod_routes.js": "javascript",
         "fk_source.js": "javascript",
         "fk_stereo_field.js": "javascript",
+        "fk_tuner.js": "javascript",
         "fk_fx_pad.js": "javascript",
         "fk_theme.js": "javascript",
         "fk_lfo_preview.js": "javascript",

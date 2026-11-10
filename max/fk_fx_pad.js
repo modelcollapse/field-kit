@@ -11,11 +11,13 @@ var palettes = [
     { canvas: "131E1B", inset: "13231E", grid: "2D4439", ink: "F2F9F3", muted: "B5CBC0", accent: "99D4AE" },
     { canvas: "211915", inset: "231914", grid: "46312A", ink: "FCF5EE", muted: "D5BFB1", accent: "F1AB82" }
 ];
+var host = this;
 var colors = palettes[0];
 var targets = [
     { name: "Tone tilt", selector: "tone", min: -100, max: 100, value: 0 },
     { name: "Echo mix", selector: "echo", min: 0, max: 100, value: 20 },
-    { name: "Room mix", selector: "space", min: 0, max: 100, value: 18 }
+    { name: "Room mix", selector: "space", min: 0, max: 100, value: 18 },
+    { name: "Distortion", selector: "distortion", min: 0, max: 100, value: 0 }
 ];
 var axes = [1, 2];
 var fxOn = false;
@@ -36,9 +38,9 @@ function clamp(target, value) {
     return Math.max(target.min, Math.min(target.max, value));
 }
 
-function source(tone, echo, space) {
-    if (!isFinite(tone) || !isFinite(echo) || !isFinite(space)) return;
-    var incoming = [tone, echo, space];
+function source(tone, echo, space, distortion) {
+    var incoming = [tone, echo, space, distortion];
+    if (!incoming.every(isFinite)) return;
     var changed = false;
     var assignedChanged = false;
     targets.forEach(function (target, index) {
@@ -49,13 +51,17 @@ function source(tone, echo, space) {
             if (index === axes[0] || index === axes[1]) assignedChanged = true;
         }
     });
-    if (!publishing && assignedChanged && (playback || recording)) stop_motion();
+    if (!publishing && assignedChanged && playback) stop_motion();
     if (changed) mgraphics.redraw();
 }
 
 function assign(axis, index) {
     if ((axis !== 0 && axis !== 1) || index !== Math.floor(index) || index < 0 || index >= targets.length) return;
     if (axes[axis] === index) return;
+    if (recording) {
+        publishMenus();
+        return;
+    }
     stop_motion();
     var other = 1 - axis;
     if (axes[other] === index) axes[other] = axes[axis];
@@ -67,6 +73,33 @@ function assign(axis, index) {
 function publishMenus() {
     outlet(0, "xmenu", axes[0]);
     outlet(0, "ymenu", axes[1]);
+}
+
+function send_mode(value) {
+    var echo = value === 1 ? "Echo return" : "Echo mix";
+    if (targets[1].name === echo) return;
+    targets[1].name = echo;
+    targets[2].name = value === 1 ? "Room return" : "Room mix";
+    ["fx_pad_x", "fx_pad_y"].forEach(function (name) {
+        var menu = host.patcher.getnamed(name);
+        menu.message("clear");
+        targets.forEach(function (target) { menu.message("append", target.name); });
+    });
+    publishMenus();
+    mgraphics.redraw();
+}
+
+function gesture_snapshot() {
+    return clip;
+}
+
+function gesture_restore(saved) {
+    stop_motion();
+    clip = saved || null;
+    if (clip) axes = clip.axes.slice();
+    else axes = [1, 2];
+    publishMenus();
+    mgraphics.redraw();
 }
 
 function enabled(value) {
@@ -88,7 +121,7 @@ function bounds() {
         width: size[0], height: size[1], left: 62, top: 134,
         right: Math.max(63, size[0] - 24), bottom: Math.max(135, size[1] - 74),
         buttonLeft: 24, buttonTop: 84, buttonHeight: 25,
-        buttonPitch: (size[0] - 40) / 4, buttonGap: 8
+        buttonPitch: (size[0] - 40) / 3, buttonGap: 8
     };
 }
 
@@ -127,12 +160,11 @@ function formatValue(target, value) {
 function motionControls() {
     var captureActive = armed || recording;
     return [
-        { text: recording ? "● Recording" : armed ? "● Armed" : "● Record", enabled: !recording,
+        { text: recording ? "■ Finish" : armed ? "Cancel" : "● Record", enabled: true,
           color: captureActive ? RECORD_COLOR : null, border: RECORD_COLOR, action: record_motion },
-        { text: "Play", enabled: !!clip && !recording && !playback,
-          color: playback ? colors.accent : null, action: play_motion },
-        { text: "Stop", enabled: !!(armed || recording || playback), action: stopGesture },
-        { text: "Clear", enabled: !!clip && !recording, action: clear_motion }
+        { text: playback ? "■ Stop" : "▶ Play", enabled: !!clip && !captureActive,
+          color: playback ? colors.accent : null, action: togglePlayback },
+        { text: "Clear", enabled: !!clip && !captureActive, action: clear_motion }
     ];
 }
 
@@ -159,10 +191,10 @@ function paintMotionStatus(grid) {
     var ink = colors.muted;
     if (recording) {
         var elapsed = Math.min(RECORD_LIMIT_MS, Math.max(0, Date.now() - recording.start));
-        caption = "Recording · " + (elapsed / 1000).toFixed(1) + " s · Release to save";
+        caption = "Recording · " + (elapsed / 1000).toFixed(1) + " s · Finish to loop";
         ink = RECORD_COLOR;
     } else if (armed) {
-        caption = "Armed · Drag the pad, then release to save";
+        caption = "Ready · Drag the pad to record";
         ink = RECORD_COLOR;
     } else if (clip) {
         var length = clip.duration < 100 ? "<0.1 s" : (clip.duration / 1000).toFixed(1) + " s";
@@ -212,7 +244,7 @@ function paint() {
     label(xMax, grid.right - mgraphics.text_measure(xMax)[0], grid.bottom + 17, colors.muted);
     label("X · " + xTarget.name + "  " + formatValue(xTarget, xTarget.value), 24, grid.height - 34, colors.ink);
     label("Y · " + yTarget.name + "  " + formatValue(yTarget, yTarget.value), 218, grid.height - 34, colors.ink);
-    var caption = fxOn ? "Record captures one drag across the pad, up to 30 s."
+    var caption = fxOn ? "Drag as often as you like. Finish starts the loop."
                       : "Turn on Main FX above to hear the assigned effects.";
     label(caption, 24, grid.height - 12, colors.muted);
 }
@@ -249,7 +281,10 @@ function currentPoint(time) {
 }
 
 function record_motion() {
-    if (recording) return;
+    if (recording) {
+        finishRecording(Date.now());
+        return;
+    }
     var arm = !armed;
     stop_motion();
     armed = arm;
@@ -276,9 +311,9 @@ function stop_motion() {
     if (active) mgraphics.redraw();
 }
 
-function stopGesture() {
-    if (recording) finishRecording(Date.now());
-    stop_motion();
+function togglePlayback() {
+    if (playback) stop_motion();
+    else play_motion();
 }
 
 function clear_motion() {
@@ -300,12 +335,12 @@ function finishRecording(now) {
     sampleRecording(now, true);
     var samples = recording.samples;
     var first = samples[0];
+    var take = recording;
+    stop_motion();
     if (samples.some(function (sample) { return sample.x !== first.x || sample.y !== first.y; })) {
-        clip = { axes: recording.axes, samples: samples, duration: samples[samples.length - 1].time };
+        clip = { axes: take.axes, samples: samples, duration: samples[samples.length - 1].time };
+        play_motion();
     }
-    recording = null;
-    motionClock.cancel();
-    mgraphics.redraw();
 }
 
 function interpolate(from, to, fraction) {
@@ -358,10 +393,11 @@ function onclick(x, y) {
     }
     if (x < grid.left || x > grid.right || y < grid.top || y > grid.bottom) return;
     var capture = armed;
-    stop_motion();
+    if (!recording) stop_motion();
     dragging = true;
     movePad(x, y, grid);
-    if (capture) {
+    if (recording) sampleRecording(Date.now(), true);
+    else if (capture) {
         recording = { axes: axes.slice(), start: Date.now(), samples: [currentPoint(0)], tenths: 0 };
         motionClock.repeat();
         mgraphics.redraw();
@@ -374,11 +410,8 @@ function ondrag(x, y, button) {
     var now = Date.now();
     // Max can deliver drag events between or before scheduled Task frames.
     // Sample those events as well, so a path that returns to its start survives.
-    if (recording && button) sampleRecording(now, true);
-    if (!button) {
-        dragging = false;
-        if (recording) finishRecording(now);
-    }
+    if (recording) sampleRecording(now, true);
+    if (!button) dragging = false;
 }
 
 function onmouseup(x, y) {
@@ -391,6 +424,6 @@ function onresize() {
 
 clamp.local = bounds.local = color.local = rectangle.local = rule.local = label.local = 1;
 formatValue.local = motionControls.local = paintMotionControls.local = paintMotionStatus.local = 1;
-publishMenus.local = stopGesture.local = 1;
+publishMenus.local = togglePlayback.local = 1;
 moveAxis.local = publishPoint.local = movePad.local = currentPoint.local = 1;
 sampleRecording.local = finishRecording.local = interpolate.local = clipPoint.local = motionFrame.local = 1;

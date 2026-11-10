@@ -31,13 +31,9 @@ _DOCK_RECTS = {
     "loop_mix_heading": (10, 207, 83, 19),
     "inspect_level": (5, 230, 44, 69),
     "inspect_pan": (54, 230, 44, 69),
-    "surface_editor_sends": (108, 201, 103, 109),
-    "send_heading": (118, 207, 83, 19),
-    "inspect_echo_send": (113, 230, 44, 69),
-    "inspect_room_send": (162, 230, 44, 69),
-    "surface_editor_fade": (216, 201, 192, 109),
-    "fade_preview_heading": (226, 207, 172, 19),
-    "loop_fade_preview": (224, 229, 176, 73),
+    "surface_editor_fade": (108, 201, 300, 109),
+    "fade_preview_heading": (118, 207, 280, 19),
+    "loop_fade_preview": (116, 229, 284, 73),
 }
 
 

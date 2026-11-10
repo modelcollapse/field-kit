@@ -221,6 +221,7 @@ function capture_pattern() {
         effects[spec[0]] = value_of(fx.getnamed(spec[0]));
     });
     effects.fx_mode = value_of(fx.getnamed("fx_mode"));
+    effects.fx_distortion = value_of(fx.getnamed("fx_distortion"));
     var drift = {};
     DRIFT_CONTROLS.forEach(function (spec) {
         drift[spec[0]] = value_of(drifting.getnamed(spec[0]));
@@ -365,6 +366,7 @@ function apply_pattern(pattern) {
         fx.getnamed(spec[0]).message(pattern.effects[spec[0]]);
     });
     fx.getnamed("fx_mode").message(pattern.effects.fx_mode === undefined ? 0 : pattern.effects.fx_mode);
+    fx.getnamed("fx_distortion").message(pattern.effects.fx_distortion === undefined ? 0 : pattern.effects.fx_distortion);
     DRIFT_CONTROLS.forEach(function (spec) {
         drifting.getnamed(spec[0]).message(pattern.drifting ? pattern.drifting[spec[0]] : spec[3]);
     });
@@ -446,6 +448,9 @@ function reset() {
     lastSlot = -1;
     set_armed(false);
     render_slots();
+    patch.getnamed("global_speed").message(1);
+    patch.getnamed("speed_mode").message(0);
+    patch.getnamed("pitch_lock").message(0);
     status("Reset · Play all to hear the loops");
 }
 
@@ -566,6 +571,16 @@ function save_set() {
     dialog.message("bang");
 }
 
+function set_gesture_pads() {
+    var patch = host.patcher;
+    var fx = patch.getnamed("mix_fx").subpatcher();
+    return {
+        fx: fx.getnamed("fx_pad_panel").subpatcher().getnamed("fx_pad_canvas").js,
+        field: patch.getnamed("stereo_field_panel").subpatcher().getnamed("canvas").js
+    };
+}
+set_gesture_pads.local = 1;
+
 function write_set(path) {
     if (typeof path !== "string" || !path || set_busy()) return;
     var folder = folder_of(path);
@@ -579,11 +594,18 @@ function write_set(path) {
         source.relative = source.path.slice(folder.length);
     }
     var snapshot = slots.slice();
+    var pads = set_gesture_pads();
     var data = {
         format: SET_FORMAT, version: SET_VERSION, source: source,
         slots: snapshot, current: current, selectedSlot: lastSlot,
         sequence: host.patcher.getnamed("sequence_control").js.sequence_snapshot(),
-        fieldPresets: host.patcher.getnamed("source_control").js.field_presets_snapshot()
+        fieldPresets: host.patcher.getnamed("source_control").js.field_presets_snapshot(),
+        gestures: { fx: pads.fx.gesture_snapshot(), field: pads.field.gesture_snapshot() },
+        globalSpeed: [
+            value_of(host.patcher.getnamed("global_speed")),
+            value_of(host.patcher.getnamed("speed_mode"))
+        ],
+        pitchLock: value_of(host.patcher.getnamed("pitch_lock"))
     };
     var stage = folder + ".field-kit-" + Date.now() + "-" + Math.floor(Math.random() * 1e9) + ".tmp";
     try {
@@ -711,6 +733,10 @@ function valid_set(data) {
         !data.slots.every(function (pattern) { return pattern === null || valid_pattern(pattern, LFO_COUNT); }) ||
         (data.sequence !== undefined && !host.patcher.getnamed("sequence_control").js.sequence_valid(data.sequence)) ||
         !host.patcher.getnamed("source_control").js.field_presets_valid(data.fieldPresets) ||
+        !gestures_valid(data.gestures) ||
+        (data.pitchLock !== undefined && !index_valid(data.pitchLock, 2)) ||
+        (data.globalSpeed !== undefined && (!Array.isArray(data.globalSpeed) || data.globalSpeed.length !== 2 ||
+            !in_range(data.globalSpeed[0], 0.5, 2) || !index_valid(data.globalSpeed[1], 2))) ||
         (data.selectedSlot !== -1 &&
             (!index_valid(data.selectedSlot, SLOT_COUNT) || !data.slots[data.selectedSlot]))) return false;
     var source = data.source;
@@ -721,6 +747,35 @@ function valid_set(data) {
                 source.relative.length > 0 && !/^(\/|\\)|:|(^|[\/\\])\.\.([\/\\]|$)/.test(source.relative))));
 }
 valid_set.local = 1;
+
+function gesture_clip_valid(clip, x, y, minimumX, minimumY) {
+    if (!clip || !index_valid(clip.duration, 30001) || clip.duration === 0 ||
+        !Array.isArray(clip.samples) || clip.samples.length < 1 ||
+        clip.samples.length > clip.duration + 1) return false;
+    var previous = -1;
+    return clip.samples.every(function (point, index) {
+        if (!point || !index_valid(point.time, clip.duration + 1) ||
+            (index === 0 && point.time !== 0) || point.time <= previous ||
+            !in_range(point[x], minimumX, 100) || !in_range(point[y], minimumY, 100)) return false;
+        previous = point.time;
+        return true;
+    });
+}
+gesture_clip_valid.local = 1;
+
+function gestures_valid(gestures) {
+    if (gestures === undefined) return true;
+    if (!gestures || !Array.isArray(gestures.field) || gestures.field.length !== VOICE_COUNT ||
+        !gestures.field.every(function (clip) {
+            return clip === null || gesture_clip_valid(clip, "pan", "level", -100, 0);
+        })) return false;
+    var fx = gestures.fx;
+    return fx === null || (!!fx && Array.isArray(fx.axes) && fx.axes.length === 2 &&
+        index_valid(fx.axes[0], 4) && index_valid(fx.axes[1], 4) && fx.axes[0] !== fx.axes[1] &&
+        gesture_clip_valid(fx, "x", "y", fx.axes[0] === 0 ? -100 : 0, fx.axes[1] === 0 ? -100 : 0) &&
+        fx.samples[fx.samples.length - 1].time === fx.duration);
+}
+gestures_valid.local = 1;
 
 function relink_set(path) {
     if (!pendingSet || !pendingSet.relinking) return;
@@ -757,12 +812,20 @@ function set_source_loaded(ok) {
     }
     cancel_recall();
     apply_pattern(opened.data.current);
+    var speed = opened.data.globalSpeed || [1, 0];
+    host.patcher.getnamed("global_speed").message(speed[0]);
+    host.patcher.getnamed("speed_mode").message(speed[1]);
+    host.patcher.getnamed("pitch_lock").message(opened.data.pitchLock === 1 ? 1 : 0);
     slots = opened.data.slots;
     lastSlot = opened.data.selectedSlot;
     activeSetPath = opened.path;
     bankDirty = false;
     host.patcher.getnamed("sequence_control").js.restore_sequence(opened.data.sequence);
     host.patcher.getnamed("source_control").js.field_presets_restore(opened.data.fieldPresets);
+    var pads = set_gesture_pads();
+    var gestures = opened.data.gestures || {};
+    pads.fx.gesture_restore(gestures.fx);
+    pads.field.gesture_restore(gestures.field);
     set_armed(false);
     render_slots();
     status(PATTERN_HINT);
@@ -888,6 +951,7 @@ function valid_pattern(pattern, lfoCount) {
         index_valid(pattern.selection.target, TARGET_COUNT) && controls_valid(pattern.effects, FX_CONTROLS) &&
         pattern.effects.fx_enabled % 1 === 0 && in_range(pattern.master, -70, 0) &&
         (pattern.effects.fx_mode === undefined || index_valid(pattern.effects.fx_mode, 2)) &&
+        (pattern.effects.fx_distortion === undefined || in_range(pattern.effects.fx_distortion, 0, 100)) &&
         (pattern.drifting === undefined || controls_valid(pattern.drifting, DRIFT_CONTROLS)) &&
         (pattern.pitchScale === undefined || index_valid(pattern.pitchScale, PITCH_SCALE_COUNT)) &&
         (pattern.mixerMutes === undefined ||

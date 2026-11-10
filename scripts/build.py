@@ -18,7 +18,9 @@ from build_mix_sends import append_sends_strip
 from build_mix_workspace import append_drifting_strip, append_drifting_taps
 from build_pattern_fade import append_pattern_fade
 from build_stereo_field_window import stereo_field_window
-from build_visuals import build as build_visuals, stereo_scope_window
+from build_tuner import add_tuner
+from build_pitch_lock import pitch_lock_patch, write_pitch_fft
+from build_visuals import WIDTH as VISUALS_WIDTH, build as build_visuals, stereo_scope_window
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent / "max"
@@ -45,8 +47,6 @@ INSPECTOR_DIALS = {
     "drive": (412, 56, "Drive %"),
     "level": (657, 52, "Level %"),
     "pan": (713, 52, "Pan %"),
-    "echo_send": (776, 51, "Echo %"),
-    "room_send": (831, 51, "Room %"),
 }
 LOOP_SENDS = ("echo_send", "room_send")
 WINDOW_MOD_CHANNELS = 4 * len(CELLS)
@@ -485,8 +485,8 @@ def sequence_controls(p):
     view = [250, WORKSPACE_TOP, 374, 20]
     p.add("workspace_view", "live.tab", view, view=view, outs=3, types=["int", "", "float"],
           parameter_mappable=0, multiline=0, num_lines_patching=1, num_lines_presentation=1,
-          **parameter("Lower workspace", 0, 0, 4, options=["Mix", "Scenes", "Modulation", "Visuals", "Hide"]))
-    p.obj("workspace_view_command", "prepend workspace", 2820, 2300, ins=2)
+          **parameter("Lower workspace", 0, 0, 3, options=["Mix", "Modulation", "Visuals", "Hide"]))
+    p.obj("workspace_view_command", "prepend workspace_tab", 2820, 2300, ins=2)
     p.connect("workspace_view", 0, "workspace_view_command")
     p.connect("workspace_view_command", 0, "theme_control")
     view = [122, WORKSPACE_TOP, 116, 20]
@@ -507,7 +507,7 @@ def sequence_controls(p):
 
 
 def mix_visuals(p):
-    rect = [MARGIN, MODULATION_TOP, TRACKS * TRACK - GUTTER, MODULATION_ROWS * ROW - GUTTER]
+    rect = [MARGIN, MODULATION_TOP, VISUALS_WIDTH, MODULATION_ROWS * ROW - GUTTER]
     p.add("visuals_panel", "bpatcher", rect, view=rect, ins=2, types=["bang"], embed=1, hidden=1,
           border=0, offset=[0.0, 0.0], enablehscroll=0, enablevscroll=0,
           lockeddragscroll=0, clickthrough=0, bgmode=0, patcher=build_visuals())
@@ -549,10 +549,9 @@ def performance_mix(p):
     area = [0, 0, PERFORMANCE_RIGHT_WIDTH, PERFORMANCE_HEIGHT]
     sends.add("surface_mix_sends", "panel", area, view=area, outs=0, background=1,
               ignoreclick=1, border=0, rounded=8, bgcolor=SLATE_PANEL)
-    append_sends_strip(sends, parameter)
+    append_sends_strip(sends)
     workspace_panel("performance_sends", sends, MARGIN + PERFORMANCE_RIGHT_OFFSET,
-                    PERFORMANCE_RIGHT_WIDTH, 1, [""])
-    p.connect("performance_sends", 0, "mix_fx", 7 + FX_MOD_CHANNELS)
+                    PERFORMANCE_RIGHT_WIDTH, 1, [])
     p.connect("mix_fx", 4 + FX_MOD_CHANNELS, "performance_sends")
 
 
@@ -572,8 +571,7 @@ def window_controls(p):
         rect = [x, EDITOR_TOP + 23, width, 20]
         p.add(f"inspector_label_{key}", "comment", rect, view=rect, outs=0, text=text)
 
-    controls = CELLS + (("echo_send", 0, 100, 0, 0, 1), ("room_send", 0, 100, 0, 0, 1))
-    for index, (key, low, high, initial, _, _) in enumerate(controls):
+    for index, (key, low, high, initial, _, _) in enumerate(CELLS):
         name = f"inspect_{key}"
         if key in ranges:
             x, width = ranges[key]
@@ -602,7 +600,6 @@ def window_controls(p):
                   showname=1, shownumber=1,
                   **({"hint": "Turn clockwise to add drive. At 0%, drive is off."} if key == "drive" else {}),
                   **parameter(f"Selected {key}", initial, low, high, short=short,
-                              unit_style=5 if key.endswith("_send") else 0,
                               units="%.2f" if key == "rate" else None))
         message = f"edit_inspect_{key}"
         p.obj(message, f"prepend inspector_edit {key}", 1600, 510 + index * 29, ins=2)
@@ -624,7 +621,6 @@ def window_controls(p):
         ("filter_type_heading", "Filter type", 474, 0, 172),
         ("filter_sweep_heading", "Filter sweep", 474, 50, 172),
         ("loop_mix_heading", "Loop mix", 657, 0, 106),
-        ("send_heading", "Loop sends", 776, 0, 104),
         ("fade_preview_heading", "Fade preview", 893, 0, 175),
         ("pitch_scale_label", "Pitch snap · All loops", 16, 76, 128),
     ):
@@ -764,7 +760,6 @@ def loop_send_gains(p, voice, y):
         p.obj(name + "_percent", "* 0.01", x, y + 28, ins=2)
         p.obj(name + "_ramp", "pack 0. 20.", x, y + 56, ins=2)
         p.obj(name + "_base_gain", "line~ 0.", x, y + 84, ins=2, outs=2, types=["signal", "bang"])
-        p.obj(name + "_sync", f"prepend inspector_sync {voice} {key}", x, y + 114, ins=2)
         p.obj(name + "_mod", "slide~ 240 240", x + 660, y + 28, ins=3, types=["signal"])
         p.obj(name + "_sum", "+~", x + 660, y + 56, ins=2, types=["signal"])
         p.obj(name + "_gain", "clip~ 0. 1.", x + 660, y + 84, ins=3, types=["signal"])
@@ -777,8 +772,6 @@ def loop_send_gains(p, voice, y):
         p.connect(name, 0, name + "_percent")
         p.connect(name + "_percent", 0, name + "_ramp")
         p.connect(name + "_ramp", 0, name + "_base_gain")
-        p.connect(name, 0, name + "_sync")
-        p.connect(name + "_sync", 0, "source_control")
 
 
 def drifting_memory(p):
@@ -825,7 +818,6 @@ def presentation_frame(p):
         ("editor_playback", 8, editor_top, 397, editor_height),
         ("editor_fx", 408, editor_top, 243, editor_height),
         ("editor_mix", 654, editor_top, 115, editor_height),
-        ("editor_sends", 772, editor_top, 113, editor_height),
         ("editor_fade", 888, editor_top, FRAME_WIDTH - 896, editor_height),
         ("effects", 8, MIX_TOP - 6, SPLIT * TRACK + 4, MIX_HEIGHT + 12),
         ("master_output", capture_left, MIX_TOP - 6, capture_width, MASTER_ROW_HEIGHT),
@@ -913,7 +905,7 @@ def build():
     p.obj("dac", "dac~ 1 2", 360, 1958, ins=2, outs=0)
     modulated_gain(p, "master", "master_gain", -12, -70, 0, 36, 22, 1840)
     for name, file, col, width, inputs, output_types in (
-        ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 8 + FX_MOD_CHANNELS,
+        ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 7 + FX_MOD_CHANNELS,
          ["signal"] * (2 + FX_MOD_CHANNELS) + ["bang", "bang", ""]),
         ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 2, []),
     ):
@@ -1022,8 +1014,14 @@ def build():
         p.connect("source_control", voice - 1, f"wave_{voice}", 2)
 
         y = 950 + 210 * (voice - 1)
-        p.obj(f"voice_{voice}", "gen~ fk_voice", 28, y + 132, ins=13, outs=12,
-              types=["signal"] * 12, width=500)
+        p.obj(f"voice_{voice}", "gen~ fk_voice", 28, y + 132, ins=13, outs=13,
+              types=["signal"] * 13, width=500)
+        shifter = f"voice_pitch_{voice}"
+        p.add(shifter, "newobj", [2680, y + 60, 125, 22], text="p Pitch Lock", ins=4, outs=2,
+              types=["signal"] * 2, patcher=pitch_lock_patch(Patch, VERSION))
+        p.connect(f"voice_{voice}", 0, shifter)
+        p.connect(f"voice_{voice}", 1, shifter, 1)
+        p.connect(f"voice_{voice}", 12, shifter, 2)
         p.obj(f"run_{voice}", "sig~ 0.", 925, y, types=["signal"])
         p.obj(f"wave_edit_revision_{voice}", "sig~ 0.", 1030, y + 108, types=["signal"])
         p.connect(f"run_{voice}", 0, f"voice_{voice}", 9)
@@ -1085,7 +1083,7 @@ def build():
         for suffix, outlet in (("left", 0), ("right", 1)):
             mix_channel = f"mixer_{suffix}_{voice}"
             p.obj(mix_channel, "*~", 2680 + 116 * outlet, y + 124, ins=2, types=["signal"])
-            p.connect(f"voice_{voice}", outlet, mix_channel)
+            p.connect(shifter, outlet, mix_channel)
             p.connect(f"mixer_gain_{voice}", 0, mix_channel, 1)
             p.connect(mix_channel, 0, "mix_fx", outlet)
             for send_index, send_key in enumerate(LOOP_SENDS):
@@ -1119,6 +1117,7 @@ def build():
 
     stereo_field(p)
     source_input(p)
+    add_tuner(p, Patch, VERSION)
     for index, control in enumerate(("master", "input_gain"), WINDOW_MOD_CHANNELS):
         p.connect("mod_signals", index, f"{control}_mod")
         p.connect(f"{control}_effective", 0, "watch_target", index + 1)
@@ -1130,7 +1129,15 @@ def build():
         index = DRIFT_MOD_START + slot
         p.connect("mod_signals", index, "drifting_memory", 3 + slot)
         p.connect("drifting_memory", 6 + slot, "watch_target", index + 1)
+    for name, command in (("global_speed", "global_speed"), ("speed_mode", "match_speed")):
+        p.obj(name + "_command", "prepend " + command, 3650, 1040 if name == "global_speed" else 1080, ins=2)
     layout_performance(p, parameter)
+    for voice in range(1, 5):
+        p.connect("pitch_lock", 0, f"voice_pitch_{voice}", 3)
+    for name in ("global_speed", "speed_mode"):
+        p.connect(name, 0, name + "_command")
+        for voice in range(1, 5):
+            p.connect(name + "_command", 0, f"voice_{voice}")
     p.save()
 
 
@@ -1165,5 +1172,6 @@ if __name__ == "__main__":
     runpy.run_path(str(SCRIPT_DIR / "build_modulation.py"))
     for generator in ("build_fx.py", "build_recorder.py"):
         runpy.run_path(str(SCRIPT_DIR / generator), run_name="__main__")
+    write_pitch_fft(Patch, VERSION, ROOT / "fk_pitch_fft.maxpat")
     build()
     demo()

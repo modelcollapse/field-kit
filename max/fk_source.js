@@ -12,7 +12,7 @@ var DEMOS = [
     {id: "glass-circuit", name: "Glass Circuit", file: "fk_demo_glass_circuit.wav", bpm: 120},
     {id: "tidal-lanterns", name: "Tidal Lanterns", file: "fk_demo_tidal_lanterns.wav", bpm: 75}
 ];
-var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "filter", "level", "pan", "echo_send", "room_send"];
+var INSPECTOR_FIELDS = ["start", "end", "rate", "direction", "fade", "drive", "filter", "level", "pan"];
 var BUFFER_OBJECTS = ["buffer", "set_buffer"];
 var INFO_OBJECTS = ["source_info", "set_source_info"];
 var INPUT_LIMIT_SECONDS = 60;
@@ -134,6 +134,7 @@ function inspect_window(index) {
     }
     paint_wave_selection();
     send("loop_fade_voice", inspectedWindow);
+    send("tuner_selected_loop", inspectedWindow);
     INSPECTOR_FIELDS.forEach(function (key) {
         var control = host.patcher.getnamed(key + "_" + inspectedWindow);
         if (control && control.getvalueof) {

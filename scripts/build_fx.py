@@ -13,10 +13,11 @@ DIALS = (
     ("space", "Room mix", "Mix %", 18, 0, 100, "Amount of room reverb."),
     ("decay", "Room decay", "Decay s", 1.7, 0.25, 5, "Reverb tail length in seconds."),
 )
+DISTORTION = ("distortion", "Distortion drive", "Drive %", 0, 0, 100,
+              "Add soft-clipped distortion to the stereo mix. At 0%, distortion is off.")
 SEND_INPUTS = ("Echo send left", "Echo send right", "Room send left", "Room send right")
-PERFORMANCE_FX_CONTROLS = ("fx_mode", "fx_enabled", "fx_echo", "fx_space")
 FX_POWER = dict(mode=1, text="Main FX · Off", texton="Main FX · On", fontface=1,
-                hint="Turn Tone, Echo and Room on or off.")
+                hint="Turn Main FX on or off.")
 
 # Turn-on defaults match the parameters in the native controls. Gen handles
 # smoothing so moving a dial or switching bypass does not jump the audio.
@@ -28,10 +29,12 @@ Param time_ms(310);
 Param repeats(28);
 Param space(18);
 Param decay(1.7);
+Param distortion(0);
 
 History fxMix(0);
 History sendBlend(0);
 History toneMix(0);
+History distortionMix(0);
 History echoMix(0.20);
 History echoTime(310);
 History echoNextTime(310);
@@ -95,6 +98,14 @@ dark = max(-toneMix, 0) * 0.75;
 bright = max(toneMix, 0) * 0.75;
 toneL = in1 - dark * (in1 - toneLowL) - bright * toneLowL;
 toneR = in2 - dark * (in2 - toneLowR) - bright * toneLowR;
+
+// Blend in a driven soft clip with output trim. Zero drive preserves the tone signal.
+distortionTarget = clamp(distortion * 0.01, 0, 1);
+distortionMix = mix(distortionMix, distortionTarget, controlRamp);
+distortionGain = 1 + 5 * distortionMix;
+distortionTrim = 1 - 0.40 * distortionMix;
+toneL = mix(toneL, tanh(toneL * distortionGain) * distortionTrim, distortionMix);
+toneR = mix(toneR, tanh(toneR * distortionGain) * distortionTrim, distortionMix);
 
 // A slight difference in times and crossfeed opens up the repeats in stereo.
 oldTapL = echoLineL.read(clamp(oldDelayTime * samplesPerMs, 1, 262141));
@@ -230,7 +241,7 @@ def parameter(name, label, initial, low, high, *, options=None, units=None, inte
     return dict(parameter_enable=1, saved_attribute_attributes={"valueof": value})
 
 
-def effects_pad(p, enabled, tone, echo, room):
+def effects_pad(p, enabled, tone, echo, room, distortion, mode_message):
     panel = Patch()
     source = panel.add("inlet", [16, 390, 26, 26], ins=0, outs=1, index=1)
     destination = panel.add("outlet", [16, 478, 26, 26], index=1)
@@ -250,7 +261,7 @@ def effects_pad(p, enabled, tone, echo, room):
     panel.cord(close, close_message)
     panel.cord(close_message, this_window)
 
-    choices = ["Tone tilt", ",", "Echo mix", ",", "Room mix"]
+    choices = ["Tone tilt", ",", "Echo mix", ",", "Room mix", ",", "Distortion"]
     for axis, (label, view) in enumerate((("x", [50, 49, 152, 24]), ("y", [244, 49, 172, 24]))):
         x = 165 + axis * 128
         menu = panel.add("umenu", [x, 434, 112, 22], outs=3, types=["int", "", ""],
@@ -288,14 +299,15 @@ def effects_pad(p, enabled, tone, echo, room):
     p.cord(open_message, window)
     p.cord(window, subpatch)
     p.cord(motion, subpatch)
+    p.cord(mode_message, subpatch)
 
-    edit = p.obj("route tone echo space fx_toggle", 0, 520, 204, outs=5, types=[""] * 5)
-    state = p.obj("pak 0 20 18", 164, 424, 82, ins=3, types=["list"])
+    edit = p.obj("route tone echo space distortion fx_toggle", 0, 520, 244, outs=6, types=[""] * 6)
+    state = p.obj("pak 0 20 18 0", 164, 424, 94, ins=4, types=["list"])
     state_message = p.obj("prepend source", 164, 456, 105, ins=2)
     bypass_message = p.obj("prepend enabled", 294, 456, 114, ins=2)
     p.cord(subpatch, edit)
-    p.cord(edit, enabled, outlet=3)
-    for index, dial in enumerate((tone, echo, room)):
+    p.cord(edit, enabled, outlet=4)
+    for index, dial in enumerate((tone, echo, room, distortion)):
         p.cord(edit, dial, outlet=index)
         p.cord(dial, state, inlet=index)
     p.cord(state, state_message)
@@ -306,17 +318,18 @@ def effects_pad(p, enabled, tone, echo, room):
 
 def build():
     p = Patch()
-    dial_pitch = 112
+    dial_pitch = 96
     gutter = 4
-    for key, x, width in (("tone", 0, dial_pitch), ("echo", dial_pitch, 3 * dial_pitch),
-                          ("room", 4 * dial_pitch, 2 * dial_pitch)):
+    for key, x, width in (("tone", 0, 2 * dial_pitch), ("echo", 2 * dial_pitch, 3 * dial_pitch),
+                          ("room", 5 * dial_pitch, 2 * dial_pitch)):
         area = [x, 23, width - gutter, 95]
         p.add("panel", area, view=area, outs=0, varname=f"surface_fx_{key}",
               background=1, ignoreclick=1, border=0, rounded=7, bgcolor=[0.13, 0.17, 0.23, 1])
     p.label("Main FX", 0, 0, 82, heading=True)
     p.label("Tone", 0, 24, dial_pitch - gutter)
-    p.label("Stereo echo", dial_pitch, 24, 3 * dial_pitch - gutter)
-    p.label("Room reverb", 4 * dial_pitch, 24, 2 * dial_pitch - gutter)
+    p.label("Distortion", dial_pitch, 24, dial_pitch - gutter)
+    p.label("Stereo echo", 2 * dial_pitch, 24, 3 * dial_pitch - gutter)
+    p.label("Room reverb", 5 * dial_pitch, 24, 2 * dial_pitch - gutter)
 
     left = p.add("inlet", [0, 172, 26, 26], ins=0, outs=1, types=["signal"], index=1,
                  comment="Mix left")
@@ -354,8 +367,7 @@ def build():
     p.cord(enabled, prefix)
     p.cord(prefix, gen)
 
-    dials = {}
-    for slot, (key, title, label, initial, low, high, hint) in enumerate(DIALS):
+    for slot, (_, title, _, _, _, _, _) in enumerate(DIALS):
         index = slot + 3
         x = 288 + slot * 72
         modulation = p.add("inlet", [x, 172, 26, 26], ins=0, outs=1, types=["signal"],
@@ -365,6 +377,8 @@ def build():
         p.cord(modulation, gen, inlet=index - 1)
         p.cord(gen, effective, outlet=index - 1)
 
+    dials = {}
+    for slot, (key, title, label, initial, low, high, hint) in enumerate(DIALS[:1] + (DISTORTION,) + DIALS[1:]):
         caption = [slot * dial_pitch, 47, dial_pitch - gutter, 15]
         p.add("comment", caption, view=caption, outs=0, varname="fx_label_" + key,
               text=label, textjustification=1, fontsize=10, ignoreclick=1)
@@ -380,7 +394,7 @@ def build():
         p.cord(prefix, gen)
         dials[key] = dial
 
-    effects_pad(p, enabled, dials["tone"], dials["echo"], dials["space"])
+    effects_pad(p, enabled, dials["tone"], dials["echo"], dials["space"], dials["distortion"], set_mode)
 
     stereo_rect = [440, 0, 110, 20]
     stereo_button = p.add("live.text", stereo_rect, outs=2, types=["bang", ""], view=stereo_rect,
@@ -396,17 +410,10 @@ def build():
     drifting_open = p.add("outlet", [792, 370, 26, 26], index=channels + 2, comment="Show Drifting Memory in Mix")
     p.cord(drifting, drifting_open)
 
-    performance = p.add("inlet", [1080, 172, 26, 26], ins=0, outs=1, types=[""],
-                        index=channels + 6, comment="Performance controls")
     feedback = p.add("outlet", [1080, 370, 26, 26], index=channels + 3,
-                     comment="Current performance controls")
-    route = p.obj("route " + " ".join(PERFORMANCE_FX_CONTROLS), 1080, 204, 300,
-                  outs=len(PERFORMANCE_FX_CONTROLS) + 1, types=[""] * (len(PERFORMANCE_FX_CONTROLS) + 1))
-    p.cord(performance, route)
-    for index, (name, control) in enumerate(zip(PERFORMANCE_FX_CONTROLS,
-                                                 (mode, enabled, dials["echo"], dials["space"]))):
+                     comment="Current FX routing and power")
+    for index, (name, control) in enumerate((("fx_mode", mode), ("fx_enabled", enabled))):
         sync = p.obj(f"prepend {name}", 1080, 240 + index * 30, 145, ins=2)
-        p.cord(route, control, outlet=index)
         p.cord(control, sync)
         p.cord(sync, feedback)
 

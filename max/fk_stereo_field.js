@@ -12,6 +12,8 @@ var palettes = [
     ["30231F", "231914", "46312A", "FCF5EE", "D5BFB1", "F1AB82", "6E4534"]
 ];
 var ink;
+var pathColors = ["8FB9F0", "99D4AE", "F4C579", "DAB1F1"].map(rgba);
+var showAllPaths = false;
 
 var FRAME_MS = 20;
 var RETURN_MS = 100;
@@ -95,6 +97,15 @@ function select(loop) {
     mgraphics.redraw();
 }
 
+function toggle_paths() {
+    showAllPaths = !showAllPaths;
+    var button = patcher.getnamed("stereo_field_paths");
+    var caption = showAllPaths ? "Show selected path" : "Show all paths";
+    button.message("text", caption);
+    button.message("texton", caption);
+    mgraphics.redraw();
+}
+
 function field_presets(armed, active, stored1, stored2, stored3, stored4, status) {
     presets.armed = armed === 1;
     presets.active = active;
@@ -133,6 +144,8 @@ function fitWindow() {
     var canvas = [12, 44, width - 24, height - 80];
     box.setboxattr("patching_rect", canvas);
     box.setboxattr("presentation_rect", canvas);
+    var paths = patcher.getnamed("stereo_field_paths");
+    if (paths && paths.valid) paths.setboxattr("presentation_rect", [width - 234, 11, 136, 23]);
     var close = patcher.getnamed("stereo_field_close");
     if (close && close.valid) close.setboxattr("presentation_rect", [width - 90, 11, 78, 23]);
     wind.dirty = dirty;
@@ -147,7 +160,7 @@ function bounds() {
         left: 64, right: Math.max(65, width - 24),
         top: 189, bottom: Math.max(190, height - 49),
         tabLeft: 14, tabWidth: (width - 28) / loops.length,
-        motionWidth: (width - 28) / 5.2,
+        motionWidth: (width - 28) / 5.5,
         markerRadius: clamp(11 + (Math.min(width, height) - 346) / 50, 11, 16)
     };
 }
@@ -184,12 +197,17 @@ function rule(x1, y1, x2, y2, value) {
     mgraphics.stroke();
 }
 
+function loopColor(loop) {
+    if (recording && recording.loop === loop) return ink.record;
+    return showAllPaths ? pathColors[loop - 1] : ink.accent;
+}
+
 function marker(loop, grid) {
     var track = loops[loop - 1];
     var point = trackPosition(track, grid);
     var active = loop === selected;
     var radius = grid.markerRadius - (active ? 0 : 2);
-    var accent = recording && recording.loop === loop ? ink.record : ink.accent;
+    var accent = loopColor(loop);
     mgraphics.ellipse(point[0] - radius, point[1] - radius, radius * 2, radius * 2);
     colour(active ? accent : ink.field);
     mgraphics.fill_preserve();
@@ -223,13 +241,17 @@ function paintPresets(grid) {
 function motionControls() {
     var track = loops[selected - 1];
     var ready = armed === selected;
-    var capturing = recording && recording.loop === selected;
+    var capturing = !!recording;
+    var hasClips = loops.some(function (loop) { return !!loop.clip; });
+    var allPlaying = hasClips && loops.every(function (loop) { return !loop.clip || !!loop.playback; });
     return [
-        { text: capturing ? "Recording" : ready ? "Armed" : "Record", active: ready || capturing,
-            enabled: !capturing, action: armMotion },
-        { text: "Play", active: !!track.playback, enabled: !!track.clip && !capturing, action: playMotion },
-        { text: "Stop", enabled: ready || capturing || !!track.playback, action: stopSelected },
-        { text: "Clear", enabled: !!track.clip && !capturing, action: clearMotion }
+        { text: capturing ? "■ Finish" : ready ? "Cancel" : "● Record", active: ready || capturing,
+            enabled: true, action: recordMotion },
+        { text: track.playback ? "■ Stop" : "▶ Play", active: !!track.playback,
+            enabled: !!track.clip && !ready && !capturing, action: togglePlayback },
+        { text: "Clear", enabled: !!track.clip && !ready && !capturing, action: clearMotion },
+        { text: allPlaying ? "■ Stop paths" : "▶ Play paths", active: allPlaying,
+            enabled: hasClips && !ready && !capturing, action: allPlaying ? stop_motion : playAllMotion }
     ];
 }
 
@@ -246,22 +268,25 @@ function paintMotion(grid) {
     }
     var track = loops[selected - 1];
     var caption = "No recording";
-    if (recording && recording.loop === selected) caption = "Release to save";
+    if (recording) caption = recording.loop === selected ? "Finish to loop" : "Recording Loop " + recording.loop;
     else if (armed === selected) caption = "Drag Loop " + selected;
     else if (track.clip) caption = track.clip.duration < 100 ? "<0.1 s" : (track.clip.duration / 1000).toFixed(1) + " s";
     label(caption, grid.tabLeft + controls.length * grid.motionWidth + 8, MOTION_TOP + 16, ink.muted);
 }
 
-function paintTrail(grid) {
-    var track = loops[selected - 1];
-    var capture = recording && recording.loop === selected ? recording : track.clip;
+function paintTrail(loop, grid) {
+    var track = loops[loop - 1];
+    var capture = recording && recording.loop === loop ? recording : track.clip;
     if (!capture || capture.samples.length < 2) return;
     var samples = capture.samples;
     var first = trackPosition(samples[0], grid);
     var lastIndex = samples.length - 1;
     var stride = Math.ceil(lastIndex / 240);
-    colour(ink.trail);
-    mgraphics.set_line_width(1.5);
+    var focused = loop === selected;
+    var trail = showAllPaths ? loopColor(loop).slice() : ink.trail;
+    if (showAllPaths) trail[3] = focused ? 0.95 : 0.62;
+    colour(trail);
+    mgraphics.set_line_width(showAllPaths && focused ? 2.5 : 1.5);
     mgraphics.move_to(first[0], first[1]);
     for (var index = stride; index < lastIndex; index += stride) {
         var point = trackPosition(samples[index], grid);
@@ -294,10 +319,12 @@ function paint() {
     for (var loop = 1; loop <= loops.length; loop++) {
         var x = grid.tabLeft + grid.tabWidth * (loop - 1);
         var active = loop === selected;
-        rectangle(x + 1, LOOP_TABS_TOP, grid.tabWidth - 2, BUTTON_HEIGHT, active ? ink.accent : ink.button);
         var track = loops[loop - 1];
+        var accent = showAllPaths ? loopColor(loop) : ink.accent;
+        rectangle(x + 1, LOOP_TABS_TOP, grid.tabWidth - 2, BUTTON_HEIGHT, active ? accent : ink.button);
         var status = track.playback ? "  ▶" : track.clip ? "  •" : "";
-        label("Loop " + loop + status, x + grid.tabWidth / 2, LOOP_TABS_TOP + 16, active ? ink.field : ink.text, true);
+        var labelColor = active ? ink.field : showAllPaths && track.clip ? accent : ink.text;
+        label("Loop " + loop + status, x + grid.tabWidth / 2, LOOP_TABS_TOP + 16, labelColor, true);
     }
 
     var track = loops[selected - 1];
@@ -328,7 +355,12 @@ function paint() {
     label("Right", grid.right, grid.bottom + 19, ink.muted, true);
     label("X · Pan", centerX, grid.bottom + 36, ink.text, true);
 
-    paintTrail(grid);
+    if (showAllPaths) {
+        for (var pathLoop = 1; pathLoop <= loops.length; pathLoop++) {
+            if (pathLoop !== selected) paintTrail(pathLoop, grid);
+        }
+    }
+    paintTrail(selected, grid);
     for (var other = 1; other <= loops.length; other++) {
         if (other !== selected) marker(other, grid);
     }
@@ -351,7 +383,11 @@ function syncClock() {
     else motionClock.cancel();
 }
 
-function armMotion() {
+function recordMotion() {
+    if (recording) {
+        finishRecording(Date.now());
+        return;
+    }
     armed = armed === selected ? 0 : selected;
     loops[selected - 1].playback = null;
     syncClock();
@@ -395,31 +431,45 @@ function finishRecording(now) {
     recording = null;
     if (take.moved && take.heldUntil > 0) {
         loops[take.loop - 1].clip = { samples: take.samples, duration: take.heldUntil };
+        playMotion(take.loop);
+        return;
     }
     syncClock();
     mgraphics.redraw();
 }
 
-function playMotion() {
-    var track = loops[selected - 1];
+function playMotion(loop, start) {
+    var track = loops[(loop || selected) - 1];
     if (!track.clip || track.playback) return;
     armed = 0;
-    track.playback = { start: Date.now(), from: { pan: track.pan, level: track.level } };
+    track.playback = { start: start === undefined ? Date.now() : start, from: { pan: track.pan, level: track.level } };
     syncClock();
     mgraphics.redraw();
 }
 
-function stopSelected() {
-    if (armed === selected) armed = 0;
-    if (recording && recording.loop === selected) finishRecording(Date.now());
-    loops[selected - 1].playback = null;
+function playAllMotion() {
+    var start = Date.now();
+    loops.forEach(function (track, index) {
+        playMotion(index + 1, start);
+    });
+}
+
+function togglePlayback() {
+    var track = loops[selected - 1];
+    if (!track.playback) {
+        playMotion(selected);
+        return;
+    }
+    track.playback = null;
     syncClock();
     mgraphics.redraw();
 }
 
 function clearMotion() {
-    stopSelected();
-    loops[selected - 1].clip = null;
+    var track = loops[selected - 1];
+    track.playback = null;
+    track.clip = null;
+    syncClock();
     mgraphics.redraw();
 }
 
@@ -429,6 +479,18 @@ function stop_motion() {
     drag = null;
     loops.forEach(function (track) { track.playback = null; });
     syncClock();
+    mgraphics.redraw();
+}
+
+function gesture_snapshot() {
+    return loops.map(function (track) { return track.clip; });
+}
+
+function gesture_restore(saved) {
+    stop_motion();
+    loops.forEach(function (track, index) {
+        track.clip = saved ? saved[index] : null;
+    });
     mgraphics.redraw();
 }
 
@@ -554,7 +616,6 @@ function ondrag(x, y, button) {
 
 function onmouseup(x, y) {
     moveLoop(x, y, true);
-    if (drag && recording && recording.loop === drag.loop) finishRecording(Date.now());
     drag = null;
 }
 
@@ -565,9 +626,9 @@ function onresize() {
 validLoop.local = clamp.local = bounds.local = trackPosition.local = 1;
 fitWindow.local = 1;
 colour.local = label.local = rectangle.local = rule.local = marker.local = 1;
-nearLoop.local = moveLoop.local = 1;
+nearLoop.local = moveLoop.local = loopColor.local = 1;
 rgba.local = readout.local = percent.local = 1;
 motionControls.local = paintMotion.local = paintTrail.local = paintPresets.local = 1;
-syncClock.local = armMotion.local = beginRecording.local = recordSample.local = 1;
-finishRecording.local = playMotion.local = stopSelected.local = clearMotion.local = 1;
+syncClock.local = recordMotion.local = beginRecording.local = recordSample.local = 1;
+finishRecording.local = playMotion.local = playAllMotion.local = togglePlayback.local = clearMotion.local = 1;
 interpolate.local = pointAt.local = motionFrame.local = publishPosition.local = 1;
