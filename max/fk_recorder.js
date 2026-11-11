@@ -8,7 +8,7 @@ var status = "Enable audio to record";
 var dspOn = false;
 var path = "";
 var lastSavedPath = "";
-var takePaths = [];
+var folderRequest = 0;
 var capturePath = "";
 var elapsedMs = 0;
 var nativeElapsedMs = null;
@@ -62,12 +62,12 @@ function render() {
     send("record_status", "set", status);
     var currentPath = path || lastSavedPath;
     if (currentPath) {
-        var name = (path ? "" : "Last saved: ") + currentPath.replace(/^.*[\\/]/, "");
+        var name = (path ? "" : "Last saved: ") + currentPath.split(/[\\/]/).slice(-2, -1)[0];
         send("record_file", "set", name.length > 56 ? name.slice(0, 48) + "…" + name.slice(-7) : name);
         send("record_file", "hint", currentPath);
     } else {
         send("record_file", "set", "");
-        send("record_file", "hint", "The filename of your current or last take");
+        send("record_file", "hint", "The folder for your current or last take");
     }
     renderTime();
 }
@@ -104,7 +104,7 @@ function choose() {
         return;
     }
     state = "choosing";
-    status = "Choose a location for your take";
+    status = "Name your take folder";
     render();
     send("save_dialog", "name", defaultName());
     send("save_dialog", "bang");
@@ -128,31 +128,27 @@ function start_path(filePath) {
         render();
         return;
     }
-    // Use the exact path that the Save dialog confirmed, including its extension.
-    if (typeof filePath !== "string" || !/\.wav$/i.test(filePath) || !/\//.test(filePath)) {
-        status = "Choose a filename ending in .wav";
+    if (typeof filePath !== "string" || !/\.wav$/i.test(filePath) || !/[\\/]/.test(filePath)) {
+        status = "Choose a take name ending in .wav";
         render();
         return;
     }
-    var base = filePath.replace(/\.wav$/i, "");
-    var proposed = [filePath];
-    for (var track = 1; track <= 4; track++) proposed.push(base + " - Loop " + track + ".wav");
-    var capture = base + " - synchronized capture.wav";
-    proposed.push(capture);
-    // Check every destination before opening any writer. Never replace an earlier take.
-    for (var index = 0; index < proposed.length; index++) {
-        var existing = new File(proposed[index], "read");
-        var occupied = existing.isopen;
-        if (occupied) existing.close();
-        if (occupied) {
-            status = "File exists · choose a new take name";
-            render();
-            return;
-        }
+    state = "preparing";
+    status = "Creating take folder…";
+    render();
+    outlet(0, "prepare_output_folder", ++folderRequest, filePath);
+}
+
+function output_folder_ready(request, mixPath) {
+    if (state !== "preparing" || request !== folderRequest) return;
+    if (!mixPath || !dspOn) {
+        state = "idle";
+        status = dspOn ? "Couldn’t create take folder" : idleStatus();
+        render();
+        return;
     }
-    capturePath = proposed.pop();
-    takePaths = proposed;
-    path = filePath;
+    path = mixPath;
+    capturePath = path.replace(/\.wav$/i, " - synchronized capture.wav");
     elapsedMs = 0;
     nativeElapsedMs = null;
     lastProgressAt = Date.now();

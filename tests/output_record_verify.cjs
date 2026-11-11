@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
-const messages = [], existing = new Set();
+const messages = [];
 const context = vm.createContext({
     patcher: { getnamed(name) { return {
         message(...args) { messages.push([name, ...args]); },
@@ -11,19 +11,19 @@ const context = vm.createContext({
     }; } },
     arrayfromargs: args => Array.from(args),
     outlet: (...args) => messages.push(['outlet', ...args]),
-    File: function(name) { this.isopen = existing.has(name); this.close = () => { this.isopen = false; }; },
     Task: function() { this.repeat = this.cancel = this.schedule = () => {}; },
 });
 vm.runInContext(fs.readFileSync(path.join(root, 'max/fk_recorder.js'), 'utf8'), context);
 context.dsp_enabled(1);
-existing.add('/takes/session - Loop 3.wav');
 context.start_path('/takes/session.wav');
-assert(!messages.some(m => m[1] === 'open'), 'a stem collision must prevent every writer from opening');
-existing.clear(); messages.length = 0;
-context.start_path('/takes/session.wav');
+assert(messages.some(m => m[0] === 'outlet' && m[2] === 'prepare_output_folder'));
+assert(!messages.some(m => m[1] === 'open'), 'wait for the folder before recording');
+context.output_folder_ready(0, '/takes/stale.wav');
+assert.equal(context.state, 'preparing');
+context.output_folder_ready(1, '/takes/session/session.wav');
 const opens = messages.filter(m => m[1] === 'open');
 assert.equal(opens.length, 1);
-assert.equal(opens[0][3], '/takes/session - synchronized capture.wav');
+assert.equal(opens[0][3], '/takes/session/session - synchronized capture.wav');
 context.elapsed(0); context.elapsed(100);
 assert.equal(context.state, 'recording');
 context.toggle_record();

@@ -211,6 +211,29 @@ maxApi.addHandler("remove_input_temp", (filename) => {
 });
 showFolders();
 
+maxApi.addHandler("prepare_output_folder", (request, value) => {
+    let mix = "";
+    try {
+        const selected = nativePath(value);
+        const filename = path.basename(selected);
+        const name = filename.replace(/\.wav$/i, "").trim();
+        if (!/\.wav$/i.test(filename) || !name || name === "." || name === "..") throw new Error("Invalid take name");
+        for (let number = 1; number <= 1000; number++) {
+            const folder = path.join(path.dirname(selected), number === 1 ? name : `${name} ${number}`);
+            try {
+                fs.mkdirSync(folder);
+                mix = path.join(folder, filename);
+                break;
+            } catch (error) {
+                if (error.code !== "EEXIST") throw error;
+            }
+        }
+    } catch (error) {
+        maxApi.post(`Field Kit could not create the take folder: ${error.message}`);
+    }
+    maxApi.outlet("output_folder_ready", request, mix);
+});
+
 // One ten-channel disk capture keeps the mix and four stereo stems sample-aligned.
 // Split in bounded blocks after recording; exclusive output creation protects old takes.
 maxApi.addHandler("split_output", (captureValue, mixValue) => {

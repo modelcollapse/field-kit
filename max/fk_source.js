@@ -1671,3 +1671,7 @@ commit_wave_edits.local = 1;
 function output_split_done(success, message) {
     host.patcher.getnamed("recorder").subpatcher().getnamed("rec_controller").message("split_done", success, message);
 }
+
+function output_folder_ready(request, mixPath) {
+    host.patcher.getnamed("recorder").subpatcher().getnamed("rec_controller").message("output_folder_ready", request, mixPath || "");
+}

@@ -116,7 +116,9 @@ keeps playing either way. The Main FX shortcut opens the same drawer.
 Hold freezes the current memory. Cut Tail clears it and sets capture to Off while
 the dry mix keeps playing. Release Hold and arm a bank to capture again.
 Click Record output… beside Main FX to capture the main mix and all four loops.
-Choose a new WAV name. Click Stop recording, then wait for Saved mix + 4 loops.
+Name the take. Field Kit creates a matching folder in the selected Recordings
+location, adding a number if the name is taken. Click Stop recording, then wait
+for Saved mix + 4 loops. All five files are in the new take folder.
 The chosen name is the main mix, with shared Main FX, Drifting Memory, and Master.
 Four matching stereo WAVs end in - Loop 1.wav through - Loop 4.wav and capture
 individual mixer strips before shared FX. All five files have identical sample counts.

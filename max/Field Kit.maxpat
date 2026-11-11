@@ -3918,14 +3918,14 @@
           "varname": "file_preferences_route",
           "maxclass": "newobj",
           "numinlets": 1,
-          "numoutlets": 4,
+          "numoutlets": 5,
           "patching_rect": [
             2425,
             2160,
-            411,
+            551,
             22
           ],
-          "text": "routepass folder_paths input_temp_ready output_split_done"
+          "text": "routepass folder_paths input_temp_ready output_split_done output_folder_ready"
         }
       },
       {
@@ -39242,6 +39242,18 @@
           "source": [
             "obj-148",
             3
+          ],
+          "destination": [
+            "obj-29",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-148",
+            4
           ],
           "destination": [
             "obj-84",

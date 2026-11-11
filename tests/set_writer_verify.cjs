@@ -44,13 +44,17 @@ function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
         return response;
     };
     write.split = (capture, mix) => { handlers.split_output(capture, mix); return response; };
+    write.prepareOutput = (id, file) => { handlers.prepare_output_folder(id, file); return response; };
     return write;
 }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "field-kit-writer-"));
 try {
     const write = loadWriter();
-    const capture = path.join(dir, "Output - synchronized capture.wav"), mix = path.join(dir, "Output.wav");
+    const selected = path.join(dir, "Output.wav");
+    const mix = path.join(dir, "Output", "Output.wav");
+    assert.deepEqual(write.prepareOutput(1, selected), ["output_folder_ready", 1, mix]);
+    const capture = mix.replace('.wav', ' - synchronized capture.wav');
     const frames = 20000, pcm = Buffer.alloc(frames * 30), header = Buffer.alloc(44);
     header.write('RIFF'); header.writeUInt32LE(pcm.length + 36, 4); header.write('WAVEfmt ', 8);
     header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20); header.writeUInt16LE(10, 22);
@@ -60,6 +64,8 @@ try {
     fs.writeFileSync(capture, Buffer.concat([header, pcm]));
     assert.equal(write.split(capture, mix)[1], 1);
     assert(!fs.existsSync(capture));
+    assert.deepEqual(write.prepareOutput(2, selected), ["output_folder_ready", 2, path.join(dir, "Output 2", "Output.wav")]);
+    assert.equal(fs.readdirSync(path.dirname(mix)).length, 5);
     for (let stem = 0; stem < 5; stem++) {
         const file = stem ? mix.replace('.wav', ` - Loop ${stem}.wav`) : mix;
         const wav = fs.readFileSync(file); assert.equal(wav.length, 44 + frames * 6);
