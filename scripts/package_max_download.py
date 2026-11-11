@@ -137,11 +137,10 @@ Applied value shows what the destination receives while audio is on.
 The lower left graph shows the selected LFO shape. Choose Breakpoint or click Use curve
 to edit that LFO's own curve. The lower right graph shows the live signal while audio is on.
 
-During loop playback, each loop finishes its current pass before fading into the
-next pattern or scene over 80 ms. Reverse loops finish at the start of their range;
-ping-pong loops change at the next turnaround. Different loop lengths switch at
-their own boundaries. The status shows when a scene is queued. A newer scene waits
-for the current handoff to finish. Shared Main FX, Drifting Memory and master level
+During loop playback, loops crossfade into the next pattern or scene over 80 ms
+as soon as the new settings are ready. Each playhead starts in its new range.
+The status shows when a scene is queued. A newer scene waits for the current
+handoff to finish. Shared Main FX, Drifting Memory and master level
 update after every loop has switched. Modulated loop controls hold their captured
 values while waiting. Stopped loops stay stopped. Fade ms still controls the loop
 seam separately. Play original uses the existing short stereo-mix transition.

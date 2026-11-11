@@ -12,6 +12,8 @@ collective=$3
 source=$4
 output=$5
 max_plist="${FIELD_KIT_MAX_APP:-/Applications/Max.app}/Contents/Info.plist"
+icon="$(dirname "$0")/../assets/FieldKit.icns"
+test -s "$icon"
 test -f "$runtime_zip"
 test -s "$collective"
 test -f "$max_plist"
@@ -87,6 +89,8 @@ codesign --verify --deep --strict "$app"
 plutil -replace CFBundleShortVersionString -string "$version" "$plist"
 plutil -replace CFBundleVersion -string "$version" "$plist"
 plutil -replace NSMicrophoneUsageDescription -string 'Field Kit uses audio input to record samples.' "$plist"
+plutil -replace CFBundleIconFile -string FieldKit.icns "$plist"
+cp "$icon" "$resources/FieldKit.icns"
 cp "$collective" "$resources/Field Kit.mxf"
 while IFS= read -r name; do
     cp "$source/$name" "$resources/C74/media/$name"
@@ -109,6 +113,8 @@ codesign --verify --strict "$proof${node#"$stage"}"
 codesign --verify --strict "$proof${node_external#"$stage"}"
 "$proof${node#"$stage"}" --check "$proof_resources/fk_set_writer.js"
 lipo "$proof_app/Contents/MacOS/Field Kit" -verify_arch arm64 x86_64
+cmp "$icon" "$proof_resources/FieldKit.icns"
+test "$(plutil -extract CFBundleIconFile raw "$proof_plist")" = FieldKit.icns
 cmp "$collective" "$proof_resources/Field Kit.mxf"
 while IFS= read -r name; do
     cmp "$source/$name" "$proof_resources/C74/media/$name"

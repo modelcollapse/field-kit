@@ -7,11 +7,11 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.23**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
+For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.24**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
 
-The v0.8.23 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.24 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.23](CHANGELOG.md).
+[See what's new in v0.8.24](CHANGELOG.md).
 
 ![Field Kit v0.8.23 standalone playing the demo](docs/screenshots/field-kit-v0823-overview.png)
 
@@ -92,7 +92,7 @@ Sets containing empty tracks require v0.8.21 or later.
 
 ## Store patterns
 
-Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. In v0.8.21, each playing loop finishes its current pass and crossfades into the next pattern over 80 ms. Scene changes use the same transition. Reverse loops finish at the start of their range and ping-pong loops switch at the next turnaround. Different loop lengths reach the new scene at different times. The status shows a queued change. A newer request waits for the current handoff to finish. Shared Main FX, Drifting Memory and master level update after all loops have switched. Modulated loop controls hold their captured values while waiting. Stopped loops stay stopped. **Play original** keeps its existing short stereo-mix transition. **Fade ms** in the loop editor still controls only that loop's seam. Recall clears active solos. Click **Cancel store** to exit store mode.
+Shift-click one of the eight squares to store the current pattern, or click **Store pattern** and pick a square. A dot marks a stored pattern, and the brightest square is the last one you stored or recalled. Click a dotted square to recall its loop settings, mixer levels, pans and mutes, pitch scale, LFO routes and curves, and effects on the current sample. Playing loops crossfade into the new pattern or scene over 80 ms as soon as the new settings are ready. Each playhead starts in its new range, at the end for reverse playback and at the start otherwise. The status shows a queued change. A newer request waits for the current handoff to finish. Shared Main FX, Drifting Memory and master level update after all loops have switched. Modulated loop controls hold their captured values while waiting. Stopped loops stay stopped. **Play original** keeps its existing short stereo-mix transition. **Fade ms** in the loop editor still controls only that loop's seam. Recall clears active solos. Click **Cancel store** to exit store mode.
 
 Open **Source, Input & Files** and use **Save Set…** in the **Set files…** menu to save the shared source and any per-loop audio file locations, all eight slots, and your current settings in one file. **Open Set…** restores the session with playback stopped. If the sample moved, choose its new location.
 

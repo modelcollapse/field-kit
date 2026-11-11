@@ -280,14 +280,14 @@ function begin_pending_recall() {
 begin_pending_recall.local = 1;
 
 // Capture on the audio thread before changing any controls. Each voice then
-// commits at its own loop boundary, independently of the Max scheduler.
+// starts its crossfade once the incoming controls have settled.
 function begin_voice_recall() {
     voiceRecall = pendingRecall;
     pendingRecall = null;
     recallGeneration = recallGeneration % 1000000 + 1;
     voiceRecallPhases = [0, 0, 0, 0];
     recallStage = "voice_capture";
-    bank_status("Pattern " + (voiceRecall.index + 1) + " queued · finishing loops.");
+    bank_status("Pattern " + (voiceRecall.index + 1) + " queued · preparing transition.");
     for (var i = 1; i <= VOICE_COUNT; i++) {
         host.patcher.getnamed("scene_sample_" + i).message("start");
         host.patcher.getnamed("voice_" + i).message("scene_command", recallGeneration * 2);
@@ -307,7 +307,7 @@ function recall_voice_phase(number, encoded) {
             voiceRecall = pendingRecall;
             pendingRecall = null;
         }
-        bank_status("Pattern " + (voiceRecall.index + 1) + " queued · finishing loops.");
+        bank_status("Pattern " + (voiceRecall.index + 1) + " queued · preparing transition.");
         recallStage = "voice_settling";
         try {
             apply_pattern(voiceRecall.pattern, true);

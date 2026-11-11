@@ -1,5 +1,11 @@
 # Field Kit changelog
 
+## v0.8.24
+
+- Crossfade into scenes and patterns as soon as their settings are ready, even when the outgoing loops have long ranges.
+- Move each playhead into its new playback range at the start of the crossfade.
+- Add a custom Field Kit icon to the macOS standalone.
+
 ## v0.8.23
 
 - Save the main mix and four loop WAVs together in a folder named after the take. Reusing a name creates a numbered folder.
