@@ -210,3 +210,68 @@ maxApi.addHandler("remove_input_temp", (filename) => {
     }
 });
 showFolders();
+
+// One ten-channel disk capture keeps the mix and four stereo stems sample-aligned.
+// Split in bounded blocks after recording; exclusive output creation protects old takes.
+maxApi.addHandler("split_output", (captureValue, mixValue) => {
+    const opened = [], created = [];
+    let input;
+    try {
+        const capture = nativePath(captureValue), mix = nativePath(mixValue);
+        if (!/\.wav$/i.test(mix) || capture !== mix.replace(/\.wav$/i, " - synchronized capture.wav")) {
+            throw new Error("Unexpected capture path");
+        }
+        input = fs.openSync(capture, "r");
+        const size = fs.fstatSync(input).size, head = Buffer.alloc(12);
+        fs.readSync(input, head, 0, 12, 0);
+        const rf64 = head.toString("ascii", 0, 4) === "RF64";
+        if ((!rf64 && head.toString("ascii", 0, 4) !== "RIFF") || head.toString("ascii", 8, 12) !== "WAVE") throw new Error("Not a WAV");
+        let at = 12, format, dataAt, dataSize, extended;
+        while (at + 8 <= size) {
+            const chunk = Buffer.alloc(8); fs.readSync(input, chunk, 0, 8, at);
+            const tag = chunk.toString("ascii", 0, 4), length = chunk.readUInt32LE(4); at += 8;
+            if (tag === "ds64") { const ds = Buffer.alloc(16); fs.readSync(input, ds, 0, 16, at); extended = Number(ds.readBigUInt64LE(8)); }
+            if (tag === "fmt ") { format = Buffer.alloc(Math.min(length, 40)); fs.readSync(input, format, 0, format.length, at); }
+            if (tag === "data") { dataAt = at; dataSize = rf64 && length === 0xffffffff ? extended : length; break; }
+            at += length + length % 2;
+        }
+        if (!format || format.length < 16 || !Number.isSafeInteger(dataSize) || !dataSize || dataAt + dataSize > size || dataSize % 30 ||
+            ![1, 0xfffe].includes(format.readUInt16LE(0)) || format.readUInt16LE(2) !== 10 || format.readUInt16LE(14) !== 24 || format.readUInt16LE(12) !== 30) throw new Error("Invalid ten-channel PCM capture");
+        const rate = format.readUInt32LE(4), frames = dataSize / 30, stereoBytes = frames * 6;
+        const outputs = [mix, ...[1,2,3,4].map(i => mix.replace(/\.wav$/i, ` - Loop ${i}.wav`))];
+        for (const output of outputs) {
+            const fd = fs.openSync(output, "wx"); opened.push(fd); created.push(output);
+            const large = stereoBytes + 36 > 0xffffffff, header = Buffer.alloc(large ? 80 : 44);
+            header.write(large ? "RF64" : "RIFF", 0); header.writeUInt32LE(large ? 0xffffffff : stereoBytes + 36, 4); header.write("WAVE", 8);
+            let offset = 12;
+            if (large) {
+                header.write("ds64", offset); header.writeUInt32LE(28, offset + 4);
+                header.writeBigUInt64LE(BigInt(stereoBytes + 72), offset + 8); header.writeBigUInt64LE(BigInt(stereoBytes), offset + 16); header.writeBigUInt64LE(BigInt(frames), offset + 24); offset += 36;
+            }
+            header.write("fmt ", offset); header.writeUInt32LE(16, offset + 4); header.writeUInt16LE(1, offset + 8); header.writeUInt16LE(2, offset + 10);
+            header.writeUInt32LE(rate, offset + 12); header.writeUInt32LE(rate * 6, offset + 16); header.writeUInt16LE(6, offset + 20); header.writeUInt16LE(24, offset + 22);
+            header.write("data", offset + 24); header.writeUInt32LE(large ? 0xffffffff : stereoBytes, offset + 28); fs.writeSync(fd, header);
+        }
+        const blockFrames = 8192, block = Buffer.alloc(blockFrames * 30);
+        for (let frame = 0; frame < frames; frame += blockFrames) {
+            const count = Math.min(blockFrames, frames - frame), bytes = count * 30;
+            if (fs.readSync(input, block, 0, bytes, dataAt + frame * 30) !== bytes) throw new Error("Short capture read");
+            for (let stem = 0; stem < 5; stem++) {
+                const output = Buffer.alloc(count * 6);
+                for (let n = 0; n < count; n++) block.copy(output, n * 6, n * 30 + stem * 6, n * 30 + stem * 6 + 6);
+                let written = 0;
+                while (written < output.length) { const amount = fs.writeSync(opened[stem], output, written, output.length - written); if (!amount) throw new Error("Short disk write"); written += amount; }
+            }
+        }
+        for (const fd of opened) { fs.fsyncSync(fd); fs.closeSync(fd); } opened.length = 0;
+        fs.closeSync(input); input = undefined;
+        fs.unlinkSync(capture);
+        maxApi.outlet("output_split_done", 1, "Saved mix + 4 loops");
+    } catch (error) {
+        for (const fd of opened) { try { fs.closeSync(fd); } catch (_) {} }
+        if (input !== undefined) { try { fs.closeSync(input); } catch (_) {} }
+        for (const filename of created) { try { fs.unlinkSync(filename); } catch (_) {} }
+        maxApi.post(`Output recording retained its synchronized capture: ${error.message}`);
+        maxApi.outlet("output_split_done", 0, "Synchronized capture kept for recovery");
+    }
+});

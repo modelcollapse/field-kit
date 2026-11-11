@@ -1,6 +1,6 @@
 autowatch = 0;
 inlets = 1;
-outlets = 0;
+outlets = 1;
 
 var host = this;
 var state = "idle";
@@ -8,6 +8,8 @@ var status = "Enable audio to record";
 var dspOn = false;
 var path = "";
 var lastSavedPath = "";
+var takePaths = [];
+var capturePath = "";
 var elapsedMs = 0;
 var nativeElapsedMs = null;
 var normalStatusColor = null;
@@ -42,11 +44,11 @@ renderTime.local = 1;
 function render() {
     var recording = state === "recording";
     var canStop = state === "starting" || recording;
-    var caption = canStop ? "Stop recording" : "Record mix…";
+    var caption = canStop ? "Stop recording" : "Record output…";
     send("record_button", "text", caption);
     send("record_button", "texton", caption);
-    send("record_button", "hint", canStop ? "Finish and save the mix recording." :
-        "Choose where to save a WAV of the final mix.");
+    send("record_button", "hint", canStop ? "Finish and save the main mix and four loop WAVs." :
+        "Save the main mix and four separate loop WAVs; shared FX are in the main mix.");
     send("record_button", "active", canStop || (dspOn && state === "idle") ? 1 : 0);
     if (recording && normalStatusColor === null) {
         normalStatusColor = host.patcher.getnamed("record_status").getattr("textcolor");
@@ -75,7 +77,7 @@ function idleStatus() {
     if (!dspOn) {
         return "Enable audio to record";
     }
-    return lastSavedPath ? "Saved stereo WAV" : "Ready to record";
+    return lastSavedPath ? "Saved mix + 4 loops" : "Ready to record";
 }
 idleStatus.local = 1;
 
@@ -132,6 +134,24 @@ function start_path(filePath) {
         render();
         return;
     }
+    var base = filePath.replace(/\.wav$/i, "");
+    var proposed = [filePath];
+    for (var track = 1; track <= 4; track++) proposed.push(base + " - Loop " + track + ".wav");
+    var capture = base + " - synchronized capture.wav";
+    proposed.push(capture);
+    // Check every destination before opening any writer. Never replace an earlier take.
+    for (var index = 0; index < proposed.length; index++) {
+        var existing = new File(proposed[index], "read");
+        var occupied = existing.isopen;
+        if (occupied) existing.close();
+        if (occupied) {
+            status = "File exists · choose a new take name";
+            render();
+            return;
+        }
+    }
+    capturePath = proposed.pop();
+    takePaths = proposed;
     path = filePath;
     elapsedMs = 0;
     nativeElapsedMs = null;
@@ -140,7 +160,7 @@ function start_path(filePath) {
     status = "Starting…";
     render();
     send("writer", "samptype", "int24");
-    send("writer", "open", "wave", path);
+    send("writer", "open", "wave", capturePath);
     send("writer", 1);
     watchProgress.repeat();
 }
@@ -241,19 +261,25 @@ function hasAudio(filePath) {
 hasAudio.local = 1;
 
 function finish() {
-    var saved = endReason !== "Couldn’t start recording" && hasAudio(path);
-    if (!saved && ++verifyAttempts < 4) {
-        verifyFile.schedule(150);
-        return;
+    if (!hasAudio(capturePath)) {
+        if (++verifyAttempts < 4) { verifyFile.schedule(150); return; }
+        status = "Capture not ready · check the recording folder";
+        state = "idle"; path = ""; render(); return;
     }
-    if (saved) {
-        lastSavedPath = path;
-        status = endReason ? "Saved partial WAV · " + endReason : "Saved stereo WAV";
-    } else {
-        status = endReason ? "No WAV saved · " + endReason : "No WAV saved · Check the save folder";
-    }
-    path = "";
-    state = "idle";
+    state = "splitting";
+    status = "Saving mix + 4 loops…";
     render();
+    outlet(0, "split_output", capturePath, path);
 }
 finish.local = 1;
+
+function split_done(success, message) {
+    if (state !== "splitting") return;
+    if (success) {
+        lastSavedPath = path;
+        status = endReason ? "Saved take · " + endReason : "Saved mix + 4 loops";
+    } else {
+        status = "Save incomplete · synchronized capture kept";
+    }
+    path = ""; state = "idle"; render();
+}

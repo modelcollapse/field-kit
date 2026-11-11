@@ -37,7 +37,7 @@ Enable audio and play one note at a time. The display shows the nearest note,
 frequency and cents relative to A4 = 440 Hz.
 
 Open Source, Input & Files → Working folders… to select the starting folders
-for Import to…, Replace audio…, Save Loop WAV…, and Record mix…. Field Kit remembers these choices across launches. The default folders, when present, are Imports and
+for Import to…, Replace audio…, Save Loop WAV…, and Record output…. Field Kit remembers these choices across launches. The default folders, when present, are Imports and
 Recordings under Documents/Field Kit.
 
 Open Source, Input & Files → Audio & MIDI Setup… and choose your Input device
@@ -115,9 +115,15 @@ I/O controls beside the delay. The mixer sends stay visible and the delay
 keeps playing either way. The Main FX shortcut opens the same drawer.
 Hold freezes the current memory. Cut Tail clears it and sets capture to Off while
 the dry mix keeps playing. Release Hold and arm a bank to capture again.
-Mix recording includes Drifting Memory. Click Record mix… beside Main FX to save
-the final stereo output to a WAV. Click the same button when it reads Stop
-recording to finish and save the take.
+Click Record output… beside Main FX to capture the main mix and all four loops.
+Choose a new WAV name. Click Stop recording, then wait for Saved mix + 4 loops.
+The chosen name is the main mix, with shared Main FX, Drifting Memory, and Master.
+Four matching stereo WAVs end in - Loop 1.wav through - Loop 4.wav and capture
+individual mixer strips before shared FX. All five files have identical sample counts.
+Capture is synchronized first, then separated after Stop. If saving fails,
+the synchronized capture remains for recovery. Existing take files are protected.
+Save Bank also requires a new filename when a bank already exists. Load Bank
+and the saved Banks & patterns folder remain available.
 The L and R master meters show each output channel. A red CLIP light identifies
 the channel that hit the output ceiling. Lower Master if either light comes on.
 

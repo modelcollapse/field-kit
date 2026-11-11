@@ -22,7 +22,7 @@ function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
     };
     vm.runInNewContext(source, {
         require: name => ({fs: fileApi, path: pathApi, os: {homedir: () => dir, tmpdir: () => dir}, "max-api": maxApi})[name],
-        process: {platform, env: {}},
+        process: {platform, env: {}}, Buffer,
     });
     function write(staged, destination, success) {
         response = null;
@@ -43,12 +43,36 @@ function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
         handlers.folder_choose(key, folder);
         return response;
     };
+    write.split = (capture, mix) => { handlers.split_output(capture, mix); return response; };
     return write;
 }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "field-kit-writer-"));
 try {
     const write = loadWriter();
+    const capture = path.join(dir, "Output - synchronized capture.wav"), mix = path.join(dir, "Output.wav");
+    const frames = 20000, pcm = Buffer.alloc(frames * 30), header = Buffer.alloc(44);
+    header.write('RIFF'); header.writeUInt32LE(pcm.length + 36, 4); header.write('WAVEfmt ', 8);
+    header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20); header.writeUInt16LE(10, 22);
+    header.writeUInt32LE(48000, 24); header.writeUInt32LE(48000 * 30, 28); header.writeUInt16LE(30, 32); header.writeUInt16LE(24, 34);
+    header.write('data', 36); header.writeUInt32LE(pcm.length, 40);
+    for (let frame = 0; frame < frames; frame++) for (let ch = 0; ch < 10; ch++) pcm.writeIntLE(frame * 10 + ch, frame * 30 + ch * 3, 3);
+    fs.writeFileSync(capture, Buffer.concat([header, pcm]));
+    assert.equal(write.split(capture, mix)[1], 1);
+    assert(!fs.existsSync(capture));
+    for (let stem = 0; stem < 5; stem++) {
+        const file = stem ? mix.replace('.wav', ` - Loop ${stem}.wav`) : mix;
+        const wav = fs.readFileSync(file); assert.equal(wav.length, 44 + frames * 6);
+        for (const frame of [0, 8191, 8192, 19999]) for (let channel = 0; channel < 2; channel++)
+            assert.equal(wav.readIntLE(44 + frame * 6 + channel * 3, 3), frame * 10 + stem * 2 + channel);
+    }
+    // A collision in the final stem must preserve it and roll back only this attempt's outputs.
+    const otherMix = path.join(dir, 'Collision.wav'), otherCapture = otherMix.replace('.wav', ' - synchronized capture.wav');
+    fs.writeFileSync(otherCapture, Buffer.concat([header, pcm]));
+    const occupied = otherMix.replace('.wav', ' - Loop 4.wav'); fs.writeFileSync(occupied, 'KEEP');
+    assert.equal(write.split(otherCapture, otherMix)[1], 0);
+    assert.equal(fs.readFileSync(occupied, 'utf8'), 'KEEP'); assert(fs.existsSync(otherCapture)); assert(!fs.existsSync(otherMix));
+
     const bankDefault = path.join(dir, "Documents", "Field Kit", "Banks");
     assert.equal(write.folders()[3], bankDefault);
     assert(fs.statSync(bankDefault).isDirectory());

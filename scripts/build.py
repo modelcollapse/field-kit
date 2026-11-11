@@ -409,11 +409,12 @@ def pattern_controls(p):
     p.connect("set_relink_result", 0, "pattern_control")
     p.connect("set_relink_cancel", 0, "pattern_control")
     p.obj("set_writer", "node.script fk_set_writer.js @autostart 1", 2425, 2125, outs=2)
-    p.obj("file_preferences_route", "routepass folder_paths input_temp_ready", 2425, 2160, outs=3)
+    p.obj("file_preferences_route", "routepass folder_paths input_temp_ready output_split_done", 2425, 2160, outs=4)
     p.connect("set_writer", 0, "file_preferences_route")
     p.connect("file_preferences_route", 0, "source_control")
     p.connect("file_preferences_route", 1, "source_control")
-    p.connect("file_preferences_route", 2, "pattern_control")
+    p.connect("file_preferences_route", 2, "source_control")
+    p.connect("file_preferences_route", 3, "pattern_control")
     add_working_folders(p, Patch(), VERSION)
     sequence_controls(p)
 
@@ -923,7 +924,7 @@ def build():
     for name, file, col, width, inputs, output_types in (
         ("mix_fx", "fk_fx.maxpat", 0, SPLIT, 7 + FX_MOD_CHANNELS,
          ["signal"] * (2 + FX_MOD_CHANNELS) + ["bang", "bang", ""]),
-        ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 2, []),
+        ("recorder", "fk_record.maxpat", SPLIT, RIGHT_TRACKS, 10, [""]),
     ):
         rect = grid_rect(col, 22, width, 5, MIX_OFFSET)
         if name == "recorder":
@@ -933,6 +934,7 @@ def build():
         p.boxes[-1]["box"].update(name=file, args=[], offset=[0.0, 0.0], border=0,
                    clickthrough=int(name == "recorder"),
                    enablehscroll=0, enablevscroll=0, lockeddragscroll=0)
+    p.connect("recorder", 0, "set_writer")
     drifting_memory(p)
     performance_mix(p)
     p.obj("fx_appearance_route", "route fx_enabled fx_mode enabled", 3740, 1815, outs=4)
@@ -1105,6 +1107,7 @@ def build():
             p.obj(mix_channel, "*~ 1.", 2680 + 116 * outlet, y + 124, ins=2, types=["signal"])
             p.connect(shifter, outlet, mix_channel)
             p.connect(mix_channel, 0, "mix_fx", outlet)
+            p.connect(mix_channel, 0, "recorder", 2 + (voice - 1) * 2 + outlet)
             for send_index, send_key in enumerate(LOOP_SENDS):
                 send_channel = f"{send_key}_{suffix}_{voice}"
                 x = 3510 + 100 * (2 * send_index + outlet)

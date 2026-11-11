@@ -896,3 +896,10 @@ files.set('/test/sets/Older loop Set.json', JSON.stringify({...emptySet, version
 host.read_set('/test/sets/Older loop Set.json');
 assert.equal(openedLoops[3], undefined);
 host.set_source_loaded(1);
+
+// Saving a bank to an occupied path must preserve every byte of the old bank.
+const originalBankBytes = files.get('/test/bank.json');
+assert(originalBankBytes);
+host.write_bank('/test/bank.json');
+assert.equal(files.get('/test/bank.json'), originalBankBytes);
+console.log('PASS existing bank files are preserved on Save Bank');

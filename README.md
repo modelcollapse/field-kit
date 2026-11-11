@@ -1,19 +1,19 @@
 # FIELD KIT
 
-FIELD KIT is a Max instrument that turns an audio file or a live recording into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, and filter. Blend the loops in the performance mixer, move them with eight LFOs, and capture the stereo mix with the built-in recorder.
+FIELD KIT is a Max instrument that turns an audio file or a live recording into four independent stereo loops. Set each loop's range, speed, direction, crossfade, drive, and filter. Blend the loops in the performance mixer, move them with eight LFOs, and capture the main mix and four separate loop WAVs with the built-in recorder.
 
 ## Start here
 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.21**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
+For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.22**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
 
-The v0.8.21 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.22 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.21](CHANGELOG.md).
+[See what's new in v0.8.22](CHANGELOG.md).
 
-![Field Kit v0.8.21 standalone playing four demo loops with a scene queued to finish the outgoing loops](docs/screenshots/field-kit-v0821-overview.png)
+![Field Kit v0.8.22 standalone with synchronized main-mix and four-loop output recording](docs/screenshots/field-kit-v0822-overview.png)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Use **Send to** and the **Import to…** button to stage your own sample for a loop or all four. The same drawer holds audio setup, loop recording, and Set files.
 
@@ -23,9 +23,9 @@ In the selected loop editor, choose **Low-pass** to cut highs, **High-pass** to 
 
 ## Working folders
 
-Open **Source, Input & Files → Working folders…** to choose the starting locations for the **Import to…** button, **Replace audio…**, **Save Loop WAV…**, and **Record mix…**. Use **Banks & patterns folder** for **Save Bank** and **Load Bank**. Patterns are stored together inside bank files. Field Kit remembers all three folder choices across launches. The default bank folder is **Documents/Field Kit/Banks**, which Field Kit creates when needed. When present, the default audio folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
+Open **Source, Input & Files → Working folders…** to choose the starting locations for the **Import to…** button, **Replace audio…**, **Save Loop WAV…**, and **Record output…**. Use **Banks & patterns folder** for **Save Bank** and **Load Bank**. Patterns are stored together inside bank files. Field Kit remembers all three folder choices across launches. The default bank folder is **Documents/Field Kit/Banks**, which Field Kit creates when needed. When present, the default audio folders are **Documents/Field Kit/Imports** and **Documents/Field Kit/Recordings**. Choose a different destination in the save dialog whenever you need to.
 
-![Working folders with import, recording and Banks & patterns locations](docs/screenshots/field-kit-v0821-working-folders.png)
+![Working folders with a saved Banks & patterns location](docs/screenshots/field-kit-v0821-working-folders.png)
 
 ## Record a source
 
@@ -64,9 +64,9 @@ Open **Visuals** and set the **Tuner** source to **Live input L**, **Live input 
 
 ## Mix the four windows
 
-Each waveform has a mixer strip with playback, level, pan, mute, solo, a peak meter, and **Echo** and **Room** sends. Click or drag the blue fader under a window’s playback button to set its volume, or edit the percentage box for a precise level. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. Mixer performance controls leave the edit selection in place. **Record mix** captures the resulting master mix.
+Each waveform has a mixer strip with playback, level, pan, mute, solo, a peak meter, and **Echo** and **Room** sends. Click or drag the blue fader under a window’s playback button to set its volume, or edit the percentage box for a precise level. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. Mixer performance controls leave the edit selection in place. **Record output** captures the resulting master mix.
 
-The **L** and **R** meters in the **Master** strip show each output channel. A red **Clip** light shows which channel hit the output ceiling. Lower **Master** if either light comes on. The **Mix recording** panel below has the recording button, timer, status, and take name.
+The **L** and **R** meters in the **Master** strip show each output channel. A red **Clip** light shows which channel hit the output ceiling. Lower **Master** if either light comes on. The **Output recording** panel below has the recording button, timer, status, and take name.
 
 Open **Stereo field…** beside **FX pad…** in the **Main FX** header. Drag a window edge to resize the Stereo Field. The tabs select which loop's pan and level are shown above the pad. Drag its dot left or right to pan it, and up or down to change its level. If dots overlap, use the tabs to pick one.
 
@@ -106,11 +106,11 @@ The scene strip at the top, between **Transport** and **Master**, shows the curr
 
 ![The compact Scene Sequencer running four programmed scenes directly below Patterns](docs/screenshots/field-kit-v0821-scenes.png)
 
-Use the workspace selector to switch between **Mix**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Mix recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to show the tuner below the workspace tabs while the analyzers stay in the right column.
+Use the workspace selector to switch between **Mix**, **Modulation**, and **Visuals**, or **Hide** to collapse the lower panel. **Mix** opens by default. On wide displays, **Full screen** puts **Output recording** and **Mix visuals** in a right column that stays visible as you switch workspaces. Select **Visuals** there to show the tuner below the workspace tabs while the analyzers stay in the right column.
 
-**Visuals** monitors the same final stereo signal as **Record mix**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. Click **Stereo X/Y…** above the scope to open a larger, resizable window. The scope plots left against right. Matching left and right signals trace a rising diagonal. Opening Stereo X/Y or Stereo Field from full screen returns the workspace to a window so you can see both at once.
+**Visuals** monitors the same final stereo signal as **Record output**. Choose **History** for a scrolling frequency history or **Spectrum** for a live frequency curve, with a separate view for each channel. Click **Stereo X/Y…** above the scope to open a larger, resizable window. The scope plots left against right. Matching left and right signals trace a rising diagonal. Opening Stereo X/Y or Stereo Field from full screen returns the workspace to a window so you can see both at once.
 
-![The Visuals workspace with live stereo frequency history, Stereo X/Y, and the docked Tuner](docs/screenshots/field-kit-v0821-visuals.png)
+![The Visuals workspace with live stereo frequency history, Stereo X/Y, and the docked Tuner](docs/screenshots/field-kit-v0822-visuals.png)
 
 ![The resizable Stereo X/Y window showing the live left and right channels of the final mix](docs/screenshots/field-kit-stereo-scope.png)
 
@@ -122,7 +122,7 @@ In **Loop sends** mode, the per-loop send routes control which loops feed Echo a
 
 The lower-left graph shows one cycle of the selected LFO’s shape. Choose **Breakpoint** or click **Use curve** to edit that LFO’s custom curve. Click to add a point, drag to move it, or Shift-click to delete it. Each LFO keeps its curve when you switch shapes. The graph on the right shows the live signal when audio is on.
 
-![A sine LFO routed to Loop 1 Pan at +25% depth with an Applied value and live signal graph](docs/screenshots/field-kit-v0821-modulation.png)
+![A sine LFO routed to Loop 1 Pan at +25% depth with an Applied value and live signal graph](docs/screenshots/field-kit-v0822-modulation.png)
 
 ## Process and capture
 
@@ -138,7 +138,7 @@ Click **● Record** in the FX pad to arm it. Drag across the grid as many times
 
 | Stereo field | FX pad |
 | --- | --- |
-| ![The Stereo Field window with four loop positions, per-loop recording and Play paths controls](docs/screenshots/field-kit-v0821-stereo-field.png) | ![The FX pad with Echo and Room axes and Record, Play and Clear controls](docs/screenshots/field-kit-v0821-fx-pad.png) |
+| ![The Stereo Field window with four loop positions, per-loop recording and Play paths controls](docs/screenshots/field-kit-v0822-stereo-field.png) | ![The FX pad with Echo and Room axes and Record, Play and Clear controls](docs/screenshots/field-kit-v0822-fx-pad.png) |
 
 **Drifting Memory** runs at the end of Main FX. In **Mix**, click **Drift · Off** to turn it on, play the loops, then choose **All** under **Arm capture**. With **Two Delays** and **Small**, the first return takes about 2½ seconds. The **Memory** meter shows what’s circulating in the delay. **Wet return** shows what the delay adds to the final mix. Use **Mix** to blend it in. Choose **Off** under **Arm capture** to stop recording into memory while the tail plays. Sets and patterns save the effect settings. Captured memory is for the current session.
 
@@ -148,9 +148,11 @@ Use **Hold** to freeze what’s in memory. **Cut Tail** clears the captured audi
 
 ![Drifting Memory enabled with Memory and Wet return meters, Hold, Cut Tail and the Advanced Time page](docs/screenshots/field-kit-v0821-drifting-memory.png)
 
-With audio enabled, click **Record mix…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. The recorder writes the final mix as a 24-bit stereo WAV at the audio device's current sample rate. **Stop all** lets the effects decay. Click the same button, now labeled **Stop recording**, to finish and save the take.
+With audio enabled, click **Record output…** and choose where to save the take. The red **RECORDING** indicator and timer show when capture is active. The recorder writes five 24-bit stereo WAVs at the audio device's current sample rate: the chosen main-mix filename and four matching files ending in ` - Loop 1.wav` through ` - Loop 4.wav`. Loop files capture each mixer strip before shared Main FX and Drifting Memory; those shared effects and Master processing are captured in the main mix. All five files start and stop together. Field Kit captures the ten channels together, then separates them after **Stop recording**. Wait for **Saved mix + 4 loops**. The temporary synchronized capture is removed after successful saving and kept for recovery if saving fails. Existing take files are never replaced: choose a new take name if any of the five destinations already exists. **Stop all** lets the effects decay. Click the same button, now labeled **Stop recording**, to finish and save the take.
 
-![Field Kit recording a stereo WAV with Stop recording visible and Same speed selected at 0.75×](docs/screenshots/field-kit-recording.jpg)
+![Field Kit v0.8.22 recording the main mix and four loops together](docs/screenshots/field-kit-v0822-recording.png)
+
+![Output recording confirms that the mix and four loop WAVs have been saved](docs/screenshots/field-kit-v0822-saved.png)
 
 ## Build and test
 
@@ -165,6 +167,7 @@ See the [release checklist](docs/releasing.md) for building, testing, and publis
 Run the playback startup, input recording, pattern bank, scene timing, curve editing, Set writer, and FX pad recording tests with Node.js.
 
 ```sh
+node tests/output_record_verify.cjs
 node tests/source_launch_verify.cjs
 node tests/input_record_verify.cjs
 node tests/pattern_bank_verify.cjs
@@ -175,3 +178,9 @@ node tests/fx_pad_verify.cjs
 ```
 
 The playback and modulation brief was inspired by Field Tone Audio's FIELD KIT. [Original instrument](https://fieldtoneaudio.gumroad.com/l/field-kit)
+
+Save Bank preserves existing bank files. To save revised patterns, choose a new filename. Load Bank and the remembered Banks & patterns folder remain available; output recording never writes bank files.
+
+![Field Kit v0.8.22 patterns with two stored demo snapshots](docs/screenshots/field-kit-v0822-scenes.png)
+
+![Field Kit v0.8.22 Drifting Memory controls beside the output recorder](docs/screenshots/field-kit-v0822-drifting-memory.png)

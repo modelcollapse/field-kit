@@ -3918,14 +3918,14 @@
           "varname": "file_preferences_route",
           "maxclass": "newobj",
           "numinlets": 1,
-          "numoutlets": 3,
+          "numoutlets": 4,
           "patching_rect": [
             2425,
             2160,
-            285,
+            411,
             22
           ],
-          "text": "routepass folder_paths input_temp_ready"
+          "text": "routepass folder_paths input_temp_ready output_split_done"
         }
       },
       {
@@ -9234,15 +9234,17 @@
           "id": "obj-202",
           "varname": "recorder",
           "maxclass": "bpatcher",
-          "numinlets": 2,
-          "numoutlets": 0,
+          "numinlets": 10,
+          "numoutlets": 1,
           "patching_rect": [
             688,
             608,
             380,
             78
           ],
-          "outlettype": [],
+          "outlettype": [
+            ""
+          ],
           "presentation": 1,
           "presentation_rect": [
             688,
@@ -39230,6 +39232,18 @@
             2
           ],
           "destination": [
+            "obj-29",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-148",
+            3
+          ],
+          "destination": [
             "obj-84",
             0
           ]
@@ -39771,6 +39785,18 @@
           ],
           "destination": [
             "obj-200",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-202",
+            0
+          ],
+          "destination": [
+            "obj-147",
             0
           ]
         }
@@ -42638,6 +42664,18 @@
             0
           ],
           "destination": [
+            "obj-202",
+            2
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-393",
+            0
+          ],
+          "destination": [
             "obj-394",
             0
           ]
@@ -42748,6 +42786,18 @@
           "destination": [
             "obj-201",
             1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-397",
+            0
+          ],
+          "destination": [
+            "obj-202",
+            3
           ]
         }
       },
@@ -44450,6 +44500,18 @@
             0
           ],
           "destination": [
+            "obj-202",
+            4
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-495",
+            0
+          ],
+          "destination": [
             "obj-496",
             0
           ]
@@ -44560,6 +44622,18 @@
           "destination": [
             "obj-201",
             1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-499",
+            0
+          ],
+          "destination": [
+            "obj-202",
+            5
           ]
         }
       },
@@ -46262,6 +46336,18 @@
             0
           ],
           "destination": [
+            "obj-202",
+            6
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-597",
+            0
+          ],
+          "destination": [
             "obj-598",
             0
           ]
@@ -46372,6 +46458,18 @@
           "destination": [
             "obj-201",
             1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-601",
+            0
+          ],
+          "destination": [
+            "obj-202",
+            7
           ]
         }
       },
@@ -48074,6 +48172,18 @@
             0
           ],
           "destination": [
+            "obj-202",
+            8
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-699",
+            0
+          ],
+          "destination": [
             "obj-700",
             0
           ]
@@ -48184,6 +48294,18 @@
           "destination": [
             "obj-201",
             1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-703",
+            0
+          ],
+          "destination": [
+            "obj-202",
+            9
           ]
         }
       },

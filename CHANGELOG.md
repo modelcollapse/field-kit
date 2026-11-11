@@ -1,5 +1,12 @@
 # Field Kit changelog
 
+## v0.8.22
+
+- Record the main mix and all four loops with one Record output / Stop recording button. Save five 24-bit stereo WAVs with identical sample counts.
+- Capture channels synchronously, then split after stopping. Keep the original capture for recovery if file creation fails.
+- Loop files capture individual mixer strips before shared effects; the main mix includes Main FX, Drifting Memory and Master processing.
+- Refuse to replace existing take files or banks. Save edited banks under a new name; Load Bank and the saved Banks & patterns folder remain available.
+
 ## v0.8.21
 
 - Add Loop actions… → Clear loop… with confirmation. Empty tracks stay silent and can receive new recordings, imports or copied audio.

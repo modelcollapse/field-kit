@@ -32,16 +32,16 @@ def build(output_dir=ROOT):
     def connect(source, target, outlet=0, inlet=0):
         lines.append({"patchline": {"source": [source, outlet], "destination": [target, inlet]}})
 
-    label("capture_title", "Mix recording", [10, 0, 131, 20], fontsize=15, fontface=1)
-    label("record_format", "Stereo WAV · 24-bit", [153, 2, 131, 17], fontsize=11)
+    label("capture_title", "Output recording", [10, 0, 131, 20], fontsize=15, fontface=1)
+    label("record_format", "Mix + 4 loops · 24-bit", [153, 2, 131, 17], fontsize=11)
     label("record_time", "00:00.0", [287, 0, 84, 20], fontsize=16, fontface=1, textjustification=2)
     label("record_status", "Enable audio to record", [10, 44, 361, 17], fontsize=12, fontface=1)
     label("record_file", "", [10, 61, 361, 16], fontsize=11)
 
-    router = obj("rec_controller", "js fk_recorder.js", 240, 216, 120, outputs=())
+    router = obj("rec_controller", "js fk_recorder.js", 240, 216, 120, outputs=("",))
     button = box("record_button", "live.text", [10, 21, 135, 21], outputs=("bang", ""),
                  visible=True, mode=0, active=0, parameter_enable=0,
-                 text="Record mix…", texton="Record mix…", hint="Choose where to save a WAV of the final mix.")
+                 text="Record output…", texton="Record output…", hint="Choose where to save a WAV of the final mix.")
     toggle = box("record_button_message", "message", [10, 150, 90, 22], 2, ("",), text="toggle_record")
     connect(button, toggle)
     connect(toggle, router)
@@ -54,11 +54,19 @@ def build(output_dir=ROOT):
     connect(chosen, router)
     connect(cancel, router)
 
-    writer = obj("writer", "sfrecord~ 2", 0, 280, 116, 2, ("signal",))
+    writer = obj("writer", "sfrecord~ 10", 0, 280, 116, 10, ("signal",))
     for index, (x, channel) in enumerate(((0, "Left"), (90, "Right")), 1):
         source = box("audio_" + channel.lower(), "inlet", [x, 216, 30, 30],
                      0, ("signal",), index=index, comment=channel + " final mix")
         connect(source, writer, inlet=index - 1)
+    for track in range(1, 5):
+        for channel in range(2):
+            index = 2 + (track - 1) * 2 + channel
+            source = box(f"track_{track}_{channel}", "inlet", [index * 90, 216, 30, 30],
+                         0, ("signal",), index=index + 1, comment=f"Loop {track} stereo channel {channel + 1}")
+            connect(source, writer, inlet=index)
+    command = box("record_commands", "outlet", [850, 500, 30, 30], outputs=(), index=1)
+    connect(router, command)
     snapshot = obj("elapsed_sample", "snapshot~ 100", 0, 314, 116, 2, ("float",))
     elapsed = obj("elapsed_message", "prepend elapsed", 0, 346, 116, 2)
     connect(writer, snapshot)

@@ -568,6 +568,12 @@ function write_bank(path) {
     if (typeof path !== "string" || !path) {
         return;
     }
+    var existing = new File(path, "read");
+    if (existing.isopen) {
+        existing.close();
+        status("Bank exists · choose a new filename to keep the original.");
+        return;
+    }
     var file;
     try {
         file = new File(path, "write", "TEXT");
