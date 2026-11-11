@@ -1,5 +1,10 @@
 # Field Kit changelog
 
+## v0.8.23
+
+- Save the main mix and four loop WAVs together in a folder named after the take. Reusing a name creates a numbered folder.
+- Fix saving and reopening large pattern banks, including all eight occupied slots. Set saving uses the same chunked writer.
+
 ## v0.8.22
 
 - Record the main mix and all four loops with one Record output / Stop recording button. Save five 24-bit stereo WAVs with identical sample counts.

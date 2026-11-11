@@ -194,7 +194,12 @@ function File(path, mode) {
         get: () => files.get(path)?.length ?? 0,
         set: length => files.set(path, files.get(path).slice(0, length)),
     });
-    this.writestring = text => { files.set(path, text); this.position = text.length; };
+    this.writestring = text => {
+        const chunk = text.slice(0, 32767);
+        const previous = files.get(path) ?? '';
+        files.set(path, previous.slice(0, this.position) + chunk + previous.slice(this.position + chunk.length));
+        this.position += chunk.length;
+    };
     this.readstring = size => {
         if (failTextRead) return null;
         const text = files.get(path).slice(this.position, this.position + size);
@@ -903,3 +908,13 @@ assert(originalBankBytes);
 host.write_bank('/test/bank.json');
 assert.equal(files.get('/test/bank.json'), originalBankBytes);
 console.log('PASS existing bank files are preserved on Save Bank');
+
+const fullBankPath = '/test/full-bank.json';
+const fullPattern = JSON.parse(files.get('/test/bank.json')).slots.find(Boolean);
+host.slots = Array.from({ length: 8 }, () => structuredClone(fullPattern));
+host.write_bank(fullBankPath);
+assert(files.get(fullBankPath).length > 32767);
+host.slots = Array(8).fill(null);
+host.read_bank(fullBankPath);
+assert.equal(host.slots.filter(Boolean).length, 8);
+console.log('PASS banks larger than the Max write limit save and reopen');

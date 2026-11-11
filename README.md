@@ -7,13 +7,15 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.22**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
+For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.23**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
 
-The v0.8.22 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.23 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.22](CHANGELOG.md).
+[See what's new in v0.8.23](CHANGELOG.md).
 
-![Field Kit v0.8.22 standalone with synchronized main-mix and four-loop output recording](docs/screenshots/field-kit-v0822-overview.png)
+![Field Kit v0.8.23 standalone playing the demo](docs/screenshots/field-kit-v0823-overview.png)
+
+[View the v0.8.23 Max workspace](docs/screenshots/field-kit-v0823-max.png)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Use **Send to** and the **Import to…** button to stage your own sample for a loop or all four. The same drawer holds audio setup, loop recording, and Set files.
 
@@ -150,9 +152,9 @@ Use **Hold** to freeze what’s in memory. **Cut Tail** clears the captured audi
 
 With audio enabled, click **Record output…** and name the take. Field Kit creates a folder with that name inside the selected location, which starts in your Recordings folder. For example, `Evening Take.wav` creates `Recordings/Evening Take/` for the mix and four loop WAVs. If that folder already exists, the new take gets a numbered folder. The red **RECORDING** indicator and timer show when capture is active. The recorder writes five 24-bit stereo WAVs at the audio device's current sample rate: the chosen main-mix filename and four matching files ending in ` - Loop 1.wav` through ` - Loop 4.wav`. Loop files capture each mixer strip before shared Main FX and Drifting Memory; those shared effects and Master processing are captured in the main mix. All five files start and stop together. Field Kit captures the ten channels together, then separates them after **Stop recording**. Wait for **Saved mix + 4 loops**. The temporary synchronized capture is removed after successful saving and kept for recovery if saving fails. Existing take files are never replaced. **Stop all** lets the effects decay. Click the same button, now labeled **Stop recording**, to finish and save the take.
 
-![Field Kit v0.8.22 recording the main mix and four loops together](docs/screenshots/field-kit-v0822-recording.png)
+![Field Kit v0.8.23 recording the main mix and four loops into a take folder](docs/screenshots/field-kit-v0823-recording.png)
 
-![Output recording confirms that the mix and four loop WAVs have been saved](docs/screenshots/field-kit-v0822-saved.png)
+![Output recording confirms that the mix and four loop WAVs have been saved](docs/screenshots/field-kit-v0823-saved.png)
 
 ## Build and test
 

@@ -574,27 +574,13 @@ function write_bank(path) {
         status("Bank exists · choose a new filename to keep the original.");
         return;
     }
-    var file;
     try {
-        file = new File(path, "write", "TEXT");
-        if (!file.isopen) {
-            throw new Error("Could not open file");
-        }
         var contents = JSON.stringify({ format: BANK_FORMAT, version: BANK_VERSION, slots: slots }, null, 2) + "\n";
-        file.position = 0;
-        file.writestring(contents);
-        if (file.position !== contents.length) {
-            throw new Error("Incomplete write");
-        }
-        file.eof = file.position;
+        write_json_file(path, contents);
         bankDirty = false;
         status("Pattern bank saved.");
     } catch (error) {
         status("Couldn’t save the pattern bank.");
-    } finally {
-        if (file && file.isopen) {
-            file.close();
-        }
     }
 }
 
@@ -740,7 +726,7 @@ function write_set(path) {
         var contents = JSON.stringify(data, null, 2).replace(/[^\x00-\x7f]/g, function (character) {
             return "\\u" + ("0000" + character.charCodeAt(0).toString(16)).slice(-4);
         }) + "\n";
-        write_set_stage(stage, contents);
+        write_json_file(stage, contents);
     } catch (error) {
         set_status("Can’t save Set. Choose a writable folder.");
         return;
@@ -752,19 +738,23 @@ function write_set(path) {
     host.patcher.getnamed("set_writer").message("commit_set", stage, path);
 }
 
-function write_set_stage(path, contents) {
+function write_json_file(path, contents) {
     var file = new File(path, "write", "TEXT");
     try {
         if (!file.isopen) throw new Error("Could not create staging file");
         file.position = 0;
-        file.writestring(contents);
-        if (file.position !== contents.length) throw new Error("Incomplete write");
+        // Max File.writestring can truncate a single large message.
+        for (var offset = 0; offset < contents.length; offset += 4096) {
+            var chunk = contents.slice(offset, offset + 4096);
+            file.writestring(chunk);
+            if (file.position !== offset + chunk.length) throw new Error("Incomplete write");
+        }
         file.eof = file.position;
     } finally {
         if (file.isopen) file.close();
     }
 }
-write_set_stage.local = 1;
+write_json_file.local = 1;
 
 function set_written(ok, stage) {
     if (!writingSet || writingSet.stage !== stage) return;
@@ -1064,7 +1054,7 @@ expand_route_rows.local = 1;
 function read_bank_text(file) {
     var size = file.eof;
     var contents = file.readstring(size);
-    if (typeof contents === "string" && file.position === size) {
+    if (typeof contents === "string" && file.position === size && contents.length === size) {
         return contents.replace(/^\uFEFF/, "");
     }
 
