@@ -81,7 +81,7 @@ def layout_performance(p, parameter):
     boxes["set_status"]["fontsize"] = 10
     backdrop("surface_source_files", [906, 120, 170, 102], **drawer)
     for name, title, x, width in (
-        ("drawer_input_title", "Input", 310, 110),
+        ("drawer_input_title", "Input", 310, 62),
         ("drawer_capture_title", "Loop recording", 674, 211),
     ):
         rect = [x, 128, width, 22]

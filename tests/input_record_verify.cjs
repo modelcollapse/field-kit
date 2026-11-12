@@ -19,7 +19,8 @@ const buffers = new Map([
 ]);
 const sampleRate = 48000;
 const fixturePath = '/fixture/Already Loaded.wav';
-const takePath = '/fixture/Input Take.wav';
+const takeSelection = '/fixture/Input Take.wav';
+const takePath = '/fixture/Input Take 2/Input Take.wav';
 const stagingPath = '/scratch/Field Kit Take.wav';
 let now = 0;
 
@@ -215,10 +216,33 @@ assert.deepEqual(JSON.parse(JSON.stringify(host.positions)), [[0, 25], [25, 50],
 assert.equal(host.get_set_loops(), null);
 host.choose_input_save();
 assert(sent('input_save_dialog', 'bang'));
-host.save_input_path(takePath);
+host.save_input_path(takeSelection);
+const expiredSave = host.loopWrite.request;
+assert(sent('set_writer', 'prepare_loop_folder', expiredSave, takeSelection));
+assert.equal(displayed('input_record_state'), 'Creating take folder…');
+advance(5000);
+assert(sent('set_writer', 'finish_loop_folder', expiredSave, 0));
+assert.equal(host.loopWrite, null);
+assert(!host.lateLoopReads[slot], 'no buffer write was started');
+
+host.save_input_path(takeSelection);
+const failedSave = host.loopWrite.request;
+host.loop_folder_ready(failedSave, '');
+assert.equal(host.loopWrite, null);
+assert.equal(shared.path, '');
+
+host.save_input_path(takeSelection);
+const save = host.loopWrite.request;
+host.loop_folder_ready(expiredSave, '/fixture/stale.wav');
+assert(!sent(`loop_buffer_${slot}`, 'writewave', '/fixture/stale.wav'));
+assert.equal(host.get_set_loops(), null);
+host.loop_folder_ready(save, takePath);
 assert(sent(`loop_buffer_${slot}`, 'writewave', takePath));
+assert(!sent(`loop_buffer_${slot}`, 'writewave', takeSelection));
+assert.equal(host.get_set_loops(), null);
 files.set(takePath, wav(frames));
 host.loop_buffer_ready(slot, sampleRate);
+assert(sent('set_writer', 'finish_loop_folder', save, 1));
 assert.equal(shared.path, takePath);
 assert(host.get_set_loops().every(filename => filename === takePath));
 

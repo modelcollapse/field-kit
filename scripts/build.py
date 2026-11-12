@@ -309,6 +309,38 @@ def source_input(p):
     p.connect("input_save_path", 0, "source_control")
 
 
+def input_monitor(p, ceiling):
+    rect = [379, 127, 110, 24]
+    p.add("input_monitor", "live.text", [76, 1998, 110, 24], view=rect, outs=2, types=["int", ""],
+          mode=1, parameter_mappable=0, text="Monitor off", texton="Monitor on", fontsize=11,
+          annotation="source_drawer", hidden=1,
+          hint="Listen to the selected inputs while audio is on. Loop recording works in either setting.",
+          **parameter("Input monitor", 0, 0, 1, options=["Off", "On"]))
+    p.obj("input_monitor_ramp", "pack 0 20", 76, 2030, ins=2)
+    p.obj("input_monitor_level", "line~ 0.", 76, 2062, ins=2, outs=2, types=["signal", "bang"])
+    p.obj("input_monitor_gain", "*~", 76, 2094, ins=2, types=["signal"])
+    p.connect("input_monitor", 0, "input_monitor_ramp")
+    p.connect("input_monitor_ramp", 0, "input_monitor_level")
+    p.connect("input_monitor_level", 0, "input_monitor_gain")
+    p.connect("master_gain", 0, "input_monitor_gain", 1)
+
+    # Add live input after the main mix and its recording tap, outside scene fades.
+    for channel, side in enumerate(("left", "right")):
+        monitor = f"input_monitor_{side}"
+        mix = f"speaker_mix_{side}"
+        output = f"speaker_output_{side}"
+        x = 140 + 140 * channel
+        p.obj(monitor, "*~", x, 1936, ins=2, types=["signal"])
+        p.obj(mix, "+~", x, 1968, ins=2, types=["signal"])
+        p.obj(output, f"clip~ {-ceiling} {ceiling}", x, 2000, ins=3, types=["signal"])
+        p.connect(f"input_trim_{side[0].upper()}", 0, monitor)
+        p.connect("input_monitor_gain", 0, monitor, 1)
+        p.connect(f"output_{side}", 0, mix)
+        p.connect(monitor, 0, mix, 1)
+        p.connect(mix, 0, output)
+        p.connect(output, 0, "dac", channel)
+
+
 def pattern_controls(p):
     row = 3
     y_offset = PATTERNS_TOP - (MARGIN + row * ROW)
@@ -409,13 +441,16 @@ def pattern_controls(p):
     p.connect("set_relink_result", 0, "pattern_control")
     p.connect("set_relink_cancel", 0, "pattern_control")
     p.obj("set_writer", "node.script fk_set_writer.js @autostart 1", 2425, 2125, outs=2)
-    p.obj("file_preferences_route", "routepass folder_paths input_temp_ready output_split_done output_folder_ready", 2425, 2160, outs=5)
+    p.obj("file_preferences_route",
+          "routepass folder_paths input_temp_ready output_split_done output_folder_ready loop_folder_ready",
+          2425, 2160, outs=6)
     p.connect("set_writer", 0, "file_preferences_route")
     p.connect("file_preferences_route", 0, "source_control")
     p.connect("file_preferences_route", 1, "source_control")
     p.connect("file_preferences_route", 2, "source_control")
     p.connect("file_preferences_route", 3, "source_control")
-    p.connect("file_preferences_route", 4, "pattern_control")
+    p.connect("file_preferences_route", 4, "source_control")
+    p.connect("file_preferences_route", 5, "pattern_control")
     add_working_folders(p, Patch(), VERSION)
     sequence_controls(p)
 
@@ -982,7 +1017,6 @@ def build():
         p.connect("master_gain", 0, "master_" + suffix, 1)
         p.connect("master_" + suffix, 0, "pattern_transition", channel)
         p.connect("pattern_transition", channel, "output_" + suffix)
-        p.connect("output_" + suffix, 0, "dac", channel)
         p.connect("output_" + suffix, 0, "recorder", channel)
         p.connect("output_" + suffix, 0, "visuals_panel", channel)
         p.connect("output_" + suffix, 0, "scope_popout_panel", channel)
@@ -1172,6 +1206,7 @@ def build():
         p.connect(f"scene_defer_{voice}", 0, f"scene_phase_{voice}")
         p.connect(f"scene_phase_{voice}", 0, "pattern_control")
     p.obj("empty_loop_buffer", "buffer~ fk-empty-unbound", 5000, 2780, outs=2, types=["float", "bang"])
+    input_monitor(p, master_output_ceiling)
     p.save()
 
 

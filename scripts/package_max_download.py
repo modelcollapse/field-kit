@@ -45,8 +45,10 @@ and Output device. Enable audio. In Input, choose the left and right channels. F
 Input gain adjusts both channels from −60 to +18 dB and starts at 0 dB.
 The two post-gain peak meters show the recording levels with peak hold
 and a red overload indicator.
+Click Monitor off to hear the selected inputs through Field Kit at the Master
+level. Monitoring starts off and only controls what you hear.
 Choose Selected loop, a loop number, or All loops in Send to. Click the Record to button.
-The current loops keep playing. Click Stop recording. Loop recording shows which take needs confirmation. Choose Use on or Discard. Recording continues until you stop it, subject to available storage. Select the recorded loop and choose Save Loop WAV… before saving a Set.
+The current loops keep playing. Click Stop recording. Loop recording shows which take needs confirmation. Choose Use on or Discard. Recording continues until you stop it, subject to available storage. Select the recorded loop and choose Save Loop WAV… before saving a Set. Choose a location and name the take. Field Kit saves the WAV in a folder with that name, adding a number if the name is taken.
 In the loop editor, Loop actions… → Copy to Loop shares the source and copies its range while
 keeping the destination’s settings. Replace audio… stages a file for that loop.
 The Import to… button in the Source drawer uses the same Send to menu. All loops uses
@@ -126,7 +128,7 @@ Capture is synchronized first, then separated after Stop. If saving fails,
 the synchronized capture remains for recovery. Existing take files are protected.
 Save Bank also requires a new filename when a bank already exists. Load Bank
 and the saved Banks & patterns folder remain available.
-The L and R master meters show each output channel. A red CLIP light identifies
+The L and R master meters show the two channels of the recorded mix. A red CLIP light identifies
 the channel that hit the output ceiling. Lower Master if either light comes on.
 
 In the modulation patchbay, choose a loop for its playback, mixer, filter, Drive,

@@ -17,7 +17,7 @@ def append_master_meter(p, left, top, ceiling):
         p.add(f"master_channel_label_{side}", "comment", channel_label, view=channel_label,
               outs=0, text=side[0].upper(), fontsize=10, fontface=1)
         p.add(meter, "live.meter~", meter_rect, view=meter_rect, outs=2, types=["float", "int"],
-              orientation=1, clip_size=2, hint=f"{side.title()} channel level sent to audio output and Mix recording.")
+              orientation=1, clip_size=2, hint=f"{side.title()} channel level in the recorded mix.")
         p.add(light, "led", light_rect, view=light_rect, types=["int"], ignoreclick=1,
               parameter_enable=0, bgcolor=[0.0, 0.0, 0.0, 0.0], offcolor=[0.27, 0.22, 0.25, 1.0],
               oncolor=[1.0, 0.26, 0.33, 1.0], useoffcolor=1, hint=clip_hint)

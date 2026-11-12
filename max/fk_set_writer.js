@@ -211,27 +211,57 @@ maxApi.addHandler("remove_input_temp", (filename) => {
 });
 showFolders();
 
-maxApi.addHandler("prepare_output_folder", (request, value) => {
-    let mix = "";
+function prepareTakeFolder(value) {
     try {
         const selected = nativePath(value);
         const filename = path.basename(selected);
         const name = filename.replace(/\.wav$/i, "").trim();
-        if (!/\.wav$/i.test(filename) || !name || name === "." || name === "..") throw new Error("Invalid take name");
+        if (!/\.wav$/i.test(value) || !name || name === "." || name === "..") throw new Error("Invalid take name");
         for (let number = 1; number <= 1000; number++) {
             const folder = path.join(path.dirname(selected), number === 1 ? name : `${name} ${number}`);
             try {
                 fs.mkdirSync(folder);
-                mix = path.join(folder, filename);
-                break;
+                return path.join(folder, filename);
             } catch (error) {
                 if (error.code !== "EEXIST") throw error;
             }
         }
+        throw new Error("No unused take folder name");
     } catch (error) {
         maxApi.post(`Field Kit could not create the take folder: ${error.message}`);
+        return "";
     }
-    maxApi.outlet("output_folder_ready", request, mix);
+}
+
+maxApi.addHandler("prepare_output_folder", (request, value) => {
+    maxApi.outlet("output_folder_ready", request, prepareTakeFolder(value));
+});
+
+const loopFolders = new Map();
+maxApi.addHandler("prepare_loop_folder", (request, value) => {
+    const file = prepareTakeFolder(value);
+    let savePath = "";
+    if (file) {
+        loopFolders.set(request, path.dirname(file));
+        // Keep the dialog's path spelling so Sets can store a relative reference.
+        const filename = path.basename(file);
+        const parent = value.slice(0, -filename.length);
+        savePath = parent + path.basename(path.dirname(file)) + parent.slice(-1) + filename;
+    }
+    maxApi.outlet("loop_folder_ready", request, savePath);
+});
+
+maxApi.addHandler("finish_loop_folder", (request, saved) => {
+    const folder = loopFolders.get(request);
+    loopFolders.delete(request);
+    if (!folder || saved) return;
+    try {
+        fs.rmdirSync(folder);
+    } catch (error) {
+        if (error.code !== "ENOTEMPTY" && error.code !== "EEXIST" && error.code !== "ENOENT") {
+            maxApi.post(`Field Kit could not remove an empty take folder: ${error.message}`);
+        }
+    }
 });
 
 // One ten-channel disk capture keeps the mix and four stereo stems sample-aligned.

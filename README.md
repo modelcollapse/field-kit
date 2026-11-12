@@ -7,15 +7,15 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.24**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
+For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.25**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
 
-The v0.8.24 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.25 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.24](CHANGELOG.md).
+[See what's new in v0.8.25](CHANGELOG.md).
 
-![Field Kit v0.8.23 standalone playing the demo](docs/screenshots/field-kit-v0823-overview.png)
+![Field Kit v0.8.25 standalone playing all four demo loops](docs/screenshots/field-kit-v0825-overview.jpg)
 
-[View the v0.8.23 Max workspace](docs/screenshots/field-kit-v0823-max.png)
+[View the v0.8.25 Max workspace](docs/screenshots/field-kit-v0825-max.jpg)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Use **Send to** and the **Import to…** button to stage your own sample for a loop or all four. The same drawer holds audio setup, loop recording, and Set files.
 
@@ -32,9 +32,11 @@ Open **Source, Input & Files → Working folders…** to choose the starting loc
 ## Record a source
 
 1. Open **Source, Input & Files**, open **Audio & MIDI Setup…**, and select your interface in **Input device** and **Output device**. Click **Enable audio**. In **Input**, choose the left and right channels. Select the same channel on both sides for a mono source.
-2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator.
+2. Set the linked input gain from −60 to +18 dB. It starts at 0 dB. The two peak meters show the levels after gain, with peak hold and a red overload indicator. Click **Monitor off** to hear the selected inputs through Field Kit at the Master level. Monitoring starts off each time you launch. The toggle only controls what you hear. Loop capture, input meters, and **Record output** work in either setting.
 3. In **Send to**, choose **Selected loop**, an explicit loop number, or **All loops**. Click **Record to** followed by the displayed destination. The current loops keep playing while you record. Recording continues until you stop it, subject to available storage. Click **Stop recording**, then check **Loop recording** for the destination awaiting confirmation. Choose **Use on** to confirm or **Discard** to keep the current loop audio.
-4. With the new loop selected, click **Save Loop WAV…** before saving a Set. One saved WAV is enough for any copies that share the take.
+4. With the new loop selected, click **Save Loop WAV…** before saving a Set. Choose a location and name the take. Field Kit creates a folder named after the take and saves the WAV inside. If the folder name is taken, Field Kit adds a number. One saved WAV is enough for any copies that share the take.
+
+![The Input drawer shows Monitor off beside the input gain and Save Loop WAV controls](docs/screenshots/field-kit-v0825-input-monitor.jpg)
 
 ![The take confirmation window with Use on all loops and Discard buttons](docs/screenshots/field-kit-take-ready.jpg)
 
@@ -68,7 +70,7 @@ Open **Visuals** and set the **Tuner** source to **Live input L**, **Live input 
 
 Each waveform has a mixer strip with playback, level, pan, mute, solo, a peak meter, and **Echo** and **Room** sends. Click or drag the blue fader under a window’s playback button to set its volume, or edit the percentage box for a precise level. **Mute** removes a window from the mix while its loop keeps running. **Solo** lets you hear one or more windows together. Mute still takes precedence, and **Unsolo** brings back the current mute mix. Mixer performance controls leave the edit selection in place. **Record output** captures the resulting master mix.
 
-The **L** and **R** meters in the **Master** strip show each output channel. A red **Clip** light shows which channel hit the output ceiling. Lower **Master** if either light comes on. The **Output recording** panel below has the recording button, timer, status, and take name.
+The **L** and **R** meters in the **Master** strip show the two channels of the recorded mix. A red **Clip** light shows which channel hit the output ceiling. Lower **Master** if either light comes on. The **Output recording** panel below has the recording button, timer, status, and take name.
 
 Open **Stereo field…** beside **FX pad…** in the **Main FX** header. Drag a window edge to resize the Stereo Field. The tabs select which loop's pan and level are shown above the pad. Drag its dot left or right to pan it, and up or down to change its level. If dots overlap, use the tabs to pick one.
 

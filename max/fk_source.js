@@ -31,6 +31,7 @@ var loopPending = null;
 var loopDestination = 0;
 var loopSet = null;
 var loopWrite = null;
+var loopSaveRequest = 0;
 var lateLoopReads = {};
 var pendingPath = "";
 var pendingName = "";
@@ -370,21 +371,18 @@ function start_loop_read(path, slot, voice, recordedBytes) {
 start_loop_read.local = 1;
 
 function loop_buffer_ready(slot, sampleRate) {
+    if (loopWrite && loopWrite.path && loopWrite.entry.slot === slot) {
+        if (has_input_audio(loopWrite.path, loopWrite.entry.frames * 6)) {
+            finish_loop_write(true);
+            return;
+        }
+        if (!lateLoopReads[slot]) {
+            finish_loop_write(false);
+            return;
+        }
+    }
     if (lateLoopReads[slot]) {
         delete lateLoopReads[slot];
-        return;
-    }
-    if (loopWrite && loopWrite.entry.slot === slot) {
-        var writing = loopWrite;
-        loopWriteTimeout.cancel();
-        loopWrite = null;
-        var saved = has_input_audio(writing.path, writing.entry.frames * 6);
-        if (saved) {
-            writing.entry.path = writing.path;
-            writing.entry.name = loop_file_name(writing.path);
-        }
-        update_status();
-        label("status", saved ? "Loop WAV saved · Ready for Save Set." : "Couldn’t save the loop WAV.");
         return;
     }
     if (!loopPending || loopPending.state !== "reading" || loopPending.slot !== slot) return;
@@ -661,12 +659,27 @@ function finish_loop_set() {
 finish_loop_set.local = 1;
 
 function loop_write_expired() {
-    if (loopWrite) lateLoopReads[loopWrite.entry.slot] = true;
-    loopWrite = null;
-    update_status();
-    label("status", "Couldn’t save the loop WAV.");
+    if (!loopWrite) return;
+    var saved = loopWrite.path && has_input_audio(loopWrite.path, loopWrite.entry.frames * 6);
+    if (loopWrite.path && !saved) lateLoopReads[loopWrite.entry.slot] = true;
+    finish_loop_write(saved);
 }
 loop_write_expired.local = 1;
+
+function finish_loop_write(saved) {
+    var writing = loopWrite;
+    loopWriteTimeout.cancel();
+    loopWrite = null;
+    send("set_writer", "finish_loop_folder", writing.request, saved ? 1 : 0);
+    if (saved) {
+        writing.entry.path = writing.path;
+        writing.entry.name = loop_file_name(writing.path);
+    }
+    update_status();
+    label("status", saved ? "Loop WAV saved · Ready for Save Set." :
+        writing.path ? "Couldn’t save the loop WAV." : "Couldn’t create the take folder.");
+}
+finish_loop_write.local = 1;
 
 function get_set_source() {
     if (!ready) return null;
@@ -927,6 +940,8 @@ function update_status() {
     } else if (staged) {
         label("input_record_state", (loopPending.entry.path ? "File" : "Take") +
             " ready · " + loop_target_name(loopPending.voice));
+    } else if (loopWrite && !loopWrite.path) {
+        label("input_record_state", "Creating take folder…");
     } else if (inputWritePath || loopWrite) {
         label("input_record_state", "Saving WAV…");
     } else if (!audioOn || audioStarting) {
@@ -1157,11 +1172,10 @@ function choose_input_save() {
 function save_input_path(path) {
     var entry = loopSources[inspectedWindow - 1];
     if (entry && !entry.path && !loop_busy() && typeof path === "string" && /\.wav$/i.test(path)) {
-        loopWrite = {entry: entry, path: path};
-        loopWriteTimeout.schedule(10000);
-        send("loop_buffer_" + entry.slot, "samptype", "int24");
-        send("loop_buffer_" + entry.slot, "writewave", path);
+        loopWrite = {entry: entry, path: "", request: ++loopSaveRequest};
+        loopWriteTimeout.schedule(5000);
         update_status();
+        send("set_writer", "prepare_loop_folder", loopWrite.request, path);
         return;
     }
     if (!ready || entry || sourceDemo || sourcePath || loop_busy() ||
@@ -1171,6 +1185,21 @@ function save_input_path(path) {
     inputSaveTimeout.schedule(10000);
     send(BUFFER_OBJECTS[activeBuffer], "samptype", "int24");
     send(BUFFER_OBJECTS[activeBuffer], "writewave", path);
+}
+
+function loop_folder_ready(request, path) {
+    if (!loopWrite || loopWrite.request !== request || loopWrite.path) return;
+    if (!path) {
+        finish_loop_write(false);
+        return;
+    }
+    loopWrite.path = path;
+    loopWriteTimeout.cancel();
+    loopWriteTimeout.schedule(10000);
+    update_status();
+    var buffer = "loop_buffer_" + loopWrite.entry.slot;
+    send(buffer, "samptype", "int24");
+    send(buffer, "writewave", path);
 }
 
 function finish_input_save() {

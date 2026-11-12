@@ -45,6 +45,8 @@ function loadWriter(platform = process.platform, fileApi = fs, pathApi = path) {
     };
     write.split = (capture, mix) => { handlers.split_output(capture, mix); return response; };
     write.prepareOutput = (id, file) => { handlers.prepare_output_folder(id, file); return response; };
+    write.prepareLoop = (id, file) => { handlers.prepare_loop_folder(id, file); return response; };
+    write.finishLoop = handlers.finish_loop_folder;
     return write;
 }
 
@@ -78,6 +80,21 @@ try {
     const occupied = otherMix.replace('.wav', ' - Loop 4.wav'); fs.writeFileSync(occupied, 'KEEP');
     assert.equal(write.split(otherCapture, otherMix)[1], 0);
     assert.equal(fs.readFileSync(occupied, 'utf8'), 'KEEP'); assert(fs.existsSync(otherCapture)); assert(!fs.existsSync(otherMix));
+
+    const occupiedFolder = path.join(dir, "Output 3");
+    fs.writeFileSync(occupiedFolder, "KEEP");
+    const loop = path.join(dir, "Output 4", "Output.wav");
+    assert.deepEqual(write.prepareLoop(1, selected), ["loop_folder_ready", 1, loop]);
+    assert.equal(fs.readFileSync(occupiedFolder, "utf8"), "KEEP");
+    write.finishLoop(999, 0);
+    assert(fs.existsSync(path.dirname(loop)));
+    write.finishLoop(1, 0);
+    assert(!fs.existsSync(path.dirname(loop)), "a failed save removes its empty folder");
+    assert.deepEqual(write.prepareLoop(2, selected), ["loop_folder_ready", 2, loop]);
+    fs.writeFileSync(loop, "KEEP");
+    write.finishLoop(2, 0);
+    assert.equal(fs.readFileSync(loop, "utf8"), "KEEP", "a failed save preserves any audio on disk");
+    assert.deepEqual(write.prepareLoop(3, path.join(dir, "missing", "Loop.wav")), ["loop_folder_ready", 3, ""]);
 
     const bankDefault = path.join(dir, "Documents", "Field Kit", "Banks");
     assert.equal(write.folders()[3], bankDefault);
@@ -153,6 +170,12 @@ try {
             fs.writeFileSync(staging, "volume path");
             write(bootVolume + ":" + staging, destination, 1);
             assert.equal(fs.readFileSync(destination, "utf8"), "volume path");
+            const volumePrefix = bootVolume + ":";
+            const nativeLoop = path.join(dir, "Volume Take", "Volume Take.wav");
+            assert.deepEqual(write.prepareLoop(4, volumePrefix + path.join(dir, "Volume Take.wav")),
+                ["loop_folder_ready", 4, volumePrefix + nativeLoop]);
+            write.finishLoop(4, 1);
+            assert(fs.existsSync(path.dirname(nativeLoop)));
         }
     }
 } finally {

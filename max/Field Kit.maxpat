@@ -3918,14 +3918,14 @@
           "varname": "file_preferences_route",
           "maxclass": "newobj",
           "numinlets": 1,
-          "numoutlets": 5,
+          "numoutlets": 6,
           "patching_rect": [
             2425,
             2160,
-            551,
+            677,
             22
           ],
-          "text": "routepass folder_paths input_temp_ready output_split_done output_folder_ready"
+          "text": "routepass folder_paths input_temp_ready output_split_done output_folder_ready loop_folder_ready"
         }
       },
       {
@@ -22064,7 +22064,7 @@
           ],
           "orientation": 1,
           "clip_size": 2,
-          "hint": "Left channel level sent to audio output and Mix recording.",
+          "hint": "Left channel level in the recorded mix.",
           "outlettype": [
             "float",
             "int"
@@ -22327,7 +22327,7 @@
           ],
           "orientation": 1,
           "clip_size": 2,
-          "hint": "Right channel level sent to audio output and Mix recording.",
+          "hint": "Right channel level in the recorded mix.",
           "outlettype": [
             "float",
             "int"
@@ -37337,7 +37337,7 @@
           "patching_rect": [
             310,
             128,
-            110,
+            62,
             22
           ],
           "text": "Input",
@@ -37349,7 +37349,7 @@
           "presentation_rect": [
             310,
             128,
-            110,
+            62,
             22
           ]
         }
@@ -37720,6 +37720,228 @@
           "outlettype": [
             "float",
             "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-820",
+          "varname": "input_monitor",
+          "maxclass": "live.text",
+          "numinlets": 1,
+          "numoutlets": 2,
+          "patching_rect": [
+            76,
+            1998,
+            110,
+            24
+          ],
+          "mode": 1,
+          "parameter_mappable": 0,
+          "text": "Monitor off",
+          "texton": "Monitor on",
+          "fontsize": 11,
+          "annotation": "source_drawer",
+          "hidden": 1,
+          "hint": "Listen to the selected inputs while audio is on. Loop recording works in either setting.",
+          "parameter_enable": 1,
+          "saved_attribute_attributes": {
+            "valueof": {
+              "parameter_longname": "Input monitor",
+              "parameter_shortname": "Input monitor",
+              "parameter_type": 2,
+              "parameter_mmin": 0,
+              "parameter_mmax": 1,
+              "parameter_initial": [
+                0
+              ],
+              "parameter_initial_enable": 1,
+              "parameter_unitstyle": 0,
+              "parameter_enum": [
+                "Off",
+                "On"
+              ]
+            }
+          },
+          "outlettype": [
+            "int",
+            ""
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            379,
+            127,
+            110,
+            24
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-821",
+          "varname": "input_monitor_ramp",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            76,
+            2030,
+            75,
+            22
+          ],
+          "text": "pack 0 20"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-822",
+          "varname": "input_monitor_level",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 2,
+          "patching_rect": [
+            76,
+            2062,
+            68,
+            22
+          ],
+          "text": "line~ 0.",
+          "outlettype": [
+            "signal",
+            "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-823",
+          "varname": "input_monitor_gain",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            76,
+            2094,
+            42,
+            22
+          ],
+          "text": "*~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-824",
+          "varname": "input_monitor_left",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            140,
+            1936,
+            42,
+            22
+          ],
+          "text": "*~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-825",
+          "varname": "speaker_mix_left",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            140,
+            1968,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-826",
+          "varname": "speaker_output_left",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            140,
+            2000,
+            124,
+            22
+          ],
+          "text": "clip~ -0.99 0.99",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-827",
+          "varname": "input_monitor_right",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            280,
+            1936,
+            42,
+            22
+          ],
+          "text": "*~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-828",
+          "varname": "speaker_mix_right",
+          "maxclass": "newobj",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            280,
+            1968,
+            42,
+            22
+          ],
+          "text": "+~",
+          "outlettype": [
+            "signal"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-829",
+          "varname": "speaker_output_right",
+          "maxclass": "newobj",
+          "numinlets": 3,
+          "numoutlets": 1,
+          "patching_rect": [
+            280,
+            2000,
+            124,
+            22
+          ],
+          "text": "clip~ -0.99 0.99",
+          "outlettype": [
+            "signal"
           ]
         }
       }
@@ -39256,6 +39478,18 @@
             4
           ],
           "destination": [
+            "obj-29",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-148",
+            5
+          ],
+          "destination": [
             "obj-84",
             0
           ]
@@ -40300,18 +40534,6 @@
             0
           ],
           "destination": [
-            "obj-194",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-226",
-            0
-          ],
-          "destination": [
             "obj-202",
             0
           ]
@@ -40458,18 +40680,6 @@
           "destination": [
             "obj-231",
             0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "obj-231",
-            0
-          ],
-          "destination": [
-            "obj-194",
-            1
           ]
         }
       },
@@ -50646,6 +50856,198 @@
           "destination": [
             "obj-84",
             0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-820",
+            0
+          ],
+          "destination": [
+            "obj-821",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-821",
+            0
+          ],
+          "destination": [
+            "obj-822",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-822",
+            0
+          ],
+          "destination": [
+            "obj-823",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-200",
+            0
+          ],
+          "destination": [
+            "obj-823",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-771",
+            0
+          ],
+          "destination": [
+            "obj-824",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-823",
+            0
+          ],
+          "destination": [
+            "obj-824",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-226",
+            0
+          ],
+          "destination": [
+            "obj-825",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-824",
+            0
+          ],
+          "destination": [
+            "obj-825",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-825",
+            0
+          ],
+          "destination": [
+            "obj-826",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-826",
+            0
+          ],
+          "destination": [
+            "obj-194",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-774",
+            0
+          ],
+          "destination": [
+            "obj-827",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-823",
+            0
+          ],
+          "destination": [
+            "obj-827",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-231",
+            0
+          ],
+          "destination": [
+            "obj-828",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-827",
+            0
+          ],
+          "destination": [
+            "obj-828",
+            1
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-828",
+            0
+          ],
+          "destination": [
+            "obj-829",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-829",
+            0
+          ],
+          "destination": [
+            "obj-194",
+            1
           ]
         }
       }

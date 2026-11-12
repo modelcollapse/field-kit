@@ -1,5 +1,10 @@
 # Field Kit changelog
 
+## v0.8.25
+
+- Add an input monitor in **Source, Input & Files**. It starts off and lets you hear the selected inputs at the Master level while recording.
+- Save each loop WAV in a folder named after the take. Reusing a name creates a numbered folder.
+
 ## v0.8.24
 
 - Crossfade into scenes and patterns as soon as their settings are ready, even when the outgoing loops have long ranges.
