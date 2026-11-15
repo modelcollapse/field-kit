@@ -24,8 +24,8 @@ def layout_performance(p, parameter):
 
     place("surface_header", [8, 8, 637, 40])
     place("surface_audio", [651, 8, 425, 40])
-    place("title", [18, 13, 125, 27])
-    place("source_label", [150, 17, 220, 22])
+    place("title", [18, 13, 105, 27])
+    place("source_label", [186, 17, 184, 22])
     place("status", [379, 17, 256, 22], fontsize=11)
     boxes["output_heading"]["presentation"] = 0
     place("audio_switch", [661, 16, 103, 24])

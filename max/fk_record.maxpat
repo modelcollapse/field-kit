@@ -660,6 +660,53 @@
             "int"
           ]
         }
+      },
+      {
+        "box": {
+          "id": "obj-32",
+          "varname": "midi_action_record_button",
+          "maxclass": "button",
+          "patching_rect": [
+            10,
+            46,
+            18,
+            18
+          ],
+          "numinlets": 1,
+          "numoutlets": 1,
+          "outlettype": [
+            "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-33",
+          "varname": "midi_learn_overlay",
+          "maxclass": "jsui",
+          "patching_rect": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "numinlets": 1,
+          "numoutlets": 0,
+          "presentation": 1,
+          "presentation_rect": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "hidden": 1,
+          "border": 0,
+          "parameter_enable": 0,
+          "filename": "fk_midi_overlay.js",
+          "jsarguments": [
+            "recorder"
+          ]
+        }
       }
     ],
     "lines": [
@@ -971,6 +1018,18 @@
           ],
           "destination": [
             "obj-12",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-32",
+            0
+          ],
+          "destination": [
+            "obj-8",
             0
           ]
         }

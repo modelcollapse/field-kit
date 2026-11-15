@@ -554,6 +554,66 @@ function publishPosition(loop, pan, level) {
     }
 }
 
+function midi_regions() {
+    var grid = bounds();
+    var regions = [];
+    var readoutWidth = 2 * grid.tabWidth - 4;
+    regions.push({ id: "axis_0", rect: [grid.tabLeft, READOUT_TOP, readoutWidth, 44],
+                   fixedId: "mixer_pan_" + selected },
+                 { id: "axis_1", rect: [grid.tabLeft + readoutWidth + 8, READOUT_TOP, readoutWidth, 44],
+                   fixedId: "mixer_level_" + selected });
+    for (var index = 0; index < loops.length; index++) {
+        regions.push({ id: "select_" + (index + 1),
+            rect: [grid.tabLeft + grid.tabWidth * index, LOOP_TABS_TOP, grid.tabWidth, BUTTON_HEIGHT] });
+    }
+    for (var slot = 1; slot <= PRESET_COUNT; slot++) {
+        regions.push({ id: "preset_" + slot, fixedId: "stereo_field_panel.store_" + slot,
+            rect: [PRESET_LEFT + (slot - 1) * PRESET_SLOT_WIDTH, PRESET_TOP, PRESET_SLOT_WIDTH, BUTTON_HEIGHT] });
+    }
+    regions.push({ id: "preset_arm", rect: [PRESET_STORE_LEFT, PRESET_TOP, PRESET_STORE_WIDTH, BUTTON_HEIGHT] });
+    motionControls().forEach(function (_, index) {
+        regions.push({ id: "motion_" + index,
+            rect: [grid.tabLeft + grid.motionWidth * index, MOTION_TOP, grid.motionWidth, BUTTON_HEIGHT] });
+    });
+    return regions;
+}
+
+function midi_preset(slot, store) {
+    outlet(0, "field_preset_slot", slot, store);
+}
+
+function midi_preset_arm() {
+    outlet(0, "field_preset_arm");
+}
+
+function midi_select(loop) {
+    if (!validLoop(loop)) return;
+    select(loop);
+    outlet(0, "select", selected);
+}
+
+function midi_motion(index) {
+    var control = motionControls()[index];
+    if (control && control.enabled) control.action();
+}
+
+function midi_axis_value(axis) {
+    var track = loops[selected - 1];
+    return axis === 0 ? track.pan : axis === 1 ? track.level : null;
+}
+
+function midi_axis(axis, value) {
+    if ((axis !== 0 && axis !== 1) || !isFinite(value)) return;
+    var track = loops[selected - 1];
+    track.playback = null;
+    if (armed === selected) beginRecording(selected);
+    else syncClock();
+    var pan = axis === 0 ? clamp(value, -100, 100) : track.pan;
+    var level = axis === 1 ? clamp(value, 0, 100) : track.level;
+    publishPosition(selected, pan, level);
+    if (recording && recording.loop === selected) recordSample(Date.now());
+}
+
 function onclick(x, y, button, mod1, shift) {
     var grid = bounds();
     drag = null;

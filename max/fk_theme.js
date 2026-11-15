@@ -318,7 +318,8 @@ remember_layout.local = 1;
 
 function remember_rects(target, panel, drawer, sceneDock) {
     target.apply(function (box) {
-        if (!Number(box.getboxattr("presentation")) || box.varname === "source_drawer_anchor") return;
+        if (!Number(box.getboxattr("presentation")) ||
+            box.varname === "source_drawer_anchor" || box.varname === "midi_learn_overlay") return;
         var rect = box.getboxattr("presentation_rect");
         if (!rect || rect.length !== 4) return;
         var isDrawerControl = false;
@@ -463,6 +464,18 @@ function msg_int(index) {
     send_theme(patch.getnamed("mixer_control"), control.concat(ink));
     paint_patch(patch.getnamed("sequence_panel").subpatcher(), sections.scenes, palette);
     paint_patch(patch.getnamed("io_setup_panel").subpatcher(), sections.input, palette);
+    var mappings = patch.getnamed("midi_mappings_panel").subpatcher();
+    paint_patch(mappings, canvas, palette);
+    var mappingTable = mappings.getnamed("midi_mapping_table");
+    mappingTable.message.apply(mappingTable, ["bgcolor"].concat(inset));
+    mappingTable.message.apply(mappingTable, ["fgcolor"].concat(ink));
+    mappingTable.message.apply(mappingTable, ["headercolor"].concat(panel));
+    mappingTable.message.apply(mappingTable, ["hcellcolor"].concat(selection));
+    mappingTable.message.apply(mappingTable, ["gridlinecolor"].concat(control));
+    var mappingSearch = mappings.getnamed("midi_mapping_search");
+    mappingSearch.message.apply(mappingSearch, ["bgcolor"].concat(inset));
+    mappingSearch.message.apply(mappingSearch, ["textcolor"].concat(ink));
+    mappingSearch.message.apply(mappingSearch, ["bordercolor"].concat(control));
     paint_patch(patch.getnamed("working_folders_panel").subpatcher(), sections.source_files, palette);
     paint_patch(patch.getnamed("loop_take_panel").subpatcher(), sections.source_files, palette);
     var tuner = patch.getnamed("tuner_panel").subpatcher();
@@ -565,7 +578,7 @@ function paint(obj, palette, sections, dim) {
         // The input recorder supplies its own white text for the red badge.
         if (name === "input_record_state") return;
         colors = { textcolor: name === "title" ? accent :
-            (dim || /status$|_help$|^help$|wave_heading|source_label|record_file|record_format/.test(name) ? muted : ink) };
+            (dim || /status$|_help$|^help$|wave_heading|source_label|version_label|record_file|record_format/.test(name) ? muted : ink) };
         break;
     case "panel":
         if (/^loop_row_/.test(name)) return;

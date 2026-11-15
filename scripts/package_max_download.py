@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from field_kit_version import RELEASE_VERSION
 from prepare_max_project import RUNTIME_ASSETS, TOP_LEVEL
 
 
@@ -13,14 +14,18 @@ LAUNCHER = "Open FIELD KIT.maxpat"
 SUPPORT = "Support"
 SUPPORT_PATH = "Patcher:/Support/"
 EMBEDDED_PATCHERS = {"fk_fx.maxpat", "fk_modulation.maxpat", "fk_record.maxpat"}
-SUPPORT_JSUI = {"fk_lfo_preview.js", "fk_loop_fade.js", "fk_stereo_field.js", "fk_fx_pad.js", "fk_tuner.js"}
+SUPPORT_JSUI = {
+    "fk_lfo_preview.js", "fk_loop_fade.js", "fk_stereo_field.js", "fk_fx_pad.js", "fk_tuner.js",
+    "fk_midi_overlay.js",
+}
 EMBEDDED_SCRIPTS = {
     "js fk_io.js": f"js {SUPPORT_PATH}fk_io.js",
+    "js fk_midi_ports.js": f"js {SUPPORT_PATH}fk_midi_ports.js",
     "js fk_mod_routes.js": f"js {SUPPORT_PATH}fk_mod_routes.js",
     "js fk_recorder.js": f"js {SUPPORT_PATH}fk_recorder.js",
     "js fk_theme.js": f"js {SUPPORT_PATH}fk_theme.js",
 }
-START_HERE = """FIELD KIT for Max
+START_HERE = f"""FIELD KIT v{RELEASE_VERSION} for Max
 
 1. Extract the ZIP and open the Field Kit folder.
 2. Double-click Open FIELD KIT.maxpat. This download requires Max 9.
@@ -64,9 +69,21 @@ Working folders also includes Banks & patterns folder. Its default is
 Documents/Field Kit/Banks. Save Bank and Load Bank start there. Patterns are
 stored together inside a bank file. Folder choices are remembered across launches.
 
-To use MIDI Learn, choose a port under MIDI In, pick a control and click Learn.
-Move an absolute CC knob or fader, or use a note or momentary CC for buttons.
-Clear removes the selected mapping. Mappings last for the current session.
+Connect your controller and click MIDI Learn in the main window. Click a Field
+Kit control, then move a knob or fader or press a MIDI button. Field Kit listens
+on the MIDI input ports available to Max. Press Escape to leave Learn mode.
+Click drawers and tabs to navigate. Shift-click one to map it. Option-click a
+loop-editor control to map it to the current loop. A regular click maps it to
+whichever loop is selected when you play.
+Open Mappings… to review, edit, clear, or undo mapping changes. Set the range,
+invert, pickup, and encoder or button mode for each assignment. Choose a
+Feedback output port for mappings you want to send back to a supported controller.
+Click Apply options to save changes to the selected mapping.
+Field Kit remembers input ports and restores mappings on launch. Choose All
+controllers or Selected controller beside Export… to save mappings as JSON.
+For Selected controller, first select one of that controller’s mappings.
+Before using Import…, use Import device to keep the original input ports or
+reassign them to another controller.
 
 Click a loop number or waveform to focus the editor beside the waveforms. Drag the waveform to set
 the range. Fade preview shows how the outgoing and incoming audio overlap.

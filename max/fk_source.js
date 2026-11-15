@@ -174,13 +174,20 @@ function inspector_edit(key, value) {
 }
 
 function inspector_filter_type(index) {
+    edit_filter_type(inspectedWindow, index);
+}
+
+function filter_type(voice) {
+    var value = control_value("filter_" + voice, 0);
+    return value < 0 ? 0 : value > 0 ? 2 : 1;
+}
+
+function edit_filter_type(voice, index) {
     if (index !== 0 && index !== 1 && index !== 2) return;
-    var control = host.patcher.getnamed("filter_" + inspectedWindow);
-    if (!control || !control.getvalueof) return;
-    var value = control.getvalueof();
-    if (Array.isArray(value)) value = value[0];
-    var strength = typeof value === "number" && isFinite(value) && value !== 0 ? Math.abs(value) : 40;
-    inspector_edit("filter", (index - 1) * strength);
+    if (voice % 1 !== 0 || voice < 1 || voice > WINDOWS) return;
+    var value = control_value("filter_" + voice, 0);
+    var strength = isFinite(value) && value !== 0 ? Math.abs(value) : 40;
+    send("filter_" + voice, (index - 1) * strength);
 }
 
 function set_inspector_value(key, value) {

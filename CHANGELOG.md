@@ -1,5 +1,12 @@
 # Field Kit changelog
 
+## v0.8.26
+
+- Display the version beside the Field Kit name in the main window.
+- Open MIDI Learn from the workspace and click controls to learn them, including loop controls, the two XY pads, and the modulation curve editor. Keep learning successive controls until you press Escape.
+- Search all mappings in one window, find them by moving the controller, resolve conflicts, undo edits, and import or export controller layouts. Field Kit restores mappings when reopened and supports multiple controllers at once.
+- Set pickup, range, inversion, encoder and button behavior per mapping. Choose a feedback port for lights on compatible controllers.
+
 ## v0.8.25
 
 - Add an input monitor in **Source, Input & Files**. It starts off and lets you hear the selected inputs at the Master level while recording.

@@ -2433,6 +2433,113 @@
                   "numoutlets": 0,
                   "text": "fx_toggle"
                 }
+              },
+              {
+                "box": {
+                  "id": "obj-18",
+                  "varname": "midi_action_fx_pad_close",
+                  "maxclass": "button",
+                  "patching_rect": [
+                    426,
+                    459,
+                    18,
+                    18
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 1,
+                  "outlettype": [
+                    "bang"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "obj-19",
+                  "varname": "midi_action_fx_pad_enabled",
+                  "maxclass": "button",
+                  "patching_rect": [
+                    16,
+                    611,
+                    18,
+                    18
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 1,
+                  "outlettype": [
+                    "bang"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "obj-20",
+                  "varname": "midi_learn_overlay",
+                  "maxclass": "jsui",
+                  "patching_rect": [
+                    0,
+                    0,
+                    1,
+                    1
+                  ],
+                  "numinlets": 1,
+                  "numoutlets": 0,
+                  "presentation": 1,
+                  "presentation_rect": [
+                    0,
+                    0,
+                    1,
+                    1
+                  ],
+                  "hidden": 1,
+                  "border": 0,
+                  "parameter_enable": 0,
+                  "filename": "fk_midi_overlay.js",
+                  "jsarguments": [
+                    "mix_fx.fx_pad_panel"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "obj-21",
+                  "varname": "midi_learn_key",
+                  "maxclass": "newobj",
+                  "patching_rect": [
+                    180,
+                    732,
+                    50,
+                    22
+                  ],
+                  "text": "key",
+                  "numinlets": 0,
+                  "numoutlets": 4,
+                  "outlettype": [
+                    "int",
+                    "int",
+                    "int",
+                    "int"
+                  ]
+                }
+              },
+              {
+                "box": {
+                  "id": "obj-22",
+                  "varname": "midi_learn_escape",
+                  "maxclass": "newobj",
+                  "patching_rect": [
+                    180,
+                    766,
+                    60,
+                    22
+                  ],
+                  "text": "sel 27",
+                  "numinlets": 2,
+                  "numoutlets": 2,
+                  "outlettype": [
+                    "bang",
+                    ""
+                  ]
+                }
               }
             ],
             "lines": [
@@ -2636,6 +2743,54 @@
                   ],
                   "destination": [
                     "obj-2",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-18",
+                    0
+                  ],
+                  "destination": [
+                    "obj-6",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-19",
+                    0
+                  ],
+                  "destination": [
+                    "obj-17",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-21",
+                    0
+                  ],
+                  "destination": [
+                    "obj-22",
+                    0
+                  ]
+                }
+              },
+              {
+                "patchline": {
+                  "source": [
+                    "obj-22",
+                    0
+                  ],
+                  "destination": [
+                    "obj-20",
                     0
                   ]
                 }
@@ -2878,6 +3033,89 @@
           "numinlets": 2,
           "numoutlets": 1,
           "text": "prepend fx_enabled"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-72",
+          "varname": "midi_action_fx_pad_open",
+          "maxclass": "button",
+          "patching_rect": [
+            558,
+            25,
+            18,
+            18
+          ],
+          "numinlets": 1,
+          "numoutlets": 1,
+          "outlettype": [
+            "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-73",
+          "varname": "midi_action_stereo_field_open",
+          "maxclass": "button",
+          "patching_rect": [
+            440,
+            25,
+            18,
+            18
+          ],
+          "numinlets": 1,
+          "numoutlets": 1,
+          "outlettype": [
+            "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-74",
+          "varname": "midi_action_drifting_delay_open",
+          "maxclass": "button",
+          "patching_rect": [
+            314,
+            25,
+            18,
+            18
+          ],
+          "numinlets": 1,
+          "numoutlets": 1,
+          "outlettype": [
+            "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-75",
+          "varname": "midi_learn_overlay",
+          "maxclass": "jsui",
+          "patching_rect": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "numinlets": 1,
+          "numoutlets": 0,
+          "presentation": 1,
+          "presentation_rect": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "hidden": 1,
+          "border": 0,
+          "parameter_enable": 0,
+          "filename": "fk_midi_overlay.js",
+          "jsarguments": [
+            "mix_fx"
+          ]
         }
       }
     ],
@@ -3646,6 +3884,42 @@
           ],
           "destination": [
             "obj-69",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-72",
+            0
+          ],
+          "destination": [
+            "obj-57",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-73",
+            0
+          ],
+          "destination": [
+            "obj-66",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-74",
+            0
+          ],
+          "destination": [
+            "obj-68",
             0
           ]
         }

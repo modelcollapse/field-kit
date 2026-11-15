@@ -12,6 +12,7 @@ from build_drift_advanced import layout_drift_advanced
 from build_drift_modulation import DRIFT_MOD_TARGETS, append_drift_modulation
 from build_fx import DIALS as FX_DIALS
 from build_io import add_io_setup
+from build_midi_targets import install_midi_targets
 from build_working_folders import add_working_folders
 from build_loop_audio import add_loop_audio
 from build_master_meter import append_master_meter
@@ -24,6 +25,7 @@ from build_stereo_field_window import stereo_field_window
 from build_tuner import add_tuner
 from build_pitch_lock import pitch_lock_patch, write_pitch_fft
 from build_visuals import WIDTH as VISUALS_WIDTH, build as build_visuals, stereo_scope_window
+from field_kit_version import RELEASE_VERSION
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent / "max"
@@ -559,6 +561,37 @@ def sequence_controls(p):
     append_mix_scene_strip(p, 638, WORKSPACE_TOP, 430)
 
 
+def midi_controls(p):
+    for name, label, x, width, command in (
+        ("midi_learn_header", "MIDI Learn", 877, 88, "learn"),
+        ("midi_mappings_header", "Mappings…", 972, 95, "open_mappings"),
+    ):
+        rect = [x, 641, width, 19]
+        p.add(name, "live.text", rect, view=rect, outs=2, types=["bang", ""],
+              text=label, texton=label, mode=0, fontsize=11, parameter_enable=0)
+        p.add(name + "_message", "message", [x, 2560, 107, 22], ins=2, text=command)
+        p.connect(name, 0, name + "_message")
+        p.connect(name + "_message", 0, "io_control")
+
+    p.add("midi_learning_status", "comment", [635, 641, 234, 19],
+          view=[635, 641, 234, 19], outs=0, fontsize=10, text="", hidden=1)
+    p.add("midi_escape_message", "message", [3070, 2390, 102, 22], ins=2, text="midi_escape")
+    p.lines = [entry for entry in p.lines if not (
+        entry["patchline"]["source"] == [p.names["fullscreen_escape"], 0]
+        and entry["patchline"]["destination"] == [p.names["fullscreen_exit_command"], 0]
+    )]
+    p.connect("fullscreen_escape", 0, "midi_escape_message")
+    p.connect("midi_escape_message", 0, "io_control")
+
+    profile_statuses = ("midi_profile_loaded", "midi_profile_saved", "midi_profile_imported",
+                        "midi_profile_exported", "midi_profile_error")
+    p.obj("midi_profile_route", "routepass " + " ".join(profile_statuses), 2400, 2220,
+          outs=len(profile_statuses) + 1)
+    p.connect("set_writer", 0, "midi_profile_route")
+    for index in range(len(profile_statuses)):
+        p.connect("midi_profile_route", index, "io_control")
+
+
 def mix_visuals(p):
     rect = [MARGIN, MODULATION_TOP, VISUALS_WIDTH, MODULATION_ROWS * ROW - GUTTER]
     p.add("visuals_panel", "bpatcher", rect, view=rect, ins=2, types=["bang"], embed=1, hidden=1,
@@ -889,6 +922,9 @@ def build():
     p = Patch()
     presentation_frame(p)
     p.ui("title", "comment", 0, 0, 3, outs=0, text="FIELD KIT", fontsize=19, fontface=1)
+    version_rect = [124, 17, 61, 20]
+    p.add("version_label", "comment", version_rect, view=version_rect, outs=0,
+          text=f"v{RELEASE_VERSION}", fontsize=10)
     p.label("source_label", "Loading demo…", 3, 0, 6, y_offset=3)
     p.label("output_heading", "Audio", SPLIT, 0, 2, y_offset=3)
     p.label("status", "Loading the demo…", SPLIT, 1, RIGHT_TRACKS, y_offset=6)
@@ -1207,6 +1243,8 @@ def build():
         p.connect(f"scene_phase_{voice}", 0, "pattern_control")
     p.obj("empty_loop_buffer", "buffer~ fk-empty-unbound", 5000, 2780, outs=2, types=["float", "bang"])
     input_monitor(p, master_output_ceiling)
+    midi_controls(p)
+    install_midi_targets(p, ROOT)
     p.save()
 
 

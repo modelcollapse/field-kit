@@ -34,6 +34,7 @@ var targetIndex = 0;
 var gains = [];
 var globalGains = [];
 var curves = [];
+var selectedCurvePoints = DEFAULT_RATES.map(function () { return 0; });
 var tables = [];
 var rates = DEFAULT_RATES.slice();
 var shapes = DEFAULT_SHAPES.slice();
@@ -162,6 +163,7 @@ function renderShape() {
     if (preview && preview.valid) preview.hidden = custom;
     if (custom) {
         paintCurve();
+        showCurveSelection();
     } else {
         send("fk_lfo_preview", "shape", shape);
         send("fk_lfo_preview", "phase", -1);
@@ -339,6 +341,96 @@ function use_curve() {
     set_shape(BREAKPOINT);
 }
 
+function midi_curve_value(axis) {
+    if (shapes[currentLfo] !== BREAKPOINT) return null;
+    var points = curves[currentLfo];
+    if (!points.length) return null;
+    var index = selectedCurvePoints[currentLfo];
+    if (axis === "select") return points.length > 2 ? index / (points.length / 2 - 1) : 0;
+    return points[index * 2 + (axis === "level" ? 1 : 0)];
+}
+
+function midi_curve(axis, value) {
+    if (shapes[currentLfo] !== BREAKPOINT || !isFinite(value)) return;
+    var points = curves[currentLfo].slice();
+    if (!points.length) return;
+    var index = selectedCurvePoints[currentLfo];
+    if (axis === "select") {
+        selectCurvePoint(Math.round(clampCurve(value, 0, 1) * (points.length / 2 - 1)));
+        return;
+    }
+    if (axis === "level") {
+        points[index * 2 + 1] = clampCurve(value, -1, 1);
+    } else if (axis === "time") {
+        var x = index * 2;
+        var low = x > 0 ? points[x - 2] + 0.000001 : 0;
+        var high = x + 2 < points.length ? points[x + 2] - 0.000001 : 1;
+        if (low > high) return;
+        points[x] = clampCurve(value, low, high);
+    } else {
+        return;
+    }
+    setCurve(currentLfo, points);
+    paintCurve();
+}
+
+function midi_curve_action(action) {
+    if (shapes[currentLfo] !== BREAKPOINT) return;
+    var points = curves[currentLfo].slice();
+    var index = selectedCurvePoints[currentLfo];
+    if (action === "first" || action === "previous" || action === "next") {
+        selectCurvePoint(action === "first" ? 0 : index + (action === "next" ? 1 : -1));
+    } else if (action === "add") {
+        var inserted = insertCurvePoint(points, index);
+        if (inserted === null) return;
+        setCurve(currentLfo, points);
+        selectCurvePoint(inserted);
+        paintCurve();
+    } else if (action === "remove" && points.length) {
+        points.splice(2 * index, 2);
+        setCurve(currentLfo, points);
+        paintCurve();
+    }
+}
+
+function insertCurvePoint(points, index) {
+    if (!points.length) {
+        points.push(0.5, 0);
+        return 0;
+    }
+    var x = index * 2;
+    var atRight = points[x] === 1;
+    var left = atRight ? x - 2 : x;
+    var right = left + 2;
+    var min = left >= 0 ? points[left] : 0;
+    var max = right < points.length ? points[right] : 1;
+    if (max - min < 0.000002) return null;
+    var from = left >= 0 ? points[left + 1] : points[x + 1];
+    var to = right < points.length ? points[right + 1] : points[x + 1];
+    points.splice(right, 0, (min + max) / 2, (from + to) / 2);
+    return right / 2;
+}
+insertCurvePoint.local = 1;
+
+function clampCurve(value, low, high) {
+    return Math.max(low, Math.min(high, value));
+}
+clampCurve.local = 1;
+
+function selectCurvePoint(index) {
+    var count = curves[currentLfo].length / 2;
+    selectedCurvePoints[currentLfo] = count ? clampCurve(index, 0, count - 1) : 0;
+    showCurveSelection();
+}
+selectCurvePoint.local = 1;
+
+function showCurveSelection() {
+    var count = curves[currentLfo].length / 2;
+    var suffix = count ? "  ·  Point " + (selectedCurvePoints[currentLfo] + 1) + " / " + count : "  ·  No points";
+    label("fk_curve_label", "LFO " + (currentLfo + 1) + "  ·  " + SHAPE_LABELS[BREAKPOINT] + suffix);
+}
+showCurveSelection.local = 1;
+
 function curve_edited() {
     if (!painting && shapes[currentLfo] === BREAKPOINT) {
         // listdump outputs nothing when all points have been removed.
@@ -391,6 +483,7 @@ function setCurve(index, points) {
         return;
     }
     curves[index] = points;
+    if (index === currentLfo && shapes[index] === BREAKPOINT) selectCurvePoint(selectedCurvePoints[index]);
     if (tables[index]) {
         tables[index].dirty = true;
         fadeCurve(index);

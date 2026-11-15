@@ -112,7 +112,9 @@ const workspace = path.join(home, "Documents", "Field Kit");
 const appData = process.platform === "darwin"
     ? path.join(home, "Library", "Application Support")
     : process.env.APPDATA || path.join(home, "AppData", "Roaming");
-const preferences = path.join(appData, "FieldKit", "working-folders.json");
+const fieldKitPreferences = path.join(appData, "FieldKit");
+const preferences = path.join(fieldKitPreferences, "working-folders.json");
+const midiPreferences = path.join(fieldKitPreferences, "midi-mappings.json");
 const defaultFolders = {
     import: path.join(workspace, "Imports"),
     recording: path.join(workspace, "Recordings"),
@@ -186,6 +188,90 @@ function saveFolder(key, value) {
 
 maxApi.addHandler("folder_get", () => showFolders());
 maxApi.addHandler("folder_choose", saveFolder);
+
+function parseMidiProfile(contents) {
+    let profile;
+    try {
+        profile = JSON.parse(contents.replace(/^\uFEFF/, ""));
+    } catch (_) {
+        throw new Error("The MIDI mapping file contains invalid JSON.");
+    }
+    return validateMidiProfile(profile);
+}
+
+function validateMidiProfile(profile) {
+    if (!profile || profile.version !== 1 || !Array.isArray(profile.mappings)) {
+        throw new Error("Choose a Field Kit MIDI mapping file.");
+    }
+    return profile;
+}
+
+function readMidiProfile(filename) {
+    return parseMidiProfile(fs.readFileSync(filename, "utf8"));
+}
+
+function writeMidiProfile(filename, profile) {
+    const existing = statIfPresent(filename);
+    if (existing && !existing.isFile()) throw new Error("Choose a regular file for the MIDI mappings.");
+    const staging = fs.mkdtempSync(path.join(path.dirname(filename), ".midi-mappings-"));
+    try {
+        const pending = path.join(staging, "midi-mappings.json");
+        fs.writeFileSync(pending, JSON.stringify(profile, null, 2) + "\n", { mode: 0o600 });
+        fs.renameSync(pending, filename);
+    } finally {
+        try {
+            fs.rmSync(staging, { recursive: true, force: true });
+        } catch (error) {
+            maxApi.post(`Field Kit could not remove MIDI mapping staging files: ${error.message}`);
+        }
+    }
+}
+
+function reportMidiProfileError(request, message, error) {
+    maxApi.post(`${message} ${error.message}`);
+    return maxApi.outlet("midi_profile_error", request, error.code ? message : error.message);
+}
+
+// Keep rapid saves ordered across asynchronous reads from Max dictionaries.
+let midiProfileQueue = Promise.resolve();
+function handleMidiProfile(selector, message, handler) {
+    maxApi.addHandler(selector, (request, ...args) => {
+        midiProfileQueue = midiProfileQueue.then(() => handler(request, ...args))
+            .catch(error => reportMidiProfileError(request, message, error));
+        return midiProfileQueue;
+    });
+}
+
+handleMidiProfile("midi_profile_get", "Couldn’t load saved MIDI mappings.", async (request, name) => {
+    let profile;
+    try {
+        profile = readMidiProfile(midiPreferences);
+    } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        profile = { version: 1, mappings: [] };
+    }
+    await maxApi.setDict(name, profile);
+    return maxApi.outlet("midi_profile_loaded", request, name);
+});
+
+handleMidiProfile("midi_profile_put", "Couldn’t save MIDI mappings.", async (request, name) => {
+    const profile = validateMidiProfile(await maxApi.getDict(name));
+    fs.mkdirSync(fieldKitPreferences, { recursive: true });
+    writeMidiProfile(midiPreferences, profile);
+    return maxApi.outlet("midi_profile_saved", request);
+});
+
+handleMidiProfile("midi_profile_import", "Couldn’t import MIDI mappings.", async (request, name, value) => {
+    const profile = readMidiProfile(nativePath(value));
+    await maxApi.setDict(name, profile);
+    return maxApi.outlet("midi_profile_imported", request, name);
+});
+
+handleMidiProfile("midi_profile_export", "Couldn’t export MIDI mappings.", async (request, name, value) => {
+    const profile = validateMidiProfile(await maxApi.getDict(name));
+    writeMidiProfile(nativePath(value), profile);
+    return maxApi.outlet("midi_profile_exported", request);
+});
 
 const inputTemps = new Set();
 maxApi.addHandler("create_input_temp", (request) => {

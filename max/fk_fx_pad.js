@@ -383,6 +383,49 @@ function motionFrame() {
     publishPoint(point.x, point.y);
 }
 
+function midi_regions() {
+    var grid = bounds();
+    var regions = motionControls().map(function (_, index) {
+        return { id: "motion_" + index,
+            rect: [grid.buttonLeft + grid.buttonPitch * index, grid.buttonTop,
+                   grid.buttonPitch - grid.buttonGap, grid.buttonHeight] };
+    });
+    regions.push({ id: "axis_0", rect: [19, grid.height - 51, 190, 23] },
+                 { id: "axis_1", rect: [213, grid.height - 51, grid.width - 233, 23] });
+    return regions;
+}
+
+function midi_motion(index) {
+    var control = motionControls()[index];
+    if (control && control.enabled) control.action();
+}
+
+function midi_axis_value(axis) {
+    var target = targets[axes[axis]];
+    return target ? (target.value - target.min) / (target.max - target.min) : null;
+}
+
+function midi_axis(axis, value) {
+    if ((axis !== 0 && axis !== 1) || !isFinite(value)) return;
+    var capture = armed;
+    if (!recording) stop_motion();
+    var values = [targets[axes[0]].value, targets[axes[1]].value];
+    var target = targets[axes[axis]];
+    values[axis] = target.min + (target.max - target.min) * Math.max(0, Math.min(1, value));
+    publishPoint(values[0], values[1]);
+    capturePoint(capture);
+}
+
+function capturePoint(capture) {
+    if (recording) sampleRecording(Date.now(), true);
+    else if (capture) {
+        recording = { axes: axes.slice(), start: Date.now(), samples: [currentPoint(0)], tenths: 0 };
+        motionClock.repeat();
+        mgraphics.redraw();
+    }
+}
+capturePoint.local = 1;
+
 function onclick(x, y) {
     var grid = bounds();
     if (y >= grid.buttonTop && y < grid.buttonTop + grid.buttonHeight && x >= grid.buttonLeft) {
@@ -396,12 +439,7 @@ function onclick(x, y) {
     if (!recording) stop_motion();
     dragging = true;
     movePad(x, y, grid);
-    if (recording) sampleRecording(Date.now(), true);
-    else if (capture) {
-        recording = { axes: axes.slice(), start: Date.now(), samples: [currentPoint(0)], tenths: 0 };
-        motionClock.repeat();
-        mgraphics.redraw();
-    }
+    capturePoint(capture);
 }
 
 function ondrag(x, y, button) {

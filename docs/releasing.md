@@ -11,6 +11,9 @@ Ship the Max 9 patch and the standalone macOS app on the same GitHub release. Bu
    node tests/output_record_verify.cjs
    node tests/source_launch_verify.cjs
    node tests/input_record_verify.cjs
+   node tests/midi_learn_verify.cjs
+   node tests/midi_ports_verify.cjs
+   node tests/midi_profile_verify.cjs
    node tests/pattern_bank_verify.cjs
    node tests/sequence_mix_verify.cjs
    node tests/curve_fade_verify.cjs

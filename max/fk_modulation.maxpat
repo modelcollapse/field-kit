@@ -160,7 +160,7 @@
             236,
             20
           ],
-          "text": "LFO 1 \u2192 W1 Start  /  Off",
+          "text": "LFO 1 → W1 Start  /  Off",
           "varname": "fk_mod_status"
         }
       },
@@ -822,7 +822,7 @@
             380,
             20
           ],
-          "text": "LFO 1  \u00b7  live signal",
+          "text": "LFO 1  ·  live signal",
           "varname": "fk_signal_label"
         }
       },
@@ -845,7 +845,7 @@
             524,
             20
           ],
-          "text": "LFO 1  \u00b7  Sine",
+          "text": "LFO 1  ·  Sine",
           "varname": "fk_curve_label"
         }
       },
@@ -868,7 +868,7 @@
             188,
             20
           ],
-          "text": "Applied value  \u00b7  Audio off",
+          "text": "Applied value  ·  Audio off",
           "varname": "fk_applied_value"
         }
       },
@@ -891,7 +891,7 @@
             188,
             20
           ],
-          "text": "LFO signal  \u00b7  Audio off",
+          "text": "LFO signal  ·  Audio off",
           "varname": "fk_lfo_value"
         }
       },
@@ -4493,6 +4493,89 @@
           ],
           "index": 2,
           "comment": "Selected feedback signal index"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-225",
+          "varname": "midi_action_fk_action_add_route",
+          "maxclass": "button",
+          "patching_rect": [
+            336,
+            97,
+            18,
+            18
+          ],
+          "numinlets": 1,
+          "numoutlets": 1,
+          "outlettype": [
+            "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-226",
+          "varname": "midi_action_fk_action_clear_route",
+          "maxclass": "button",
+          "patching_rect": [
+            432,
+            97,
+            18,
+            18
+          ],
+          "numinlets": 1,
+          "numoutlets": 1,
+          "outlettype": [
+            "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-227",
+          "varname": "midi_action_fk_action_use_curve",
+          "maxclass": "button",
+          "patching_rect": [
+            528,
+            121,
+            18,
+            18
+          ],
+          "numinlets": 1,
+          "numoutlets": 1,
+          "outlettype": [
+            "bang"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-228",
+          "varname": "midi_learn_overlay",
+          "maxclass": "jsui",
+          "patching_rect": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "numinlets": 1,
+          "numoutlets": 0,
+          "presentation": 1,
+          "presentation_rect": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "hidden": 1,
+          "border": 0,
+          "parameter_enable": 0,
+          "filename": "fk_midi_overlay.js",
+          "jsarguments": [
+            "patchbay"
+          ]
         }
       }
     ],
@@ -8537,6 +8620,42 @@
           ],
           "destination": [
             "obj-224",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-225",
+            0
+          ],
+          "destination": [
+            "obj-22",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-226",
+            0
+          ],
+          "destination": [
+            "obj-24",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-227",
+            0
+          ],
+          "destination": [
+            "obj-45",
             0
           ]
         }

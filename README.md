@@ -7,15 +7,13 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.25**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
+For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.26**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
 
-The v0.8.25 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.26 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.25](CHANGELOG.md).
+[See what's new in v0.8.26](CHANGELOG.md).
 
-![Field Kit v0.8.25 standalone playing all four demo loops](docs/screenshots/field-kit-v0825-overview.jpg)
-
-[View the v0.8.25 Max workspace](docs/screenshots/field-kit-v0825-max.jpg)
+![Field Kit v0.8.26 in Max with the stereo demo and the version beside the title](docs/screenshots/field-kit-v0826-max.png)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Use **Send to** and the **Import to…** button to stage your own sample for a loop or all four. The same drawer holds audio setup, loop recording, and Set files.
 
@@ -42,11 +40,17 @@ Open **Source, Input & Files → Working folders…** to choose the starting loc
 
 ## MIDI Learn
 
-Open **Source, Input & Files → Audio & MIDI Setup…** and choose a controller under **MIDI In**. Pick a control and click **Learn**. Move an absolute MIDI CC knob or fader for a value, or press a note or momentary CC button for an action. You can learn global speed, master level, transport, Main FX, and each loop’s play, level, pan, and sends.
+Connect your controller and click **MIDI Learn** in the main window. Click the Field Kit control to map, then move a knob or fader or press a MIDI button. Field Kit listens on the MIDI input ports available to Max. Press **Escape** to leave Learn mode.
 
-Select a mapped control and click **Clear** to remove its assignment. MIDI input starts off, and assignments are kept for the current session.
+Click drawers, tabs, and other navigation controls to move through Field Kit while Learn is active. **Shift-click** one to map the navigation control itself. **Option-click** a loop-editor control to map it to the loop you are editing. A regular click maps the control to whichever loop is selected when you play. Buttons trigger actions. Use a knob to select among menu choices, or map a specific choice to a MIDI button from **All controls** in **Mappings…**. Option-click a pattern or preset slot to map storing into the slot.
 
-![Audio & MIDI Setup with independent input and output menus, MIDI In, and the Learn and Clear buttons](docs/screenshots/field-kit-audio-midi-setup.jpg)
+Open **Mappings…** to find a control, review its assignment, remap it, or clear it. **Undo** reverses the last mapping change. For a continuous control, set its **Min** and **Max**, invert its direction, or enable **Pickup** so an absolute knob or fader takes over when it reaches the current value. Select a matching **Encoder** mode for a relative knob. For an action, choose the **Button** behavior. Use **Feedback** to choose an output port for a mapping if your controller can receive MIDI updates. Click **Apply options** to save changes to the selected mapping.
+
+Field Kit remembers each mapping’s input port and restores mappings on launch. Choose **All controllers** or **Selected controller** beside **Export…** to save mappings to a JSON file. For **Selected controller**, first select one of that controller’s mappings. Before using **Import…**, leave **Import device** on **Keep devices** to keep the original input ports or choose a controller to assign the imported mappings to its input port.
+
+![Field Kit in MIDI Learn with the Global Speed target selected](docs/screenshots/field-kit-v0826-midi-learn.png)
+
+![Field Kit MIDI Mappings with example assignments from two controllers](docs/screenshots/field-kit-v0826-midi-mappings.png)
 
 ## Play and shape the loops
 
