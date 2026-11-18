@@ -9,6 +9,7 @@ Ship the Max 9 patch and the standalone macOS app on the same GitHub release. Bu
    ```sh
    python3 scripts/build.py
    python3 tests/collective_graph_verify.py
+   python3 tests/standalone_metadata_verify.py
    node tests/output_record_verify.cjs
    node tests/source_launch_verify.cjs
    node tests/exchange_receive_verify.cjs
@@ -32,7 +33,7 @@ Ship the Max 9 patch and the standalone macOS app on the same GitHub release. Bu
    python3 scripts/prepare_max_project.py max build/standalone
    ```
 
-3. Open **Field Kit.maxproj** in Max 9 and choose **Build Collective / Application… → Application**. Verify the resulting app has the Field Kit bundle identifier `audio.poeticstate.fieldkit` and the intended release version in both `CFBundleShortVersionString` and `CFBundleVersion`. Confirm it includes the current collective, demo, Node for Max, and Set writer. Check the microphone usage description and retain `fk_exchange_node.js` with its `handoff/exchange.js` and `handoff/max-exchange.js` sidecars for Node for Max. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
+3. Open **Field Kit.maxproj** in Max 9 and choose **Build Collective / Application… → Application**. Verify the resulting app has the Field Kit bundle identifier `audio.poeticstate.fieldkit` and the intended release version in both `CFBundleShortVersionString` and `CFBundleVersion`. Confirm it includes the current collective, demo, Node for Max, and Set writer. Verify the app declares no `CFBundleDocumentTypes` or `CFBundleURLTypes` inherited from the Max runtime, so it does not claim unrelated files or URL schemes. Check the microphone usage description and retain `fk_exchange_node.js` with its `handoff/exchange.js` and `handoff/max-exchange.js` sidecars for Node for Max. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
 4. If Max cannot export an Application, export a fresh **Collective** from the project and use the packager with a verified Field Kit runtime archive built by the same Max version and build. Use a fresh folder for the staged inputs and substitute the release version and file paths.
 
    ```sh

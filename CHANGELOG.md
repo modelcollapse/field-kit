@@ -2,6 +2,8 @@
 
 ## v0.8.27
 
+- Prevent the standalone from claiming Max patches, JSON, JavaScript, PDF, audio documents or URL schemes through inherited runtime metadata.
+
 - Receive rendered audio from Looper directly into the selected loop, keeping the other loops and their playback states.
 - Show receive status in Source, Input & Files. Incoming audio waits while a source operation is active and is committed only after a successful load.
 - Preserve the existing loop on load failure, with retryable local delivery when Field Kit is busy or closed.
