@@ -28,6 +28,8 @@ var loopSources = [null, null, null, null];
 var loopCleared = [false, false, false, false];
 var emptyBufferName = "";
 var loopPending = null;
+var exchangeRequest = null;
+var exchangeRecent = [];
 var loopDestination = 0;
 var loopSet = null;
 var loopWrite = null;
@@ -346,6 +348,91 @@ function set_loop_destination(index) {
     update_status();
 }
 
+// A Send from Looper is an explicit request to replace the currently selected loop.
+// Load into a free pool buffer first; the other loops and DSP state stay untouched.
+function receive_exchange(id, path, name, kind, destination) {
+    if (typeof id !== "string" || !id) return;
+    if (exchangeRecent.indexOf(id) !== -1) { send("exchange_worker", "loaded", id); return; }
+    if (exchangeRequest && exchangeRequest.id === id) return;
+    if (destination !== "selected" || typeof path !== "string" || path.charAt(0) !== "/") {
+        send("exchange_worker", "failed", id, "Choose a valid audio file for the selected Field Kit loop.");
+        return;
+    }
+    if (!ready || loop_busy()) {
+        send("exchange_worker", "busy", id, "Field Kit is finishing another source operation.");
+        receive_status("Waiting for the current source operation");
+        return;
+    }
+    var slot = pool_slot();
+    if (slot < 0) {
+        send("exchange_worker", "busy", id, "Field Kit has no free source buffer yet.");
+        receive_status("Waiting for a free source buffer");
+        return;
+    }
+    exchangeRequest = {id: id, path: path, name: typeof name === "string" && name ? name : loop_file_name(path), voice: inspectedWindow};
+    label("exchange_receive_status", "Receiving " + exchangeRequest.name + " for Loop " + inspectedWindow + "…");
+    try { start_loop_read(path, slot, inspectedWindow); }
+    catch (error) {
+        loopPending = null;
+        exchange_reply(false, "Could not load received audio: " + error.message);
+        update_status();
+    }
+}
+
+function receive_status() {
+    if (exchangeRequest) return;
+    label("exchange_receive_status", arrayfromargs(arguments).join(" "));
+}
+
+function exchange_reply(success, reason) {
+    var request = exchangeRequest;
+    if (!request) return;
+    exchangeRequest = null;
+    if (success) {
+        exchangeRecent.push(request.id);
+        if (exchangeRecent.length > 32) exchangeRecent.shift();
+        label("exchange_receive_status", "Received " + request.name + " → Loop " + request.voice);
+        send("exchange_worker", "loaded", request.id);
+    } else {
+        label("exchange_receive_status", reason || "Could not receive audio");
+        send("exchange_worker", "failed", request.id, reason || "Could not receive audio");
+    }
+}
+exchange_reply.local = 1;
+
+function commit_exchange_switch() {
+    var change = loopPending;
+    var request = exchangeRequest;
+    var voice = request.voice;
+    var old = loopSources[voice - 1];
+    var cleared = loopCleared[voice - 1];
+    var range = positions[voice - 1].slice();
+    try {
+        loopSources[voice - 1] = change.entry;
+        loopCleared[voice - 1] = false;
+        bind_loop(voice);
+        set_region(voice, change.range[0], change.range[1]);
+    } catch (error) {
+        loopSources[voice - 1] = old;
+        loopCleared[voice - 1] = cleared;
+        var reason = "Could not install received audio: " + error.message;
+        try { bind_loop(voice); set_region(voice, range[0], range[1]); }
+        catch (restoreError) { set_play(voice, false); reason += " The previous loop could not be rebound."; }
+        loopPending = null;
+        release_loop_buffer(change.entry);
+        send("run_" + voice, audioOn && playing[voice - 1] ? 1 : 0);
+        exchange_reply(false, reason);
+        update_status();
+        return;
+    }
+    loopPending = null;
+    send("run_" + voice, audioOn && playing[voice - 1] ? 1 : 0);
+    if (old) release_loop_buffer(old);
+    update_status();
+    exchange_reply(true);
+}
+commit_exchange_switch.local = 1;
+
 function import_loop_audio() {
     choose_loop_audio(loopDestination || inspectedWindow);
 }
@@ -415,7 +502,10 @@ function loop_buffer_ready(slot, sampleRate) {
             entry.path = "";
             entry.name = "Recorded take";
         }
-        stage_loop_entry(loopPending.voice, entry);
+        if (exchangeRequest) {
+            entry.name = exchangeRequest.name;
+            switch_loop_audio(exchangeRequest.voice, entry, [0, 100]);
+        } else stage_loop_entry(loopPending.voice, entry);
     }
 }
 
@@ -427,6 +517,8 @@ loop_read_expired.local = 1;
 function fail_loop_read(late) {
     if (!loopPending || loopPending.state !== "reading") return;
     var failed = loopPending;
+    exchange_reply(false, late ? "Timed out loading received audio. The previous loop was kept." :
+        "Could not load received audio. The previous loop was kept.");
     if (late) lateLoopReads[loopPending.slot] = true;
     loopPending = null;
     if (loopSet) {
@@ -548,6 +640,7 @@ function switch_loop_audio(voice, entry, range, clearing) {
 switch_loop_audio.local = 1;
 
 function commit_loop_switch() {
+    if (exchangeRequest) { commit_exchange_switch(); return; }
     var change = loopPending;
     var previous = [];
     change.voices.forEach(function (voice) {

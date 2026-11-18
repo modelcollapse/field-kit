@@ -1,3 +1,3 @@
 """Version displayed by both Field Kit downloads."""
 
-RELEASE_VERSION = "0.8.26"
+RELEASE_VERSION = "0.8.27"

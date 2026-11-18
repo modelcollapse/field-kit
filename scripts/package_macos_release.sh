@@ -25,26 +25,15 @@ fi
 
 # Reject a stale or incomplete collective before expanding the large runtime ZIP.
 media_files=$(python3 - "$collective" "$source" "$(dirname "$0")" <<'PY'
-from collections import Counter
 import json
 from pathlib import Path
 import sys
 
 
-def graph(patcher):
-    boxes = {}
-    for entry in patcher['boxes']:
-        box = entry['box']
-        child = graph(box['patcher']) if 'patcher' in box else None
-        boxes[box['id']] = (box['maxclass'], box.get('varname'), child)
-    lines = (entry['patchline'] for entry in patcher.get('lines', ()))
-    cords = Counter((tuple(line['source']), tuple(line['destination'])) for line in lines)
-    return boxes, cords
-
-
 collective, source, scripts = map(Path, sys.argv[1:])
 sys.path.insert(0, str(scripts.resolve()))
 from prepare_max_project import RUNTIME_ASSETS, TOP_LEVEL
+from collective_graph import graph
 
 data = collective.read_bytes()
 main = json.loads((source / TOP_LEVEL).read_text())['patcher']
@@ -62,6 +51,8 @@ for group, assets in RUNTIME_ASSETS.items():
             raise SystemExit(f'The staged source is missing {name}')
         # Max moves media outside the collective when building an app.
         evidence = name.encode() if group == 'media' else asset.read_bytes()
+        if name.startswith('handoff/'):
+            continue  # Node resolves these versioned sidecars relative to its entry script.
         if evidence not in data:
             raise SystemExit(f'The compiled collective is missing the staged {name}')
 print('\n'.join(RUNTIME_ASSETS['media']))
@@ -90,12 +81,16 @@ plutil -replace CFBundleShortVersionString -string "$version" "$plist"
 plutil -replace CFBundleVersion -string "$version" "$plist"
 plutil -replace NSMicrophoneUsageDescription -string 'Field Kit uses audio input to record samples.' "$plist"
 plutil -replace CFBundleIconFile -string FieldKit.icns "$plist"
+python3 "$(dirname "$0")/standalone_metadata.py" "$plist"
 cp "$icon" "$resources/FieldKit.icns"
 cp "$collective" "$resources/Field Kit.mxf"
 while IFS= read -r name; do
     cp "$source/$name" "$resources/C74/media/$name"
 done <<< "$media_files"
-cp "$source/fk_set_writer.js" "$resources/fk_set_writer.js"
+for name in fk_set_writer.js fk_exchange_node.js handoff/exchange.js handoff/max-exchange.js; do
+    mkdir -p "$resources/$(dirname "$name")"
+    cp "$source/$name" "$resources/$name"
+done
 
 # Change only the app signature. The signed runtime libraries and Node keep their signatures.
 codesign --force --sign - "$app"
@@ -109,9 +104,13 @@ proof_app="$proof/Field Kit.app"
 proof_resources="$proof_app/Contents/Resources"
 proof_plist="$proof_app/Contents/Info.plist"
 codesign --verify --deep --strict "$proof_app"
+python3 "$(dirname "$0")/standalone_metadata.py" --check "$proof_plist"
 codesign --verify --strict "$proof${node#"$stage"}"
 codesign --verify --strict "$proof${node_external#"$stage"}"
-"$proof${node#"$stage"}" --check "$proof_resources/fk_set_writer.js"
+for name in fk_set_writer.js fk_exchange_node.js handoff/exchange.js handoff/max-exchange.js; do
+    "$proof${node#"$stage"}" --check "$proof_resources/$name"
+    cmp "$source/$name" "$proof_resources/$name"
+done
 lipo "$proof_app/Contents/MacOS/Field Kit" -verify_arch arm64 x86_64
 cmp "$icon" "$proof_resources/FieldKit.icns"
 test "$(plutil -extract CFBundleIconFile raw "$proof_plist")" = FieldKit.icns

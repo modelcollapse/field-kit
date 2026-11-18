@@ -74,6 +74,9 @@ def layout_performance(p, parameter):
         place(name, rect, **drawer)
     rect = [105, 130, 46, 19]
     p.add("loop_destination_label", "comment", rect, view=rect, outs=0, text="Send to", fontsize=11, **drawer)
+    rect = [20, 198, 260, 18]
+    p.add("exchange_receive_status", "comment", rect, view=rect, outs=0,
+          text="Looper receive starting…", fontsize=10, **drawer)
     boxes["input_level_label"].update(text="Input level", fontsize=11)
     boxes["input_record_state"]["fontsize"] = 11
     for name in ("load", "input_record_button", "input_save_button"):

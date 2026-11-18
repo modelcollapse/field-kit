@@ -8,8 +8,12 @@ Ship the Max 9 patch and the standalone macOS app on the same GitHub release. Bu
 
    ```sh
    python3 scripts/build.py
+   python3 tests/collective_graph_verify.py
+   python3 tests/standalone_metadata_verify.py
    node tests/output_record_verify.cjs
    node tests/source_launch_verify.cjs
+   node tests/exchange_receive_verify.cjs
+   node tests/exchange_bootstrap_verify.cjs
    node tests/input_record_verify.cjs
    node tests/midi_learn_verify.cjs
    node tests/midi_ports_verify.cjs
@@ -29,12 +33,14 @@ Ship the Max 9 patch and the standalone macOS app on the same GitHub release. Bu
    python3 scripts/prepare_max_project.py max build/standalone
    ```
 
-3. Open **Field Kit.maxproj** in Max 9 and choose **Build Collective / Application… → Application**. Verify the resulting app has the Field Kit bundle identifier `audio.poeticstate.fieldkit` and the intended release version in both `CFBundleShortVersionString` and `CFBundleVersion`. Confirm it includes the current collective, demo, Node for Max, and Set writer. Check the microphone usage description. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
+3. Open **Field Kit.maxproj** in Max 9 and choose **Build Collective / Application… → Application**. Verify the resulting app has the Field Kit bundle identifier `audio.poeticstate.fieldkit` and the intended release version in both `CFBundleShortVersionString` and `CFBundleVersion`. Confirm it includes the current collective, demo, Node for Max, and Set writer. Verify the app declares no `CFBundleDocumentTypes` or `CFBundleURLTypes` inherited from the Max runtime, so it does not claim unrelated files or URL schemes. Check the microphone usage description and retain `fk_exchange_node.js` with its `handoff/exchange.js` and `handoff/max-exchange.js` sidecars for Node for Max. [Cycling ’74 standalone build guide](https://docs.cycling74.com/userguide/standalones_and_collectives/)
 4. If Max cannot export an Application, export a fresh **Collective** from the project and use the packager with a verified Field Kit runtime archive built by the same Max version and build. Use a fresh folder for the staged inputs and substitute the release version and file paths.
 
    ```sh
    mkdir -p build/standalone-runtime
-   cp build/standalone/{patchers,code,media}/* build/standalone-runtime/
+   cp -R build/standalone/patchers/. build/standalone-runtime/
+   cp -R build/standalone/code/. build/standalone-runtime/
+   cp -R build/standalone/media/. build/standalone-runtime/
    bash scripts/package_macos_release.sh VERSION \
      "/path/to/verified-runtime.zip" "build/Field Kit.mxf" \
      build/standalone-runtime build/field-kit-macos.zip
@@ -54,6 +60,7 @@ Open **Open FIELD KIT.maxpat** from a clean extraction in Max. Then quit Max and
 - [ ] Exercise both Main FX modes. Check that each mixer strip has its own Echo and Room sends, that the Main FX dials switch between **Mix %** and **Return %**, and that the FX routing status follows the mode and power. Confirm that bypassed dials dim but remain editable in each theme. Open Drifting Memory's **Advanced** drawer from Mix and from Main FX. Check that all four mixer sends stay visible, that its three pages work, and that delay audio continues while switching views. Check that **Hold** preserves memory and **Cut Tail** clears the wet signal and turns capture off while dry audio continues. Open **Stereo field** and **FX pad** and verify manual movement, FX axis selection, and record/play/stop/clear on both pads. Verify that **Play paths** and **Stop paths** control the Stereo Field gestures while audio playback continues. Enable FX in the pad and confirm Main FX stays in sync after closing and reopening it.
 - [ ] Store contrasting patterns and check that manual and sequenced changes crossfade without a mute gap. Run a scene sequence with different bar lengths, **Next bar**, and **Repeat**. Open and close the sequencer from Patterns while it runs and confirm the scene strip still shows its progress. Store and recall two different Stereo Field presets, then save and reopen a Set to check both are restored. Save and reopen a Bank, and check an older fixture if available.
 - [ ] Route LFOs to a loop, a loop send, Main FX, and Drifting Memory and confirm the effective value and audio respond. Check Mix, Scenes, Modulation, Visuals, Hide, the section shades in all three themes, and entering and exiting full screen. Confirm Master and Output recording have visibly separate backgrounds and the selected loop stands out across the mixer and waveform. Check live signal in both History and Spectrum and on the stereo scope.
+- [ ] Send a rendered region, whole audio and chain from Looper to the selected Field Kit loop. Check the selected destination and status, unchanged other loops and playback states, native committed-delivery acknowledgment, a deferred send while busy, and a send queued while Field Kit is closed. Use a disposable local exchange folder for test fixtures.
 - [ ] Record which macOS version, chip, and audio devices were tested and any limits of the verification. Resolve regressions before publishing.
 
 ## Review screenshots and publish
