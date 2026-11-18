@@ -1,5 +1,11 @@
 # Field Kit changelog
 
+## v0.8.27
+
+- Receive rendered audio from Looper directly into the selected loop, keeping the other loops and their playback states.
+- Show receive status in Source, Input & Files. Incoming audio waits while a source operation is active and is committed only after a successful load.
+- Preserve the existing loop on load failure, with retryable local delivery when Field Kit is busy or closed.
+
 ## v0.8.26
 
 - Display the version beside the Field Kit name in the main window.

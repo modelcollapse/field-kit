@@ -7,15 +7,17 @@ FIELD KIT is a Max instrument that turns an audio file or a live recording into 
 - **[Download the latest Max patch](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-max.zip).** Unzip it and double-click **Open FIELD KIT.maxpat** in Max 9. **START HERE.txt** has the quick instructions. Keep **Support** and the companion Max patches beside the launcher.
 - **[Download the latest standalone macOS app](https://github.com/modelcollapse/field-kit/releases/latest/download/field-kit-macos.zip).** Unzip it and open **Field Kit.app**. Max is not required.
 
-For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.26**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
+For an organized installation, keep **Field Kit.app** and both versioned ZIPs in **Applications/Field Kit/Field Kit v0.8.27**. Keep the app bundle named **Field Kit.app** so its embedded runtime can find the collective.
 
-The v0.8.26 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
+The v0.8.27 standalone includes Apple silicon and Intel binaries. It is ad hoc signed and has no Apple notarization. macOS may show a first launch alert. [Apple’s explanation of first launch alerts](https://support.apple.com/en-us/102445).
 
-[See what's new in v0.8.26](CHANGELOG.md).
+[See what's new in v0.8.27](CHANGELOG.md).
 
-![Field Kit v0.8.26 in Max with the stereo demo and the version beside the title](docs/screenshots/field-kit-v0826-max.png)
+![Field Kit workspace in Max with the stereo demo](docs/screenshots/field-kit-v0826-max.png)
 
 The original demo loads on startup. Click **Play all** to hear it. Open **Source, Input & Files → Demos…** to play **Glass Circuit** (120 BPM), **Tidal Lanterns** (75 BPM), or the original demo. Each new demo uses four equal loop regions and sets the scene tempo to match. Use **Send to** and the **Import to…** button to stage your own sample for a loop or all four. The same drawer holds audio setup, loop recording, and Set files.
+
+In Looper, **Send to Field Kit selected loop** sends the rendered audio to the loop selected in Field Kit. Field Kit receives it when ready, keeps the other loops and playback states, and shows the result in **Source, Input & Files**. A send waits while Field Kit is recording or loading another source. Receiving audio does not enable audio or start stopped loops. [Handoff details and verification](docs/audio-handoff.md).
 
 Choose **Slate**, **Moss**, or **Ember** from the **Theme** menu in the header. Each theme uses related background shades to separate source setup, the mixer, loop controls, effects, and recording.
 

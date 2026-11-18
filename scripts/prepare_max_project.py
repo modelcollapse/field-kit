@@ -31,6 +31,9 @@ RUNTIME_ASSETS = {
         "fk_midi_ports.js": "javascript",
         "fk_midi_targets.js": "javascript",
         "fk_set_writer.js": "javascript",
+        "fk_exchange_node.js": "javascript",
+        "handoff/exchange.js": "javascript",
+        "handoff/max-exchange.js": "javascript",
         "fk_recorder.js": "javascript",
         "fk_patterns.js": "javascript",
         "fk_sequence.js": "javascript",
@@ -94,7 +97,9 @@ def prepare_project(source, destination):
         group_dir.mkdir(parents=True, exist_ok=True)
         contents[group] = {}
         for name, kind in files.items():
-            copy2(source / name, group_dir / name)
+            target = group_dir / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            copy2(source / name, target)
             attributes = {"kind": kind, "local": 1}
             if name == TOP_LEVEL:
                 attributes["toplevel"] = 1

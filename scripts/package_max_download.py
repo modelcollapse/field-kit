@@ -32,6 +32,11 @@ START_HERE = f"""FIELD KIT v{RELEASE_VERSION} for Max
 3. Click Play all to hear the original demo. In Source, Input & Files, open Demos… for Glass Circuit (120 BPM) or Tidal Lanterns (75 BPM), or choose a Send to destination and click the Import to… button for your own sample.
 4. Choose Slate, Moss, or Ember from Theme in the header.
 
+Looper's Send to Field Kit selected loop replaces the loop selected in Field Kit
+when its rendered audio has loaded. Other loops keep their audio and playback
+states. Source, Input & Files shows receive status. A send waits during recording
+or another source operation; receiving does not enable audio or start loops.
+
 In Transport, Speed changes all four loops from half to double speed.
 Relative speed multiplies each loop’s own speed. Same speed plays every loop
 at the displayed speed. Choose Tape to change pitch with speed, or Pitch Lock
@@ -232,6 +237,8 @@ def make_download(source, archive):
         "js fk_source.js": f"js {SUPPORT_PATH}fk_source.js",
         "js fk_patterns.js": f"js {SUPPORT_PATH}fk_patterns.js",
         "js fk_sequence.js": f"js {SUPPORT_PATH}fk_sequence.js",
+        "node.script fk_exchange_node.js @autostart 1":
+            f"node.script {SUPPORT_PATH}fk_exchange_node.js @autostart 1",
         "node.script fk_set_writer.js @autostart 1":
             f"node.script {SUPPORT_PATH}fk_set_writer.js @autostart 1",
         "gen~ fk_voice": f"gen~ @gen {SUPPORT_PATH}fk_voice.gendsp",
